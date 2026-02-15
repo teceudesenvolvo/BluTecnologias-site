@@ -1,82 +1,80 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 
 export const Navbar: React.FC = () => {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const location = useLocation();
-
-  const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'Produtos', path: '/products' },
-    { name: 'Blog', path: '/blog' },
-    { name: 'Admin', path: '/admin' },
-  ];
-
-  const isActive = (path: string) => location.pathname === path;
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white/70 backdrop-blur-lg border border-white/40 rounded-2xl shadow-lg px-6 py-3 flex justify-between items-center">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            {/* Using the provided logo image. Ensure 'logo.png' is in the public folder. */}
-            <img 
-              src="/logo.png" 
-              alt="Blu Tecnologias" 
-              className="h-12 w-auto object-contain group-hover:scale-105 transition-transform rounded-xl" 
-            />
-          </Link>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.path}
-                className={`text-sm font-medium transition-all duration-300 hover:text-blue-600 ${
-                  isActive(link.path) ? 'text-blue-600 font-bold' : 'text-slate-600'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] transition-all hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 active:translate-y-0">
-              Falar com Consultor
-            </button>
+    <nav className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link to="/" className="flex-shrink-0 flex items-center gap-3">
+              <img
+                className="h-10 w-auto rounded-lg"
+                src={logo}
+                alt="Blu Tecnologias"
+              />
+              <span className="font-bold text-xl text-blue-900 tracking-tight">
+                Blu Tecnologias
+              </span>
+            </Link>
+          </div>
+          
+          <div className="hidden md:flex md:items-center md:space-x-8">
+            <Link to="/" className="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Início</Link>
+            <Link to="/products" className="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Soluções</Link>
+            <Link to="/blog" className="text-slate-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Blog</Link>
+            <Link to="/admin" className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-sm">Área do Cliente</Link>
           </div>
 
-          {/* Mobile Toggle */}
-          <button 
-            className="md:hidden text-slate-600"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? <X /> : <Menu />}
-          </button>
+          <div className="flex items-center md:hidden">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-slate-600 hover:text-blue-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+            >
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
-
-        {/* Mobile Menu */}
-        {isOpen && (
-          <div className="absolute top-24 left-6 right-6 bg-white/90 backdrop-blur-xl border border-white/50 rounded-2xl shadow-2xl p-6 flex flex-col gap-4 md:hidden animate-fade-in-down">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.path}
-                onClick={() => setIsOpen(false)}
-                className={`text-lg font-medium ${
-                  isActive(link.path) ? 'text-blue-600' : 'text-slate-600'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-lg">
-              Agendar Demo
-            </button>
-          </div>
-        )}
       </div>
+
+      {isOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            <Link 
+              to="/" 
+              className="block text-slate-600 hover:text-blue-600 hover:bg-slate-50 px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              Início
+            </Link>
+            <Link 
+              to="/products" 
+              className="block text-slate-600 hover:text-blue-600 hover:bg-slate-50 px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              Soluções
+            </Link>
+            <Link 
+              to="/blog" 
+              className="block text-slate-600 hover:text-blue-600 hover:bg-slate-50 px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setIsOpen(false)}
+            >
+              Blog
+            </Link>
+            <Link 
+              to="/admin" 
+              className="block w-full text-left text-blue-600 font-medium hover:bg-blue-50 px-3 py-2 rounded-md text-base"
+              onClick={() => setIsOpen(false)}
+            >
+              Área do Cliente
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
