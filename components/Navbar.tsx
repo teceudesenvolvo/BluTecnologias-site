@@ -8,7 +8,7 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { name: 'Início', path: '/' },
-    { name: 'Produtos', path: '/products' },
+    { name: 'Soluções', path: '/products' },
     { name: 'Novidades', path: '/blog' },
     { name: 'Entrar', path: '/admin' },
   ];

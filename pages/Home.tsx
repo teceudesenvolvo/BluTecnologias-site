@@ -1,95 +1,111 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, Users, MapPin, ThumbsUp, Headphones } from 'lucide-react';
-import { Card3D } from '../components/ui/Card3D';
-import { initialSoftwares } from '../services/mockData';
+import { ChevronRight } from 'lucide-react';
+import { ScrollReveal } from '../components/ScrollReveal';
 
 export const Home: React.FC = () => {
   return (
-    <div className="min-h-screen bg-slate-100">
-      {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-6 overflow-hidden">
-        {/* Background Blobs */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-cyan-400/20 rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10 text-center">
-          <div className="inline-block mb-6 px-4 py-1.5 rounded-full bg-white/50 backdrop-blur-sm border border-white/60 shadow-sm">
-            <span className="text-blue-600 font-semibold text-sm tracking-wide uppercase">
-              GovTech de Alta Performance
-            </span>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-800 mb-8 tracking-tight leading-tight">
-            Transformando a <br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-500">
-              Gestão Pública
-            </span>
-          </h1>
-          
-          <p className="text-xl text-slate-500 max-w-2xl mx-auto mb-12 leading-relaxed">
-            Tecnologia que aproxima o cidadão, moderniza processos e traz transparência para Prefeituras e Câmaras Municipais.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <Link to="/products">
-              <button className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-[0_10px_20px_rgba(37,99,235,0.3)] hover:shadow-[0_15px_30px_rgba(37,99,235,0.4)] hover:-translate-y-1 transition-all flex items-center">
-                Conheça Nossas Soluções
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </button>
+    <div className="bg-white font-sans text-slate-900 pt-14">
+      
+      {/* Hero 1: App da Câmara (Dark Theme - iPhone Pro style) */}
+      <section className="relative h-[85vh] bg-gradient-to-b from-blue-50 to-white text-slate-900 flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden">
+        <ScrollReveal className="z-10 text-center px-6">
+          <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight">App da Câmara</h2>
+          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Cidadania na palma da mão.</p>
+          <div className="flex items-center justify-center gap-8 text-blue-600 text-lg font-medium">
+            <Link to="/products/3" className="hover:underline flex items-center gap-1">
+              Saiba mais <ChevronRight size={18} />
             </Link>
-            <button className="px-8 py-4 bg-white text-slate-700 rounded-2xl font-bold text-lg shadow-[6px_6px_12px_#c5c5c5,-6px_-6px_12px_#ffffff] hover:shadow-[8px_8px_16px_#c5c5c5,-8px_-8px_16px_#ffffff] hover:-translate-y-1 transition-all">
-              Falar com Especialista
-            </button>
+            <Link to="/products/3" className="hover:underline flex items-center gap-1">
+              Baixar <ChevronRight size={18} />
+            </Link>
           </div>
-        </div>
+        </ScrollReveal>
+        {/* Abstract visual for App */}
+        <ScrollReveal delay={200} className="mt-12 w-[280px] md:w-[350px] h-full bg-zinc-900 rounded-t-[3rem] border-t-8 border-x-8 border-zinc-800 shadow-2xl mx-auto relative ring-1 ring-slate-900/5">
+           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-black rounded-b-2xl" />
+           <div className="w-full h-full flex flex-col items-center pt-20 px-4 gap-4">
+              <div className="w-full h-32 bg-zinc-800 rounded-2xl animate-pulse opacity-50"></div>
+              <div className="w-full h-20 bg-zinc-800 rounded-2xl animate-pulse opacity-30"></div>
+              <div className="w-full h-20 bg-zinc-800 rounded-2xl animate-pulse opacity-30"></div>
+           </div>
+        </ScrollReveal>
       </section>
 
-      {/* Stats / Trust Section */}
-      <section className="py-12 bg-white/50 backdrop-blur-sm border-y border-white/50">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div className="p-6">
-            <MapPin className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-            <div className="text-slate-500 font-medium">Cidades Atendidas</div>
+      {/* Hero 2: Portal de Serviços (Light Theme) */}
+      <section className="relative h-[85vh] bg-slate-50 flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-slate-200">
+        <ScrollReveal className="z-10 text-center px-6">
+          <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight text-slate-900">Portal de Serviços</h2>
+          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Eficiência para a gestão.</p>
+          <div className="flex items-center justify-center gap-8 text-blue-600 text-lg font-medium">
+            <Link to="/products/1" className="hover:underline flex items-center gap-1">
+              Saiba mais <ChevronRight size={18} />
+            </Link>
+            <Link to="/products/1" className="hover:underline flex items-center gap-1">
+              Agendar Demo <ChevronRight size={18} />
+            </Link>
           </div>
-          <div className="p-6 border-l border-r border-slate-200/50">
-            <ThumbsUp className="w-12 h-12 text-cyan-500 mx-auto mb-4" />
-            <div className="text-slate-500 font-medium">Aprovação Popular</div>
-          </div>
-          <div className="p-6">
-            <Headphones className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-            <div className="text-slate-500 font-medium">Suporte Especializado</div>
-          </div>
-        </div>
+        </ScrollReveal>
+        {/* Abstract visual */}
+        <ScrollReveal delay={200} className="mt-12 w-[90%] max-w-5xl h-full bg-white rounded-t-2xl shadow-2xl border border-slate-200 mx-auto relative top-10 flex flex-col">
+           {/* Browser window mock */}
+           <div className="h-10 bg-slate-100 border-b border-slate-200 rounded-t-2xl flex items-center px-4 gap-2">
+             <div className="w-3 h-3 rounded-full bg-red-400" />
+             <div className="w-3 h-3 rounded-full bg-yellow-400" />
+             <div className="w-3 h-3 rounded-full bg-green-400" />
+           </div>
+           <div className="flex-1 bg-slate-50 p-8 grid grid-cols-3 gap-4">
+              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
+              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
+              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
+              <div className="col-span-2 h-64 bg-white rounded-xl shadow-sm"></div>
+              <div className="col-span-1 h-64 bg-white rounded-xl shadow-sm"></div>
+           </div>
+        </ScrollReveal>
       </section>
 
-      {/* Featured Products Preview */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Ecossistema Blu</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">
-              Soluções integradas desenhadas especificamente para as necessidades do setor público brasileiro.
-            </p>
+      {/* Hero 3: Portal Legislativo */}
+      <section className="relative h-[85vh] bg-white flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-slate-200">
+         <ScrollReveal className="z-10 text-center px-6">
+          <div className="mb-4">
+             <span className="text-orange-600 font-bold tracking-wider text-xs uppercase">Novo</span>
           </div>
+          <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight text-slate-900">Portal do Legislativo</h2>
+          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Transparência total.</p>
+          <div className="flex items-center justify-center gap-8 text-blue-600 text-lg font-medium">
+            <Link to="/products/2" className="hover:underline flex items-center gap-1">
+              Saiba mais <ChevronRight size={18} />
+            </Link>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-3xl aspect-video">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-orange-50 rounded-3xl blur-2xl opacity-60 transform rotate-3 scale-95"></div>
+            <div className="absolute inset-0 bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center">
+                <span className="text-slate-300 font-bold text-4xl">Ao Vivo</span>
+            </div>
+        </ScrollReveal>
+      </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {initialSoftwares.slice(0, 3).map((software) => (
-              <Card3D
-                key={software.id}
-                title={software.nome_produto}
-                description={software.descricao_venda}
-                features={software.features}
-                icon={
-                  software.icone_3d === 'LayoutDashboard' ? <Zap className="w-8 h-8" /> :
-                  software.icone_3d === 'Landmark' ? <ShieldCheck className="w-8 h-8" /> :
-                  <Users className="w-8 h-8" />
-                }
-              />
-            ))}
-          </div>
+      {/* Grid Section for Blog/News */}
+      <section className="py-6 px-6 bg-white">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+           {/* Card 1 */}
+           <ScrollReveal className="h-full">
+             <div className="bg-slate-50 h-[500px] rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.01] duration-500">
+                <h3 className="text-4xl font-bold mb-4 z-10 text-slate-900">Blog Blu</h3>
+                <p className="text-xl text-slate-500 mb-6 z-10">Fique por dentro das novidades.</p>
+                <Link to="/blog" className="text-blue-600 hover:underline z-10 flex items-center gap-1 font-medium">Ler artigos <ChevronRight size={16}/></Link>
+             </div>
+           </ScrollReveal>
+           
+           {/* Card 2 */}
+           <ScrollReveal delay={200} className="h-full">
+             <div className="bg-black text-white h-[500px] rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.01] duration-500">
+                <h3 className="text-4xl font-bold mb-4 z-10">Área do Cliente</h3>
+                <p className="text-xl text-slate-400 mb-6 z-10">Gerencie seus produtos.</p>
+                <Link to="/admin" className="text-blue-400 hover:underline z-10 flex items-center gap-1 font-medium">Acessar <ChevronRight size={16}/></Link>
+             </div>
+           </ScrollReveal>
         </div>
       </section>
     </div>
