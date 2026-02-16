@@ -2,6 +2,10 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { ScrollReveal } from '../components/ScrollReveal';
+import AppCamaraImg from '../assets/HomeAppCamara.png';
+import PortalServicosImg from '../assets/DashPortalServicos.png';
+import PortalLegislativoImg from '../assets/PortalLegis.png';
+import BluEscolarImg from '../assets/BluEscolar-Dash.png';
 
 export const Home: React.FC = () => {
   return (
@@ -11,24 +15,19 @@ export const Home: React.FC = () => {
       <section className="relative h-[85vh] bg-gradient-to-b from-blue-50 to-white text-slate-900 flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden">
         <ScrollReveal className="z-10 text-center px-6">
           <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight">App da Câmara</h2>
-          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Cidadania na palma da mão.</p>
+          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Um canal direto com o cidadão.</p>
           <div className="flex items-center justify-center gap-8 text-blue-600 text-lg font-medium">
             <Link to="/products/3" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
-            <Link to="/products/3" className="hover:underline flex items-center gap-1">
-              Baixar <ChevronRight size={18} />
+            <Link to="/products/1" className="hover:underline flex items-center gap-1">
+              Agendar Demo <ChevronRight size={18} />
             </Link>
           </div>
         </ScrollReveal>
         {/* Abstract visual for App */}
-        <ScrollReveal delay={200} className="mt-12 w-[280px] md:w-[350px] h-full bg-zinc-900 rounded-t-[3rem] border-t-8 border-x-8 border-zinc-800 shadow-2xl mx-auto relative ring-1 ring-slate-900/5">
-           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-black rounded-b-2xl" />
-           <div className="w-full h-full flex flex-col items-center pt-20 px-4 gap-4">
-              <div className="w-full h-32 bg-zinc-800 rounded-2xl animate-pulse opacity-50"></div>
-              <div className="w-full h-20 bg-zinc-800 rounded-2xl animate-pulse opacity-30"></div>
-              <div className="w-full h-20 bg-zinc-800 rounded-2xl animate-pulse opacity-30"></div>
-           </div>
+        <ScrollReveal delay={200} className="mt-12 w-[280px] md:w-[350px] h-full bg-zinc-900 rounded-t-[3rem] border-t-8 border-x-8 border-zinc-800 shadow-2xl mx-auto relative ring-1 ring-slate-900/5 overflow-hidden">
+           <img src={AppCamaraImg} alt="Demonstração do App da Câmara" className="w-full h-full object-cover object-top" />
         </ScrollReveal>
       </section>
 
@@ -47,20 +46,14 @@ export const Home: React.FC = () => {
           </div>
         </ScrollReveal>
         {/* Abstract visual */}
-        <ScrollReveal delay={200} className="mt-12 w-[90%] max-w-5xl h-full bg-white rounded-t-2xl shadow-2xl border border-slate-200 mx-auto relative top-10 flex flex-col">
+        <ScrollReveal delay={200} className="mt-12 w-[90%] max-w-5xl h-full bg-white rounded-t-2xl shadow-2xl border border-slate-200 mx-auto relative top-10 flex flex-col overflow-hidden">
            {/* Browser window mock */}
-           <div className="h-10 bg-slate-100 border-b border-slate-200 rounded-t-2xl flex items-center px-4 gap-2">
+           <div className="h-10 bg-slate-100 border-b border-slate-200 rounded-t-2xl flex items-center px-4 gap-2 flex-shrink-0">
              <div className="w-3 h-3 rounded-full bg-red-400" />
              <div className="w-3 h-3 rounded-full bg-yellow-400" />
              <div className="w-3 h-3 rounded-full bg-green-400" />
            </div>
-           <div className="flex-1 bg-slate-50 p-8 grid grid-cols-3 gap-4">
-              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
-              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
-              <div className="col-span-1 h-40 bg-white rounded-xl shadow-sm"></div>
-              <div className="col-span-2 h-64 bg-white rounded-xl shadow-sm"></div>
-              <div className="col-span-1 h-64 bg-white rounded-xl shadow-sm"></div>
-           </div>
+           <img src={PortalServicosImg} alt="Demonstração do Portal de Serviços" className="w-full h-full object-cover object-top" />
         </ScrollReveal>
       </section>
 
@@ -78,11 +71,32 @@ export const Home: React.FC = () => {
             </Link>
           </div>
         </ScrollReveal>
-        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-3xl aspect-video">
-            <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-orange-50 rounded-3xl blur-2xl opacity-60 transform rotate-3 scale-95"></div>
-            <div className="absolute inset-0 bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center">
-                <span className="text-slate-300 font-bold text-4xl">Ao Vivo</span>
+        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-4xl">
+            <div className="absolute -inset-4 bg-gradient-to-tr from-blue-100 to-orange-50 rounded-3xl blur-2xl opacity-60 transform rotate-3 scale-95"></div>
+            <img src={PortalLegislativoImg} alt="Demonstração do Portal do Legislativo" className="relative w-full rounded-2xl shadow-2xl border border-slate-100" />
+        </ScrollReveal>
+      </section>
+
+      {/* Hero 4: Blu Escolar */}
+      <section className="relative h-[85vh] bg-indigo-600 text-white flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-indigo-500">
+         <ScrollReveal className="z-10 text-center px-6">
+          <div className="mb-4">
+             <span className="bg-white/20 text-white font-bold tracking-wider text-xs uppercase px-3 py-1 rounded-full">Educação</span>
+          </div>
+          <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight">Blu Escolar</h2>
+          <p className="text-2xl md:text-3xl font-medium text-indigo-100 mb-8">Gestão educacional inteligente.</p>
+          <div className="flex items-center justify-center gap-8 text-white text-lg font-medium">
+            <Link to="/products/4" className="hover:underline flex items-center gap-1">
+              Saiba mais <ChevronRight size={18} />
+            </Link>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-4xl aspect-[16/9] bg-white rounded-t-3xl shadow-2xl border-t-8 border-x-8 border-white/10 mx-auto top-10 overflow-hidden flex flex-col">
+            <div className="h-12 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2 flex-shrink-0">
+               <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+               <div className="w-3 h-3 rounded-full bg-slate-300"></div>
             </div>
+            <img src={BluEscolarImg} />
         </ScrollReveal>
       </section>
 

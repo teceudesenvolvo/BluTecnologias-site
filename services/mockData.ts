@@ -4,7 +4,7 @@ export const initialSoftwares: Software[] = [
   {
     id: '1',
     nome_produto: 'Portal de Serviços',
-    descricao_venda: 'Centralize todos os serviços públicos em um único lugar. Agilidade para o cidadão, eficiência para a gestão.',
+    descricao_venda: 'Otimize a prestação de serviços e reduza custos. Uma plataforma única para centralizar o atendimento ao cidadão e digitalizar processos.',
     icone_3d: 'LayoutDashboard',
     link_demo: '#',
     features: ['Emissão de Guias', 'Protocolo Digital', 'Consulta de Processos']
@@ -12,7 +12,7 @@ export const initialSoftwares: Software[] = [
   {
     id: '2',
     nome_produto: 'Portal do Legislativo',
-    descricao_venda: 'Transparência total para as Câmaras Municipais. Sessões ao vivo, pautas digitais e votação eletrônica.',
+    descricao_venda: 'Modernize a gestão legislativa e cumpra as leis de transparência com facilidade. Ofereça sessões ao vivo, pautas digitais e votação eletrônica segura.',
     icone_3d: 'Landmark',
     link_demo: '#',
     features: ['Transmissão Ao Vivo', 'Gestão de Pautas', 'Portal da Transparência']
@@ -20,10 +20,18 @@ export const initialSoftwares: Software[] = [
   {
     id: '3',
     nome_produto: 'App da Câmara',
-    descricao_venda: 'O legislativo na palma da mão do cidadão. Inclui módulos exclusivos para PROCON e Procuradoria da Mulher.',
+    descricao_venda: 'Engaje o cidadão e fortaleça o mandato. Um canal direto de comunicação que oferece dados valiosos para a tomada de decisão e inclui módulos de serviços essenciais.',
     icone_3d: 'Smartphone',
     link_demo: '#',
     features: ['Denúncias PROCON', 'Apoio à Mulher', 'Notificações Push']
+  },
+  {
+    id: '4',
+    nome_produto: 'Blu Escolar',
+    descricao_venda: 'Modernize a gestão educacional do seu município. Matrículas 100% online, diário de classe digital e controle de frequência em tempo real.',
+    icone_3d: 'GraduationCap',
+    link_demo: '#',
+    features: ['Matrícula Online', 'Diário Digital', 'Gestão de Transportes']
   }
 ];
 

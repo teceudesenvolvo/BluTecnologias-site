@@ -11,7 +11,8 @@ import {
   Star,
   Shield,
   Zap,
-  Globe
+  Globe,
+  GraduationCap
 } from 'lucide-react';
 
 export const ProductDetails: React.FC = () => {
@@ -38,6 +39,7 @@ export const ProductDetails: React.FC = () => {
       case 'LayoutDashboard': return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
       case 'Landmark': return <Landmark className="w-full h-full" strokeWidth={1} />;
       case 'Smartphone': return <Smartphone className="w-full h-full" strokeWidth={1} />;
+      case 'GraduationCap': return <GraduationCap className="w-full h-full" strokeWidth={1} />;
       default: return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
     }
   };

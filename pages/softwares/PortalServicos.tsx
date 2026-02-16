@@ -93,7 +93,7 @@ export const PortalServicos: React.FC = () => {
               <div className="relative z-10">
                 <h3 className="text-3xl font-bold mb-4">Atendimento Digital</h3>
                 <p className="text-gray-400 text-lg max-w-md">
-                  Reduza filas e burocracia permitindo que o cidadão solicite serviços diretamente de casa.
+                  Ofereça um portal intuitivo onde o cidadão pode emitir guias, solicitar certidões, protocolar documentos e consultar processos 24/7, sem precisar se deslocar até a prefeitura.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-3/4 h-3/4 bg-gradient-to-tl from-blue-600/20 to-transparent rounded-tl-full opacity-50 group-hover:opacity-70 transition-opacity" />
@@ -102,8 +102,10 @@ export const PortalServicos: React.FC = () => {
             <div className="col-span-1 md:col-span-2 bg-[#1a1a1a] rounded-[2rem] p-10 flex flex-col justify-between hover:bg-[#202020] transition-colors duration-500">
               <div>
                 <Zap className="w-12 h-12 text-blue-500 mb-6" />
-                <h3 className="text-2xl font-bold mb-3">Rápido</h3>
-                <p className="text-gray-400">Processos automatizados.</p>
+                <h3 className="text-2xl font-bold mb-3">Fluxos Inteligentes</h3>
+                <p className="text-gray-400">
+                  Configure processos automatizados que direcionam cada solicitação para o setor responsável, com prazos e alertas de SLA.
+                </p>
               </div>
             </div>
           </div>

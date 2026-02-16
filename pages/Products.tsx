@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { initialSoftwares } from '../services/mockData';
-import { LayoutDashboard, Landmark, Smartphone, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Landmark, Smartphone, ChevronRight, GraduationCap } from 'lucide-react';
 
 export const Products: React.FC = () => {
   const getIcon = (iconName: string) => {
@@ -9,6 +9,7 @@ export const Products: React.FC = () => {
       case 'LayoutDashboard': return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
       case 'Landmark': return <Landmark className="w-full h-full" strokeWidth={1} />;
       case 'Smartphone': return <Smartphone className="w-full h-full" strokeWidth={1} />;
+      case 'GraduationCap': return <GraduationCap className="w-full h-full" strokeWidth={1} />;
       default: return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
     }
   };

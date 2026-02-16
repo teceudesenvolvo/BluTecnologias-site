@@ -56,20 +56,20 @@ export const AppCamara: React.FC = () => {
           
           <h1 className="text-6xl md:text-8xl font-bold tracking-tight mb-6">
             <span className="block text-slate-900 leading-tight">
-              A Câmara Municipal <br/> na palma da sua mão.
+              Aproxime sua gestão <br/> dos cidadãos.
             </span>
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-500 max-w-3xl mx-auto leading-relaxed mt-8 font-medium">
-            Mais do que um aplicativo, uma ferramenta de cidadania. Registre demandas, fale com vereadores e acesse serviços essenciais com apenas um toque.
+            Ofereça aos seus cidadãos uma ferramenta poderosa para participação e acesso a serviços, enquanto sua gestão ganha dados estratégicos e otimiza o atendimento.
           </p>
 
           <div className="mt-12 flex justify-center gap-4">
              <button className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-slate-200 flex items-center gap-2">
-               <Download size={20} /> Baixar Agora
+               <Calendar size={20} /> Agendar Demonstração
              </button>
              <a href="#features" className="text-blue-600 hover:text-blue-700 px-8 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-all hover:bg-blue-50">
-               Conheça os Serviços <ChevronRight size={20} />
+               Conheça as Funcionalidades <ChevronRight size={20} />
              </a>
           </div>
 
@@ -107,10 +107,10 @@ export const AppCamara: React.FC = () => {
             <AlertTriangle size={32} />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
-            Cansado da burocracia para ser ouvido?
+            Sua gestão está realmente ouvindo o cidadão?
           </h2>
           <p className="text-xl text-slate-600 leading-relaxed">
-            Sabemos que, muitas vezes, o caminho até o poder público parece distante. Filas, protocolos perdidos e a falta de retorno desanimam quem quer melhorar a cidade. O nosso app nasceu para acabar com essa barreira.
+            Processos em papel, demandas perdidas e falta de dados estruturados dificultam uma gestão responsiva e eficiente. A distância entre o gabinete e o cidadão gera desconfiança e sobrecarrega o atendimento presencial.
           </p>
         </div>
       </section>
@@ -127,7 +127,7 @@ export const AppCamara: React.FC = () => {
               <span className="text-blue-600">quem decide.</span>
             </h2>
             <p className="text-lg text-slate-500 mb-8 leading-relaxed">
-              Criamos uma ponte digital segura e transparente. Agora, a distância entre a sua sugestão e a ação do vereador é de apenas alguns cliques. Transformamos a participação política em algo simples, rápido e moderno.
+              Nossa plataforma cria uma ponte digital segura e transparente entre o cidadão e o legislativo. Transforme a participação política em uma fonte de dados para uma governança mais inteligente e assertiva.
             </p>
             <div className="flex gap-4">
               <div className="flex items-center gap-2 text-slate-700 font-medium">
@@ -174,7 +174,7 @@ export const AppCamara: React.FC = () => {
                 </div>
                 <h3 className="text-3xl font-bold mb-4 text-white">Ouvidoria Digital</h3>
                 <p className="text-slate-400 text-lg max-w-lg">
-                  Sua voz com protocolo e resposta. Registre denúncias de buracos, iluminação ou saneamento. Anexe fotos, use o GPS do celular para marcar o local exato e acompanhe o andamento em tempo real.
+                  Centralize e gerencie todas as demandas da ouvidoria. O cidadão registra ocorrências com geolocalização e fotos, e o gestor acompanha tudo através de dashboards, SLAs e relatórios de desempenho.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-64 h-64 bg-gradient-to-tl from-blue-600/20 to-transparent rounded-tl-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
@@ -185,7 +185,7 @@ export const AppCamara: React.FC = () => {
                <div>
                  <ShoppingBag className="w-12 h-12 text-orange-500 mb-6" />
                  <h3 className="text-2xl font-bold mb-2 text-white">Procon na Mão</h3>
-                 <p className="text-slate-400">Defenda seus direitos. Abra reclamações, envie notas fiscais e documentos sem sair de casa.</p>
+                 <p className="text-slate-400">Digitalize o atendimento do PROCON, permitindo que cidadãos abram reclamações e enviem documentos online, reduzindo o fluxo presencial.</p>
                </div>
             </div>
 
@@ -193,7 +193,7 @@ export const AppCamara: React.FC = () => {
             <div className="col-span-1 bg-slate-800 rounded-3xl p-10 border border-slate-700 hover:bg-slate-750 transition-all group">
                <HeartHandshake className="w-12 h-12 text-pink-500 mb-6" />
                <h3 className="text-2xl font-bold mb-2 text-white">Procuradoria da Mulher</h3>
-               <p className="text-slate-400">Canal de apoio e proteção. Denúncias seguras e "Botão de Emergência" para situações de risco.</p>
+               <p className="text-slate-400">Ofereça um canal de apoio com denúncias seguras e "Botão de Emergência", garantindo sigilo e agilidade no atendimento.</p>
             </div>
 
             {/* 7. Agendamento de Gabinetes */}
@@ -204,7 +204,7 @@ export const AppCamara: React.FC = () => {
                  </div>
                  <h3 className="text-3xl font-bold mb-4 text-white">Agendamento de Gabinetes</h3>
                  <p className="text-slate-400 text-lg max-w-lg">
-                   Marque uma conversa com seu Vereador. Chega de tentativas frustradas. Escolha o parlamentar, veja os horários e agende sua reunião presencial ou virtual.
+                   Otimize a agenda dos gabinetes. O sistema permite que os cidadãos solicitem e agendem reuniões de forma organizada, liberando a equipe para focar em atividades estratégicas.
                  </p>
                </div>
                <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-green-600/20 rounded-full blur-3xl group-hover:bg-green-600/30 transition-colors duration-500"></div>
@@ -216,7 +216,7 @@ export const AppCamara: React.FC = () => {
                  <Tv className="w-16 h-16 text-blue-400 mb-6" />
                  <h3 className="text-3xl font-bold mb-4 text-white">TV Câmara e Transparência</h3>
                  <p className="text-slate-300 text-lg max-w-2xl">
-                   Acompanhe as sessões ao vivo. Assista ao que está sendo votado hoje, tenha acesso ao histórico de leis e veja exatamente como cada vereador está trabalhando.
+                   Cumpra a lei de acesso à informação com excelência. Transmita sessões ao vivo e disponibilize um arquivo completo de leis, projetos e votações, integrado ao perfil de cada parlamentar.
                  </p>
                </div>
             </div>
@@ -227,13 +227,13 @@ export const AppCamara: React.FC = () => {
       {/* 9. Como Funciona (Passo a Passo) */}
       <section className="py-32 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">Começar é muito simples</h2>
+          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">Como implementar na sua cidade</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
-              { icon: Download, title: "Baixe o App", desc: "Disponível para iOS e Android." },
-              { icon: UserCheck, title: "Faça seu Cadastro", desc: "Use o Gov.br ou e-mail para acesso seguro." },
-              { icon: MousePointerClick, title: "Escolha o Serviço", desc: "Selecione o que você precisa no menu." },
-              { icon: Bell, title: "Acompanhe", desc: "Receba notificações sobre cada atualização." }
+              { icon: MousePointerClick, title: "Implantação Rápida", desc: "Nossa equipe configura e personaliza o app para a sua Câmara." },
+              { icon: UserCheck, title: "Treinamento e Suporte", desc: "Capacitamos sua equipe para gerenciar a plataforma e extrair o máximo de insights." },
+              { icon: Users, title: "Divulgação para Cidadãos", desc: "Fornecemos material de campanha para engajar a população a usar o novo canal." },
+              { icon: BarChart3, title: "Análise de Dados", desc: "Acompanhe os resultados através de relatórios e dashboards inteligentes." }
             ].map((step, i) => (
               <div key={i} className="flex flex-col items-center text-center">
                 <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-6">
@@ -250,19 +250,19 @@ export const AppCamara: React.FC = () => {
       {/* 10. Benefícios para a Cidade */}
       <section className="py-32 px-6 bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">Por que usar o aplicativo?</h2>
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">Vantagens para a Gestão Pública</h2>
         </div>
         
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
               <Zap className="w-12 h-12 text-yellow-500 mx-auto mb-6" />
               <h3 className="text-xl font-bold text-slate-900 mb-3">Agilidade</h3>
-              <p className="text-slate-500">Processos digitais são 5x mais rápidos que o papel.</p>
+              <p className="text-slate-500">Reduza o tempo de resposta ao cidadão com processos e fluxos automatizados.</p>
            </div>
            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
               <Eye className="w-12 h-12 text-blue-600 mx-auto mb-6" />
               <h3 className="text-xl font-bold text-slate-900 mb-3">Transparência</h3>
-              <p className="text-slate-500">Você sabe exatamente quem está cuidando da sua demanda.</p>
+              <p className="text-slate-500">O cidadão acompanha o status de suas solicitações, aumentando a confiança na gestão.</p>
            </div>
            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
               <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-6" />
@@ -275,23 +275,23 @@ export const AppCamara: React.FC = () => {
       {/* 11. Depoimentos (Prova Social) */}
       <section className="py-32 px-6 bg-white">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">O que dizem os cidadãos</h2>
+          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">O que dizem os gestores</h2>
           <div className="grid gap-8 md:grid-cols-2">
             <div className="bg-slate-50 p-8 rounded-3xl relative">
               <Quote className="absolute top-6 left-6 text-blue-200 w-10 h-10" />
               <p className="text-slate-700 italic mb-6 relative z-10 pt-6">
-                "Finalmente consegui resolver o problema da iluminação na minha rua. O protocolo pelo app realmente funciona!"
+                "Com o App, centralizamos a ouvidoria e reduzimos o tempo de resposta em 60%. Os relatórios nos dão uma visão clara dos principais problemas da cidade."
               </p>
-              <div className="font-bold text-slate-900">– Maria Silva</div>
-              <div className="text-sm text-slate-500">Bairro Centro</div>
+              <div className="font-bold text-slate-900">– Prefeito de Cidade Exemplo</div>
+              <div className="text-sm text-slate-500">Cliente Blu</div>
             </div>
             <div className="bg-slate-50 p-8 rounded-3xl relative">
               <Quote className="absolute top-6 left-6 text-blue-200 w-10 h-10" />
               <p className="text-slate-700 italic mb-6 relative z-10 pt-6">
-                "Poder agendar o Procon pelo celular me poupou uma manhã inteira de trabalho."
+                "A funcionalidade da Procuradoria da Mulher foi um marco. Conseguimos oferecer um canal seguro e eficiente, que era uma demanda antiga da nossa comunidade."
               </p>
-              <div className="font-bold text-slate-900">– João Santos</div>
-              <div className="text-sm text-slate-500">Bairro Vila Nova</div>
+              <div className="font-bold text-slate-900">– Vereadora de Vila Nova</div>
+              <div className="text-sm text-slate-500">Cliente Blu</div>
             </div>
           </div>
         </div>
@@ -319,9 +319,9 @@ export const AppCamara: React.FC = () => {
           <h2 className="text-3xl font-bold text-center mb-12 text-slate-900">Dúvidas comuns</h2>
           <div className="space-y-6">
             {[
-              { q: "O app é gratuito?", a: "Sim, totalmente gratuito para o cidadão." },
-              { q: "Preciso ir à Câmara validar meu cadastro?", a: "Não, a validação é feita digitalmente." },
-              { q: "Posso acompanhar pedidos de outras pessoas?", a: "Você pode ver as demandas públicas no mapa de transparência, mas seus dados privados são sigilosos." }
+              { q: "Qual o modelo de contratação?", a: "Nossas soluções são contratadas através de uma assinatura anual (SaaS), que inclui implantação, treinamento, suporte e atualizações contínuas." },
+              { q: "A implantação exige uma equipe de TI dedicada?", a: "Não. Nossa plataforma é 100% em nuvem e nossa equipe cuida de toda a configuração. Sua equipe precisará apenas de um treinamento básico para operar o painel de gestão." },
+              { q: "Como os dados dos cidadãos são protegidos?", a: "Operamos em total conformidade com a LGPD. Todos os dados são criptografados e o acesso às informações é controlado por níveis de permissão, garantindo sigilo e segurança." }
             ].map((item, i) => (
               <div key={i} className="border-b border-slate-100 pb-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
@@ -337,7 +337,7 @@ export const AppCamara: React.FC = () => {
       {/* 14. Números de Impacto */}
       <section className="py-24 px-6 bg-blue-600 text-white">
         <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-12">Resultados da nossa transparência</h2>
+          <h2 className="text-3xl font-bold mb-12">Resultados que sua gestão pode alcançar</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6">
               <div className="text-5xl font-bold mb-2">+500</div>
@@ -358,14 +358,11 @@ export const AppCamara: React.FC = () => {
       {/* Footer CTA Final */}
       <section id="download" className="py-32 px-6 bg-slate-50 text-center">
         <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-8">
-          Pronto para exercer sua cidadania?
+          Pronto para transformar sua gestão?
         </h2>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
           <button className="px-10 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-3">
-            <Smartphone size={24} /> Baixar para iOS
-          </button>
-          <button className="px-10 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-3">
-            <Smartphone size={24} /> Baixar para Android
+            <Calendar size={24} /> Agendar uma Demonstração
           </button>
         </div>
       </section>

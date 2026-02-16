@@ -87,7 +87,7 @@ export const PortalLegislativo: React.FC = () => {
               <div className="relative z-10">
                 <h3 className="text-3xl font-bold mb-4">Sessões ao Vivo</h3>
                 <p className="text-gray-400 text-lg max-w-md">
-                  Transmissão e arquivamento de sessões plenárias com indexação automática de pautas.
+                  Transmita e arquive todas as sessões plenárias com qualidade HD. A plataforma indexa automaticamente as pautas e falas, facilitando a consulta pelo cidadão e imprensa.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-3/4 h-3/4 bg-gradient-to-tl from-blue-600/20 to-transparent rounded-tl-full opacity-50 group-hover:opacity-70 transition-opacity" />
@@ -96,8 +96,10 @@ export const PortalLegislativo: React.FC = () => {
             <div className="col-span-1 md:col-span-2 bg-[#1a1a1a] rounded-[2rem] p-10 flex flex-col justify-between hover:bg-[#202020] transition-colors duration-500">
               <div>
                 <Shield className="w-12 h-12 text-blue-500 mb-6" />
-                <h3 className="text-2xl font-bold mb-3">Seguro</h3>
-                <p className="text-gray-400">Votação eletrônica auditável.</p>
+                <h3 className="text-2xl font-bold mb-3">Processo Legislativo Digital</h3>
+                <p className="text-gray-400">
+                  Gerencie projetos de lei, indicações e requerimentos de forma 100% digital, desde o protocolo pelo vereador até a votação eletrônica em plenário.
+                </p>
               </div>
             </div>
           </div>
