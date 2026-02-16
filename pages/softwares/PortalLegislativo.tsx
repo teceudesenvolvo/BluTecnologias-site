@@ -84,9 +84,9 @@ export const PortalLegislativo: React.FC = () => {
             <button className="px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2">
               <Download size={20} /> Baixar o App
             </button>
-            <button className="px-8 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+            <Link to="/contact" className="px-8 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
               <Play size={20} /> Demo Parlamentar
-            </button>
+            </Link>
           </div>
         </ScrollReveal>
 
@@ -157,7 +157,7 @@ export const PortalLegislativo: React.FC = () => {
                 <div>
                     <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">O Cidadão no Centro</h2>
                     <p className="text-xl text-slate-400 mb-8">
-                        Uma interface intuitiva que coloca a Câmara no bolso do cidadão.
+                        Uma interface intuitiva em React Native que coloca a Câmara no bolso do cidadão.
                     </p>
                     <div className="space-y-6">
                         <div className="flex gap-4">
@@ -346,9 +346,9 @@ export const PortalLegislativo: React.FC = () => {
             <div className="text-center border-t border-slate-800 pt-16">
                 <h2 className="text-3xl md:text-4xl font-bold mb-8">Pronto para o futuro?</h2>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                    <button className="px-10 py-4 bg-green-600 text-white rounded-full font-bold text-lg hover:bg-green-700 transition-all shadow-xl flex items-center gap-3">
+                    <Link to="/contact" className="px-10 py-4 bg-green-600 text-white rounded-full font-bold text-lg hover:bg-green-700 transition-all shadow-xl flex items-center gap-3">
                         <Phone size={24} /> Fale com Consultores
-                    </button>
+                    </Link>
                 </div>
             </div>
         </div>

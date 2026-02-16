@@ -11,6 +11,8 @@ import { PortalLegislativo } from './pages/softwares/PortalLegislativo';
 import { AppCamara } from './pages/softwares/AppCamara';
 import { Login } from './pages/Login';
 import { BluEscolar } from './pages/softwares/BluEscolar';
+import { Contact } from './pages/Contact';
+import { ProductDetails } from './pages/softwares/ProductDetails';
 
 const App: React.FC = () => {
   return (
@@ -25,9 +27,11 @@ const App: React.FC = () => {
             <Route path="/products/2" element={<PortalLegislativo />} />
             <Route path="/products/3" element={<AppCamara />} />
             <Route path="/products/4" element={<BluEscolar />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/contact" element={<Contact />} />
           </Routes>
         </main>
         <Footer />

@@ -41,9 +41,9 @@ export const Navbar: React.FC = () => {
                 {link.name}
               </Link>
             ))}
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] transition-all hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 active:translate-y-0">
+            <Link to="/contact" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] transition-all hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 active:translate-y-0">
               Fale com a gente
-            </button>
+            </Link>
           </div>
 
           {/* Mobile Toggle */}
@@ -70,9 +70,9 @@ export const Navbar: React.FC = () => {
                 {link.name}
               </Link>
             ))}
-            <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-lg">
+            <Link to="/contact" className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-lg text-center">
               Agendar Demo
-            </button>
+            </Link>
           </div>
         )}
       </div>

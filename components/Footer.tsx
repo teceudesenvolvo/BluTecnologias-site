@@ -29,6 +29,7 @@ export const Footer: React.FC = () => {
             <h4 className="font-bold text-slate-800 mb-4">Empresa</h4>
             <ul className="space-y-2 text-sm text-slate-500">
               <li><Link to="/blog" className="hover:text-blue-600">Blog</Link></li>
+              <li><Link to="/contact" className="hover:text-blue-600">Fale Conosco</Link></li>
               <li><a href="#" className="hover:text-blue-600">Sobre Nós</a></li>
               <li><a href="#" className="hover:text-blue-600">Carreiras</a></li>
             </ul>
@@ -37,9 +38,8 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-bold text-slate-800 mb-4">Contato</h4>
             <ul className="space-y-2 text-sm text-slate-500">
-              <li>contato@blutec.com.br</li>
-              <li>0800 123 4567</li>
-              <li>Brasília, DF</li>
+              <li>contato@blutecnologias.com.br</li>
+              <li>Fortaleza, CE</li>
             </ul>
           </div>
         </div>

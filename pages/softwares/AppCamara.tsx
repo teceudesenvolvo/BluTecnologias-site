@@ -67,9 +67,9 @@ export const AppCamara: React.FC = () => {
           </p>
 
           <div className="mt-12 flex justify-center gap-4">
-             <button className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-slate-200 flex items-center gap-2">
+             <Link to="/contact" className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold text-lg transition-all shadow-lg hover:shadow-slate-200 flex items-center gap-2">
                <Calendar size={20} /> Agendar Demonstração
-             </button>
+             </Link>
              <a href="#features" className="text-blue-600 hover:text-blue-700 px-8 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-all hover:bg-blue-50">
                Conheça as Funcionalidades <ChevronRight size={20} />
              </a>
@@ -387,9 +387,9 @@ export const AppCamara: React.FC = () => {
           Pronto para transformar sua gestão?
         </h2>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <button className="px-10 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-3">
+          <Link to="/contact" className="px-10 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-3">
             <Calendar size={24} /> Agendar uma Demonstração
-          </button>
+          </Link>
         </div>
       </section>
     </div>

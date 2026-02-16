@@ -187,9 +187,9 @@ export const ProductDetails: React.FC = () => {
             Modernize sua gestão.
           </h2>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <button className="px-10 py-4 bg-blue-600 text-white rounded-full font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-600/30">
+            <Link to="/contact" className="px-10 py-4 bg-blue-600 text-white rounded-full font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-600/30">
               Solicitar Orçamento
-            </button>
+            </Link>
             <Link to="/products" className="px-10 py-4 text-slate-600 font-bold text-lg hover:bg-slate-50 rounded-full transition-all flex items-center">
               Ver todos os produtos <ChevronRight className="w-5 h-5 ml-1" />
             </Link>

@@ -20,7 +20,7 @@ export const Home: React.FC = () => {
             <Link to="/products/3" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
-            <Link to="/products/1" className="hover:underline flex items-center gap-1">
+            <Link to="/contact" className="hover:underline flex items-center gap-1">
               Agendar Demo <ChevronRight size={18} />
             </Link>
           </div>
@@ -40,7 +40,7 @@ export const Home: React.FC = () => {
             <Link to="/products/1" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
-            <Link to="/products/1" className="hover:underline flex items-center gap-1">
+            <Link to="/contact" className="hover:underline flex items-center gap-1">
               Agendar Demo <ChevronRight size={18} />
             </Link>
           </div>
@@ -89,6 +89,9 @@ export const Home: React.FC = () => {
             <Link to="/products/4" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
+            <Link to="/contact" className="hover:underline flex items-center gap-1">
+              Agendar Demo <ChevronRight size={18} />
+            </Link>
           </div>
         </ScrollReveal>
         <ScrollReveal delay={200} className="mt-12 relative w-full max-w-4xl aspect-[16/9] bg-white rounded-t-3xl shadow-2xl border-t-8 border-x-8 border-slate-200 mx-auto top-10 overflow-hidden flex flex-col">
@@ -96,7 +99,7 @@ export const Home: React.FC = () => {
                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
             </div>
-            <img src={BluEscolarImg} />
+            <img src={BluEscolarImg} alt="Demonstração do Blu Escolar" className="w-full h-full object-cover object-top" />
         </ScrollReveal>
       </section>
 

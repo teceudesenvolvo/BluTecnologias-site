@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Smartphone, 
   MapPin, 
@@ -22,7 +23,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { ScrollReveal } from '../../components/ScrollReveal';
-import BluEscolarImg from '../../assets/dashBluEscolar.png';
+import BluEscolarImg from '../../assets/dashBluEscolar.png'; // Certifique-se que esta imagem existe
 
 export const BluEscolar: React.FC = () => {
   useEffect(() => {
@@ -32,8 +33,6 @@ export const BluEscolar: React.FC = () => {
   return (
     <div className="bg-white text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pt-14">
       
-      
-
       {/* 1. O Despertar (Hero) */}
       <section id="overview" className="pt-32 pb-20 px-6 text-center">
         <ScrollReveal>
@@ -243,9 +242,9 @@ export const BluEscolar: React.FC = () => {
             Blu Escolar. A educação merece esse upgrade.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <button className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-2">
+            <Link to="/contact" className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-2">
               Agendar Demonstração <ArrowRight size={20} />
-            </button>
+            </Link>
             <button className="px-10 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow-md">
               Baixar Whitepaper
             </button>

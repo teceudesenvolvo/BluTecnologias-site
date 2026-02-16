@@ -44,9 +44,9 @@ export const Products: React.FC = () => {
                     <Link to={`/products/${software.id}`} className="text-blue-600 hover:underline flex items-center gap-1 font-medium">
                       Saiba mais <ChevronRight size={16} />
                     </Link>
-                    <span className="text-blue-600 hover:underline flex items-center gap-1 font-medium cursor-pointer">
+                    <Link to="/contact" className="text-blue-600 hover:underline flex items-center gap-1 font-medium cursor-pointer">
                       Agendar Demo <ChevronRight size={16} />
-                    </span>
+                    </Link>
                   </div>
                 </div>
 
@@ -65,9 +65,9 @@ export const Products: React.FC = () => {
           <div className="md:col-span-2 group relative overflow-hidden rounded-[2.5rem] bg-blue-600 text-white aspect-[2/1] flex flex-col items-center justify-center p-10 text-center">
              <h2 className="text-3xl md:text-5xl font-bold mb-6">Blu Ecosystem</h2>
              <p className="text-blue-100 text-xl mb-8 max-w-2xl">Uma plataforma única para conectar prefeitura, câmara e cidadãos com eficiência e transparência.</p>
-             <button className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-blue-50 transition-colors">
+             <Link to="/contact" className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-blue-50 transition-colors">
                Falar com um Especialista
-             </button>
+             </Link>
           </div>
 
         </div>
