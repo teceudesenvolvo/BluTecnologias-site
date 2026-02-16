@@ -22,6 +22,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { ScrollReveal } from '../../components/ScrollReveal';
+import BluEscolarImg from '../../assets/dashBluEscolar.png';
 
 export const BluEscolar: React.FC = () => {
   useEffect(() => {
@@ -75,11 +76,11 @@ export const BluEscolar: React.FC = () => {
       </section>
 
       {/* 3. A Experiência Mobile */}
-      <section className="py-32 px-6 bg-black text-white overflow-hidden">
+      <section className="py-32 px-6 bg-gradient-to-b from-purple-50 to-white overflow-hidden">
         <div className="max-w-7xl mx-auto text-center mb-24">
           <ScrollReveal>
-            <h2 className="text-5xl md:text-7xl font-bold mb-8 tracking-tight">A escola no seu bolso.</h2>
-            <p className="text-2xl text-gray-400 max-w-3xl mx-auto font-medium">
+            <h2 className="text-5xl md:text-7xl font-bold mb-8 tracking-tight text-slate-900">A escola no seu bolso.</h2>
+            <p className="text-2xl text-slate-500 max-w-3xl mx-auto font-medium">
               O App Blu Escolar coloca o poder da gestão educacional na palma da mão. Notificações em tempo real, consulta de notas e frequência com a naturalidade de um gesto.
             </p>
           </ScrollReveal>
@@ -171,32 +172,26 @@ export const BluEscolar: React.FC = () => {
         </div>
       </section>
 
-      {/* 10. Dashboard Pro (Dark Mode) */}
-      <section className="py-32 px-6 bg-[#101010] text-white">
+      {/* 10. Dashboard Pro (Light Gradient) */}
+      <section className="py-32 px-6 bg-gradient-to-b from-purple-100 to-white text-slate-900">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
            <ScrollReveal>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-wider mb-6">
                 Para o Gestor
               </div>
               <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">Decisões baseadas em dados, não em palpites.</h2>
-              <p className="text-xl text-gray-400 leading-relaxed font-medium">
+              <p className="text-xl text-slate-600 leading-relaxed font-medium">
                 Uma central de comando para a Secretaria de Educação. Visualize mapas de calor de demanda escolar e ocupação de salas em tempo real.
               </p>
            </ScrollReveal>
            <ScrollReveal delay={200}>
-              <div className="bg-[#1a1a1a] rounded-3xl border border-white/10 p-8 shadow-2xl">
-                 <div className="flex items-center justify-between mb-8">
-                    <div className="h-4 w-32 bg-white/10 rounded-full"></div>
-                    <BarChart3 className="text-indigo-500" />
+              <div className="relative w-full aspect-[16/9] bg-white rounded-t-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+                 <div className="h-8 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2 flex-shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-400"></div>
                  </div>
-                 <div className="space-y-6">
-                    <div className="h-40 bg-gradient-to-r from-indigo-900/50 to-indigo-600/20 rounded-2xl border border-indigo-500/20"></div>
-                    <div className="grid grid-cols-3 gap-4">
-                       <div className="h-24 bg-white/5 rounded-2xl"></div>
-                       <div className="h-24 bg-white/5 rounded-2xl"></div>
-                       <div className="h-24 bg-white/5 rounded-2xl"></div>
-                    </div>
-                 </div>
+                 <img src={BluEscolarImg} alt="Dashboard Blu Escolar" className="w-full h-full object-cover object-top" />
               </div>
            </ScrollReveal>
         </div>

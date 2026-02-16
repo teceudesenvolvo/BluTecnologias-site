@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { initialSoftwares } from '../../services/mockData';
+import PortalServicosImg from '../../assets/DashPortalServicos.png';
+import AppCamaraImg from '../../assets/HomeAppCamara.png';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -11,8 +13,34 @@ import {
   Star,
   Shield,
   Zap,
-  Globe
+  Globe,
+  Scale,
+  HeartHandshake,
+  Siren,
+  ShieldQuestion,
+  MessageSquare,
+  Banknote,
+  Library,
+  FileSearch,
+  Bell,
+  Lock,
+  Calendar,
+  Video,
+  Users,
+  Info,
+  Mic,
+  Newspaper,
+  BookMarked,
+  HelpCircle,
+  Accessibility,
+  Handshake,
+  ListChecks,
+  UserCog,
+  Phone,
+  FileText,
+  Sparkles
 } from 'lucide-react';
+import { ScrollReveal } from '../../components/ScrollReveal';
 
 export const PortalServicos: React.FC = () => {
   // ID fixo para o Portal de Serviços
@@ -24,110 +52,166 @@ export const PortalServicos: React.FC = () => {
 
   if (!product) return null;
 
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'LayoutDashboard': return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
-      case 'Landmark': return <Landmark className="w-full h-full" strokeWidth={1} />;
-      case 'Smartphone': return <Smartphone className="w-full h-full" strokeWidth={1} />;
-      default: return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
-    }
-  };
-
   return (
-    <div className="bg-white text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 pt-20">
-      <div className="sticky top-20 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">{product.nome_produto}</h2>
-          <div className="flex items-center gap-4">
-            <Link to="/products" className="text-xs text-slate-500 hover:text-slate-900 transition-colors hidden sm:block">
-              Visão Geral
-            </Link>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-full font-medium transition-all">
-              Agendar Demo
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="bg-white text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900 pt-14">
+      
 
-      <section className="relative pt-12 pb-32 overflow-hidden">
+      {/* 1 & 2. Hero Section */}
+      <section id="overview" className="pt-32 pb-20 px-6 text-center bg-slate-50">
+        <ScrollReveal>
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+            A Câmara a um clique de distância.
+          </h1>
+          <p className="text-2xl md:text-4xl font-medium text-slate-500 mb-10 max-w-4xl mx-auto tracking-tight">
+            Nosso compromisso é modernizar processos e usar a tecnologia como ponte para a transparência e eficiência pública.
+          </p>
+          <div className="flex justify-center gap-4">
+            <a href="#servicos" className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg">
+              Conhecer Serviços
+            </a>
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Hero Image */}
+      <section className="px-6 -mt-10">
+        <ScrollReveal delay={200} className="max-w-6xl mx-auto">
+          <div className="relative w-full aspect-[16/9] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2 flex-shrink-0">
+              <div className="w-3 h-3 rounded-full bg-red-400" />
+              <div className="w-3 h-3 rounded-full bg-yellow-400" />
+              <div className="w-3 h-3 rounded-full bg-green-400" />
+            </div>
+            <img src={PortalServicosImg} alt="Dashboard do Portal de Serviços" className="w-full h-full object-cover object-top" />
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* 3-10. Main Services Grid */}
+      <section id="servicos" className="py-32 px-6 bg-white">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-orange-200 bg-orange-50 text-orange-600 text-[10px] font-bold uppercase tracking-widest mb-8">
-            <Star className="w-3 h-3 fill-current" />
-            Destaque
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Cidadania Digital e Segura</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Serviços essenciais para o cidadão, disponíveis de forma online, rápida e com total proteção de dados.</p>
           </div>
           
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-slate-900 mb-6">
-            {product.nome_produto}
-          </h1>
-          <p className="text-2xl md:text-3xl font-medium text-slate-500 max-w-3xl mx-auto leading-relaxed tracking-tight">
-            {product.descricao_venda}
-          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Atendimento Jurídico */}
+            <ScrollReveal className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+              <Scale className="w-12 h-12 text-blue-600 mb-6" />
+              <h3 className="text-2xl font-bold mb-3">Atendimento Jurídico</h3>
+              <p className="text-slate-600 mb-4">Orientação gratuita para cidadãos que não podem contratar um advogado. Solicite online com RG, CPF e comprovante de residência.</p>
+              <a href="#" className="font-semibold text-blue-600 hover:underline">Saiba como solicitar &rarr;</a>
+            </ScrollReveal>
 
-          <div className="mt-20 relative mx-auto max-w-5xl">
-             <div className="relative aspect-[16/9] bg-gradient-to-b from-slate-50 to-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex items-center justify-center group">
-               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-50 via-transparent to-transparent opacity-50"></div>
-               <div className="w-48 h-48 text-slate-900/10 group-hover:text-blue-600/20 transition-all duration-1000 transform group-hover:scale-110 group-hover:rotate-3">
-                  {getIcon(product.icone_3d)}
-               </div>
-               <div className="absolute bottom-12 left-12 right-12 h-24 bg-white/60 backdrop-blur-xl rounded-2xl border border-white/50 shadow-lg flex items-center justify-around px-12 animate-fade-in-up">
-                  <div className="h-2 w-1/4 bg-slate-200 rounded-full"></div>
-                  <div className="h-2 w-1/4 bg-slate-200 rounded-full"></div>
-                  <div className="h-2 w-1/6 bg-blue-100 rounded-full"></div>
-               </div>
-            </div>
+            {/* Procuradoria da Mulher */}
+            <ScrollReveal delay={100} className="bg-pink-50 border border-pink-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300 lg:col-span-2">
+              <HeartHandshake className="w-12 h-12 text-pink-600 mb-6" />
+              <h3 className="text-2xl font-bold mb-3">Procuradoria da Mulher</h3>
+              <p className="text-slate-600 mb-4">Órgão dedicado à defesa dos direitos das mulheres. Realize denúncias de forma sigilosa e segura, com acolhimento por equipe especializada.</p>
+              <div className="flex flex-wrap gap-4">
+                <a href="#" className="font-semibold text-pink-600 hover:underline">Fazer denúncia &rarr;</a>
+                <span className="font-semibold text-red-600 flex items-center gap-2"><Siren size={18}/> Botão do Pânico (Exclusivo no App)</span>
+              </div>
+            </ScrollReveal>
+
+            {/* PROCON */}
+            <ScrollReveal delay={200} className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300 lg:col-span-2">
+              <ShieldQuestion className="w-12 h-12 text-green-600 mb-6" />
+              <h3 className="text-2xl font-bold mb-3">PROCON Municipal Digital</h3>
+              <p className="text-slate-600 mb-4">Defenda seus direitos de consumidor. Registre reclamações contra empresas e prestadores de serviço diretamente pelo portal.</p>
+              <a href="#" className="font-semibold text-green-600 hover:underline">Registrar reclamação &rarr;</a>
+            </ScrollReveal>
+
+            {/* Ouvidoria */}
+            <ScrollReveal delay={300} className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+              <MessageSquare className="w-12 h-12 text-purple-600 mb-6" />
+              <h3 className="text-2xl font-bold mb-3">Ouvidoria: Sua Voz</h3>
+              <p className="text-slate-600 mb-4">O canal oficial para enviar sugestões, elogios, críticas ou reclamações sobre qualquer serviço municipal.</p>
+              <a href="#" className="font-semibold text-purple-600 hover:underline">Fale com a Ouvidoria &rarr;</a>
+            </ScrollReveal>
           </div>
         </div>
       </section>
 
-      <section className="bg-[#101010] text-white py-32">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-24 max-w-3xl">
-            <h2 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
-              Eficiência para <br/>
-              <span className="text-gray-500">serviços ao cidadão.</span>
-            </h2>
+      {/* 11-22. Transparência e Atividade Legislativa */}
+      <section id="transparencia" className="py-32 px-6 bg-gradient-to-b from-blue-50 to-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Legislativo Aberto e Transparente</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Acompanhe de perto o trabalho dos vereadores e as decisões que moldam o futuro da nossa cidade.</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-            <div className="col-span-1 md:col-span-4 bg-[#1a1a1a] rounded-[2rem] p-10 md:p-14 overflow-hidden relative group min-h-[500px] flex flex-col justify-between hover:bg-[#202020] transition-colors duration-500">
-              <div className="relative z-10">
-                <h3 className="text-3xl font-bold mb-4">Atendimento Digital</h3>
-                <p className="text-gray-400 text-lg max-w-md">
-                  Ofereça um portal intuitivo onde o cidadão pode emitir guias, solicitar certidões, protocolar documentos e consultar processos 24/7, sem precisar se deslocar até a prefeitura.
-                </p>
-              </div>
-              <div className="absolute right-0 bottom-0 w-3/4 h-3/4 bg-gradient-to-tl from-blue-600/20 to-transparent rounded-tl-full opacity-50 group-hover:opacity-70 transition-opacity" />
-            </div>
-
-            <div className="col-span-1 md:col-span-2 bg-[#1a1a1a] rounded-[2rem] p-10 flex flex-col justify-between hover:bg-[#202020] transition-colors duration-500">
-              <div>
-                <Zap className="w-12 h-12 text-blue-500 mb-6" />
-                <h3 className="text-2xl font-bold mb-3">Fluxos Inteligentes</h3>
-                <p className="text-gray-400">
-                  Configure processos automatizados que direcionam cada solicitação para o setor responsável, com prazos e alertas de SLA.
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { icon: Banknote, title: "Portal da Transparência", desc: "Consulte gastos, licitações e contratos." },
+              { icon: Library, title: "Leis Municipais", desc: "Acesse a biblioteca digital de leis e decretos." },
+              { icon: FileSearch, title: "Acompanhe seu Processo", desc: "Verifique o andamento de suas solicitações." },
+              { icon: Calendar, title: "Agenda de Sessões", desc: "Fique por dentro do calendário de votações." },
+              { icon: Video, title: "Sessões Ao Vivo", desc: "Assista às sessões em tempo real pela internet." },
+              { icon: Users, title: "Perfil dos Vereadores", desc: "Conheça a biografia e projetos de cada parlamentar." },
+              { icon: Newspaper, title: "Notícias e Comunicados", desc: "Feed de atualizações e eventos da Câmara." },
+              { icon: BookMarked, title: "Diário Oficial", desc: "Acesso às publicações e atos administrativos." },
+            ].map((item, i) => (
+              <ScrollReveal key={i} delay={i * 100} className="bg-white p-8 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
+                <item.icon className="w-10 h-10 text-blue-600 mb-5" />
+                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-500">{item.desc}</p>
+              </ScrollReveal>
+            ))}
           </div>
         </div>
       </section>
+      
+      {/* 14 & 15. App e Segurança */}
+      <section className="py-32 px-6 bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+          <ScrollReveal>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider mb-6">
+              Mobilidade e Segurança
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">O poder na palma da sua mão.</h2>
+            <p className="text-xl text-gray-400 leading-relaxed mb-6">
+              Com o aplicativo da Câmara, você recebe notificações em tempo real e acessa ferramentas exclusivas.
+            </p>
+            <p className="text-xl text-gray-400 leading-relaxed">
+              Todos os seus dados são protegidos com criptografia de ponta a ponta, em total conformidade com a LGPD.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={200} className="relative mx-auto max-w-[300px]">
+            <div className="relative aspect-[9/19] bg-zinc-800 rounded-[3rem] border-[8px] border-zinc-900 shadow-2xl overflow-hidden ring-1 ring-white/10">
+              <img src={AppCamaraImg} alt="App da Câmara" className="w-full h-full object-cover" />
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
 
+      {/* 19-30. Outras Seções */}
       <section className="py-32 px-6 bg-slate-50">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center">Funcionalidades</h2>
-          <div className="grid gap-4">
-            {product.features.map((feature, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm flex items-center gap-4 hover:scale-[1.01] transition-transform duration-300">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                </div>
-                <span className="text-lg text-slate-700 font-medium">{feature}</span>
-              </div>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Mais para Você</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Informação, participação e o futuro da gestão pública digital.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              { icon: Info, title: "Como Funciona a Câmara?", desc: "Entenda o papel do Poder Legislativo e a importância do seu vereador." },
+              { icon: Mic, title: "Tribuna Livre", desc: "Saiba como usar a palavra durante as sessões para levar as demandas da sua comunidade." },
+              { icon: Accessibility, title: "Acessibilidade Digital", desc: "Nosso compromisso em tornar o portal acessível para pessoas com deficiência." },
+              { icon: ListChecks, title: "Guia de Serviços Online", desc: "Um índice completo de todos os serviços que podem ser resolvidos de forma 100% digital." },
+              { icon: UserCog, title: "Portal do Servidor", desc: "Área restrita para funcionários da Câmara acessarem seus documentos e avisos." },
+              { icon: Sparkles, title: "O Futuro é Digital", desc: "Conheça nosso plano de expansão com novos serviços e funcionalidades para os próximos meses." },
+            ].map((item, i) => (
+              <ScrollReveal key={i} delay={i * 100} className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <item.icon className="w-8 h-8 text-slate-500 mb-4" />
+                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-500">{item.desc}</p>
+              </ScrollReveal>
             ))}
           </div>
         </div>
       </section>
 
+      {/* CTA Final */}
       <section className="py-32 px-6 bg-white border-t border-slate-100">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-5xl md:text-6xl font-bold text-slate-900 mb-8 tracking-tight">

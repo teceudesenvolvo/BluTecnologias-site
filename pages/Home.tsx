@@ -5,7 +5,7 @@ import { ScrollReveal } from '../components/ScrollReveal';
 import AppCamaraImg from '../assets/HomeAppCamara.png';
 import PortalServicosImg from '../assets/DashPortalServicos.png';
 import PortalLegislativoImg from '../assets/PortalLegis.png';
-import BluEscolarImg from '../assets/BluEscolar-Dash.png';
+import BluEscolarImg from '../assets/dashBluEscolar.png';
 
 export const Home: React.FC = () => {
   return (
@@ -58,14 +58,14 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Hero 3: Portal Legislativo */}
-      <section className="relative h-[85vh] bg-white flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-slate-200">
+      <section className="relative h-[85vh] bg-gradient-to-b from-green-100 to-white flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-green-100">
          <ScrollReveal className="z-10 text-center px-6">
           <div className="mb-4">
              <span className="text-orange-600 font-bold tracking-wider text-xs uppercase">Novo</span>
           </div>
           <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight text-slate-900">Portal do Legislativo</h2>
           <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Transparência total.</p>
-          <div className="flex items-center justify-center gap-8 text-blue-600 text-lg font-medium">
+          <div className="flex items-center justify-center gap-8 text-green-600 text-lg font-medium">
             <Link to="/products/2" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
@@ -78,20 +78,20 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Hero 4: Blu Escolar */}
-      <section className="relative h-[85vh] bg-indigo-600 text-white flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-indigo-500">
+      <section className="relative h-[85vh] bg-gradient-to-b from-purple-100 to-white text-slate-900 flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden border-t border-purple-100">
          <ScrollReveal className="z-10 text-center px-6">
           <div className="mb-4">
-             <span className="bg-white/20 text-white font-bold tracking-wider text-xs uppercase px-3 py-1 rounded-full">Educação</span>
+             <span className="bg-purple-200 text-purple-800 font-bold tracking-wider text-xs uppercase px-3 py-1 rounded-full">Educação</span>
           </div>
           <h2 className="text-5xl md:text-7xl font-bold mb-4 tracking-tight">Blu Escolar</h2>
-          <p className="text-2xl md:text-3xl font-medium text-indigo-100 mb-8">Gestão educacional inteligente.</p>
-          <div className="flex items-center justify-center gap-8 text-white text-lg font-medium">
+          <p className="text-2xl md:text-3xl font-medium text-slate-500 mb-8">Gestão educacional inteligente.</p>
+          <div className="flex items-center justify-center gap-8 text-purple-600 text-lg font-medium">
             <Link to="/products/4" className="hover:underline flex items-center gap-1">
               Saiba mais <ChevronRight size={18} />
             </Link>
           </div>
         </ScrollReveal>
-        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-4xl aspect-[16/9] bg-white rounded-t-3xl shadow-2xl border-t-8 border-x-8 border-white/10 mx-auto top-10 overflow-hidden flex flex-col">
+        <ScrollReveal delay={200} className="mt-12 relative w-full max-w-4xl aspect-[16/9] bg-white rounded-t-3xl shadow-2xl border-t-8 border-x-8 border-slate-200 mx-auto top-10 overflow-hidden flex flex-col">
             <div className="h-12 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2 flex-shrink-0">
                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
@@ -114,10 +114,10 @@ export const Home: React.FC = () => {
            
            {/* Card 2 */}
            <ScrollReveal delay={200} className="h-full">
-             <div className="bg-black text-white h-[500px] rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.01] duration-500">
+             <div className="bg-gradient-to-b from-blue-100 to-white text-slate-900 h-[500px] rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.01] duration-500 border border-blue-50">
                 <h3 className="text-4xl font-bold mb-4 z-10">Área do Cliente</h3>
-                <p className="text-xl text-slate-400 mb-6 z-10">Gerencie seus produtos.</p>
-                <Link to="/admin" className="text-blue-400 hover:underline z-10 flex items-center gap-1 font-medium">Acessar <ChevronRight size={16}/></Link>
+                <p className="text-xl text-slate-500 mb-6 z-10">Gerencie seus produtos.</p>
+                <Link to="/admin" className="text-blue-600 hover:underline z-10 flex items-center gap-1 font-medium">Acessar <ChevronRight size={16}/></Link>
              </div>
            </ScrollReveal>
         </div>

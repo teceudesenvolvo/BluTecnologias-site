@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { initialSoftwares } from '../../services/mockData';
+import AppCamaraImg from '../../assets/HomeAppCamara.png';
+import MulherAppCamaraImg from '../../assets/MulherAppCamara.png';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -73,28 +75,10 @@ export const AppCamara: React.FC = () => {
              </a>
           </div>
 
-          {/* Abstract Phone Visualization */}
+          {/* Phone Visualization with Image */}
           <div className="mt-24 relative mx-auto max-w-[300px] md:max-w-[400px]">
-             <div className="relative aspect-[9/19] bg-white rounded-[3rem] border-[8px] border-slate-800 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
-               {/* Screen Content */}
-               <div className="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center p-6">
-                  <div className="w-16 h-16 bg-blue-600 rounded-2xl mb-8 shadow-lg flex items-center justify-center">
-                    <Smartphone className="w-8 h-8 text-white" strokeWidth={2} />
-                  </div>
-                  <div className="w-full h-2 bg-slate-200 rounded-full mb-4"></div>
-                  <div className="w-3/4 h-2 bg-slate-200 rounded-full mb-4"></div>
-                  <div className="w-1/2 h-2 bg-slate-200 rounded-full"></div>
-                  
-                  {/* Floating UI Elements */}
-                  <div className="absolute bottom-10 left-6 right-6 h-16 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm flex items-center justify-around px-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Zap size={16}/></div>
-                    <div className="w-8 h-8 rounded-full text-slate-400 flex items-center justify-center"><Users size={16}/></div>
-                    <div className="w-8 h-8 rounded-full text-slate-400 flex items-center justify-center"><FileText size={16}/></div>
-                  </div>
-               </div>
-               
-               {/* Dynamic Island / Notch */}
-               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-7 bg-black rounded-b-2xl"></div>
+             <div className="relative aspect-[9/19] bg-zinc-900 rounded-[3rem] border-[8px] border-zinc-800 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
+               <img src={AppCamaraImg} alt="App da Câmara" className="w-full h-full object-cover object-top" />
             </div>
           </div>
         </div>
@@ -221,6 +205,48 @@ export const AppCamara: React.FC = () => {
                </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Seção Destaque: Procuradoria da Mulher */}
+      <section className="py-32 px-6 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+           <div className="order-2 md:order-1 relative mx-auto max-w-[300px]">
+             <div className="relative aspect-[9/19] bg-zinc-900 rounded-[3rem] border-[8px] border-zinc-800 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
+               <img src={MulherAppCamaraImg} alt="Procuradoria da Mulher" className="w-full h-full object-cover" />
+             </div>
+           </div>
+           <div className="order-1 md:order-2">
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-bold uppercase tracking-wider mb-6">
+               Proteção e Apoio
+             </div>
+             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
+               Procuradoria da Mulher Digital
+             </h2>
+             <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+               Um canal exclusivo e seguro para acolhimento e denúncias. Além do atendimento especializado, o aplicativo oferece o <strong>Botão do Pânico</strong>, que envia um alerta imediato com geolocalização em situações de risco.
+             </p>
+             <ul className="space-y-4">
+               <li className="flex items-center gap-3 text-slate-700 font-medium">
+                 <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center text-pink-600">
+                   <HeartHandshake size={20} />
+                 </div>
+                 Acolhimento e Orientação Jurídica
+               </li>
+               <li className="flex items-center gap-3 text-slate-700 font-medium">
+                 <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                   <AlertTriangle size={20} />
+                 </div>
+                 Botão do Pânico com Geolocalização
+               </li>
+               <li className="flex items-center gap-3 text-slate-700 font-medium">
+                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                   <Lock size={20} />
+                 </div>
+                 Sigilo Absoluto e Segurança
+               </li>
+             </ul>
+           </div>
         </div>
       </section>
 
