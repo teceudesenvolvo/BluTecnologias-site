@@ -10,7 +10,7 @@ export const Navbar: React.FC = () => {
     { name: 'Início', path: '/' },
     { name: 'Soluções', path: '/products' },
     { name: 'Novidades', path: '/blog' },
-    { name: 'Entrar', path: '/admin' },
+    { name: 'Entrar', path: '/login' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
