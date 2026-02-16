@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png'; 
 
 export const Footer: React.FC = () => {
   return (
@@ -8,7 +9,7 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <img src="/logo.png" alt="Blu Tecnologias" className="h-12 w-auto rounded-xl" />
+              <img src={Logo} alt="Blu Tecnologias" className="h-12 w-auto rounded-xl" />
             </div>
             <p className="text-slate-500 text-sm leading-relaxed">
               Soluções inteligentes para gestão pública. Conectando cidadãos e governo com transparência e eficiência.

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, Users } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, Users, MapPin, ThumbsUp, Headphones } from 'lucide-react';
 import { Card3D } from '../components/ui/Card3D';
 import { initialSoftwares } from '../services/mockData';
 
@@ -51,15 +51,15 @@ export const Home: React.FC = () => {
       <section className="py-12 bg-white/50 backdrop-blur-sm border-y border-white/50">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
           <div className="p-6">
-            <div className="text-4xl font-bold text-blue-600 mb-2">+150</div>
+            <MapPin className="w-12 h-12 text-blue-600 mx-auto mb-4" />
             <div className="text-slate-500 font-medium">Cidades Atendidas</div>
           </div>
           <div className="p-6 border-l border-r border-slate-200/50">
-            <div className="text-4xl font-bold text-cyan-500 mb-2">98%</div>
+            <ThumbsUp className="w-12 h-12 text-cyan-500 mx-auto mb-4" />
             <div className="text-slate-500 font-medium">Aprovação Popular</div>
           </div>
           <div className="p-6">
-            <div className="text-4xl font-bold text-blue-600 mb-2">24/7</div>
+            <Headphones className="w-12 h-12 text-blue-600 mx-auto mb-4" />
             <div className="text-slate-500 font-medium">Suporte Especializado</div>
           </div>
         </div>

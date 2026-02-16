@@ -8,7 +8,7 @@ export const Blog: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
-            Blog Blu
+            Novidades
           </h1>
           <p className="text-slate-500">
             Notícias, inovações e atualizações sobre tecnologia no setor público.
