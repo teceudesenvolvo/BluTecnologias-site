@@ -43,6 +43,20 @@ export interface ContactLead {
   status: 'lead' | 'active';
 }
 
+export interface ProspectFile {
+  name: string;
+  base64: string;
+}
+export interface Prospect {
+  id: string;
+  municipio: string;
+  estado: string;
+  sessaoOrdinaria: string;
+  endereco: string;
+  presidente: string;
+  files: ProspectFile[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -156,6 +170,61 @@ export const blogService = {
       return false;
     }
   }
+};
+
+export const prospectService = {
+  async getAll(): Promise<Prospect[]> {
+    try {
+      const response = await fetch(`${DB_URL}/prospects.json`);
+      const data = await response.json();
+      if (!data) return [];
+      return Object.entries(data).map(([id, prospect]: [string, any]) => ({
+        id,
+        ...prospect,
+      })).reverse();
+    } catch (error) {
+      console.error('Erro ao buscar prospects:', error);
+      return [];
+    }
+  },
+
+  async create(prospect: Omit<Prospect, 'id'>): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/prospects.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prospect),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao criar prospect:', error);
+      return false;
+    }
+  },
+
+  async update(id: string, prospect: Partial<Prospect>): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/prospects/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prospect),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao atualizar prospect:', error);
+      return false;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/prospects/${id}.json`, { method: 'DELETE' });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao deletar prospect:', error);
+      return false;
+    }
+  },
 };
 
 export const certificateService = {

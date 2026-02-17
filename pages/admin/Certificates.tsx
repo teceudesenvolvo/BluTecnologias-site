@@ -8,6 +8,9 @@ export const Certificates: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState('Todos');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [dateFilterType, setDateFilterType] = useState<'expiryDate' | 'issueDate'>('expiryDate');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -105,11 +108,26 @@ export const Certificates: React.FC = () => {
     return { label: 'Vigente', color: 'text-green-600 bg-green-50', icon: CheckCircle, border: 'border-slate-200' };
   };
 
+  const filteredByType = selectedType === 'Todos' 
+    ? certificates 
+    : certificates.filter(cert => cert.name === selectedType);
+
+  const filteredCertificates = filteredByType.filter(cert => {
+    if (!dateFilter.start && !dateFilter.end) {
+      return true;
+    }
+    const dateToCompare = cert[dateFilterType];
+    const startOk = !dateFilter.start || dateToCompare >= dateFilter.start;
+    const endOk = !dateFilter.end || dateToCompare <= dateFilter.end;
+
+    return startOk && endOk;
+  });
+
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 min-h-[600px] relative">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <div>
-            <h3 className="text-xl font-bold text-slate-700">Gestão de Documentos</h3>
+            <h3 className="text-xl font-bold text-slate-700">Gestão de Documentação</h3>
             <p className="text-slate-500 text-sm">Monitore a vigência de CNDs e documentos legais.</p>
           </div>
           <button 
@@ -120,15 +138,55 @@ export const Certificates: React.FC = () => {
           </button>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <span className="font-medium text-sm text-slate-600">Filtrar por:</span>
+          <select 
+              value={selectedType} 
+              onChange={e => setSelectedType(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          >
+              <option value="Todos">Todos os Tipos</option>
+              {docTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+              ))}
+          </select>
+          <select 
+              value={dateFilterType} 
+              onChange={e => setDateFilterType(e.target.value as any)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          >
+              <option value="expiryDate">Data de Vencimento</option>
+              <option value="issueDate">Data de Emissão</option>
+          </select>
+          <label htmlFor="startDate" className="text-sm font-medium text-slate-600">De:</label>
+          <input 
+              type="date" 
+              id="startDate"
+              value={dateFilter.start}
+              onChange={e => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm"
+          />
+          <label htmlFor="endDate" className="text-sm font-medium text-slate-600">Até:</label>
+          <input 
+              type="date" 
+              id="endDate"
+              value={dateFilter.end}
+              onChange={e => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm"
+          />
+          <button onClick={() => { setDateFilter({ start: '', end: '' }); setSelectedType('Todos'); }} className="text-sm font-medium text-blue-600 hover:underline">Limpar Filtros</button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
              <div className="col-span-full flex justify-center py-20 text-slate-400">
                <Loader2 className="animate-spin" />
              </div>
-          ) : certificates.length === 0 ? (
-             <div className="col-span-full text-center py-20 text-slate-400">Nenhum documento cadastrado.</div>
+          ) : filteredCertificates.length === 0 ? (
+             <div className="col-span-full text-center py-20 text-slate-400">Nenhum documento encontrado para os filtros aplicados.</div>
           ) : (
-            certificates.map((cert) => {
+            filteredCertificates.map((cert) => {
               const status = getStatus(cert.expiryDate);
               return (
                 <div key={cert.id} className={`border ${status.border} rounded-2xl p-6 hover:shadow-md transition-all relative group bg-white`}>
