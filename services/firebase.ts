@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { BlogPost } from '../types';
 
 // Configuração do Firebase - Substitua pelos dados do seu projeto no Console do Firebase
@@ -19,6 +20,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
 const DB_URL = 'https://blutecnologias-site-default-rtdb.firebaseio.com';
 
@@ -30,17 +32,71 @@ export interface Transaction {
   date: string;
 }
 
+export interface ClientContract {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  value: number;
+  fileUrl?: string;
+}
+
+export interface ClientAdjustment {
+  id: string;
+  date: string;
+  percentage: number;
+  newValue: number;
+  observation?: string;
+}
+
+export interface ClientInvoice {
+  id: string;
+  month: string;
+  amount: number;
+  status: 'sent' | 'paid' | 'pending';
+  fileUrl?: string;
+}
+
+export interface ClientProposal {
+  id: string;
+  date: string;
+  title: string;
+  value: number;
+  status: 'sent' | 'accepted' | 'rejected';
+  fileUrl?: string;
+}
+
+export interface ClientReport {
+  id: string;
+  month: string;
+  title: string;
+  fileUrl?: string;
+}
+
 export interface ContactLead {
   id: string;
   name: string;
+  razaoSocial?: string;
+  cnpj?: string;
+  inscricaoMunicipal?: string;
   role: string;
   email: string;
   phone: string;
   city: string;
+  state?: string;
+  address?: string;
+  cep?: string;
+  complement?: string;
+  financialContact?: string;
   solution: string;
   message: string;
   date: string;
   status: 'lead' | 'active';
+  contracts?: ClientContract[];
+  adjustments?: ClientAdjustment[];
+  invoices?: ClientInvoice[];
+  proposals?: ClientProposal[];
+  reports?: ClientReport[];
 }
 
 export interface ProspectFile {
@@ -49,6 +105,7 @@ export interface ProspectFile {
 }
 export interface Prospect {
   id: string;
+  tipoOrgao: 'camara' | 'prefeitura' | 'secretaria';
   municipio: string;
   estado: string;
   sessaoOrdinaria: string;
@@ -468,6 +525,43 @@ export const clientService = {
       return response.ok;
     } catch (error) {
       console.error('Erro ao atualizar status do cliente:', error);
+      return false;
+    }
+  },
+
+  async update(id: string, data: Partial<ContactLead>): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/contacts/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao atualizar dados do cliente:', error);
+      return false;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/contacts/${id}.json`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+      return false;
+    }
+  },
+
+  async sendBilling(clientId: string, billingData: any): Promise<boolean> {
+    try {
+      const sendEmail = httpsCallable(functions, 'sendBillingEmail');
+      await sendEmail({ clientId, ...billingData });
+      return true;
+    } catch (error) {
+      console.error('Erro ao enviar cobrança via Cloud Functions:', error);
       return false;
     }
   }
