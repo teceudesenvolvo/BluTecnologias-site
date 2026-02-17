@@ -18,6 +18,12 @@ export const Blog: React.FC = () => {
     fetchPosts();
   }, []);
 
+  const stripHtml = (html: string) => {
+     const tmp = document.createElement("DIV");
+     tmp.innerHTML = html;
+     return tmp.textContent || tmp.innerText || "";
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 pt-32 pb-20 px-6">
       <div className="max-w-7xl mx-auto">
@@ -60,7 +66,7 @@ export const Blog: React.FC = () => {
                     <Calendar className="w-3 h-3" /> {post.date}
                   </span>
                   <span className="flex items-center gap-1">
-                    <User className="w-3 h-3" /> {post.author_mascote}
+                    <User className="w-3 h-3" /> {(post as any).author || post.author_mascote}
                   </span>
                 </div>
 
@@ -69,7 +75,7 @@ export const Blog: React.FC = () => {
                 </h2>
                 
                 <p className="text-slate-500 text-sm line-clamp-3 mb-6 flex-grow">
-                  {post.content}
+                  {stripHtml(post.content)}
                 </p>
 
                 <Link to={`/blog/${post.id}`} className="text-blue-600 font-semibold text-sm hover:underline self-start">

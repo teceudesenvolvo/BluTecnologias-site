@@ -42,7 +42,7 @@ export const Admin: React.FC = () => {
     { id: 'financial', label: 'Financeiro', icon: DollarSign, component: Financial },
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare, component: Tasks },
     { id: 'clients', label: 'Clientes', icon: Users, component: Clients },
-    { id: 'certificates', label: 'Certidões', icon: FileBadge, component: Certificates },
+    { id: 'certificates', label: 'Documentos', icon: FileBadge, component: Certificates },
   ];
 
   const ActiveComponent = menuItems.find(item => item.id === activeTab)?.component || News;
