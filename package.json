@@ -10,11 +10,12 @@
     "start": "vite"
   },
   "dependencies": {
+    "@google/genai": "latest",
+    "firebase": "^12.9.0",
+    "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest",
-    "lucide-react": "latest",
-    "@google/genai": "latest"
+    "react-router-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",

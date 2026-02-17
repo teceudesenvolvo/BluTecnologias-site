@@ -1,8 +1,23 @@
-import React from 'react';
-import { initialBlogPosts } from '../services/mockData';
-import { Calendar, User } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { blogService } from '../services/firebase';
+import { BlogPost } from '../types';
+import { Calendar, User, Loader2 } from 'lucide-react';
 
 export const Blog: React.FC = () => {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      const data = await blogService.getAll();
+      setPosts(data);
+      setLoading(false);
+    };
+
+    fetchPosts();
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-100 pt-32 pb-20 px-6">
       <div className="max-w-7xl mx-auto">
@@ -15,8 +30,15 @@ export const Blog: React.FC = () => {
           </p>
         </div>
 
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="text-center text-slate-500 py-20">Nenhuma postagem encontrada.</div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {initialBlogPosts.map((post) => (
+          {posts.map((post) => (
             <article 
               key={post.id}
               className="bg-white rounded-3xl overflow-hidden shadow-[10px_10px_30px_#d1d5db,-10px_-10px_30px_#ffffff] hover:shadow-[15px_15px_40px_#d1d5db,-15px_-15px_40px_#ffffff] transition-all duration-300 hover:-translate-y-2 flex flex-col"
@@ -50,13 +72,14 @@ export const Blog: React.FC = () => {
                   {post.content}
                 </p>
 
-                <button className="text-blue-600 font-semibold text-sm hover:underline self-start">
+                <Link to={`/blog/${post.id}`} className="text-blue-600 font-semibold text-sm hover:underline self-start">
                   Ler mais
-                </button>
+                </Link>
               </div>
             </article>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

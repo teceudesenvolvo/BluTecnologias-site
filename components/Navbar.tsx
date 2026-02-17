@@ -9,7 +9,6 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { name: 'Início', path: '/' },
     { name: 'Novidades', path: '/blog' },
-    { name: 'Entrar', path: '/login' },
   ];
 
   const isActive = (path: string) => location.pathname === path;

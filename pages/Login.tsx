@@ -1,9 +1,32 @@
-import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { auth, signInWithEmailAndPassword } from '../services/firebase';
+import { ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { ScrollReveal } from '../components/ScrollReveal';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 
 export const Login: React.FC = () => {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate('/admin');
+    } catch (err) {
+      setError('Falha no login. Verifique suas credenciais.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden bg-[#f5f5f7]">
        {/* Colorful background blobs similar to iCloud but subtle */}
@@ -23,14 +46,21 @@ export const Login: React.FC = () => {
                 Gerencie sua cidade inteligente.
             </p>
 
-            <form className="w-full">
+            <form className="w-full" onSubmit={handleLogin}>
                 <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {error && (
+                      <div className="bg-red-50 text-red-600 p-3 text-sm flex items-center gap-2 border-b border-red-100">
+                        <AlertCircle size={16} /> {error}
+                      </div>
+                    )}
                     <div className="relative border-b border-slate-100 group">
                         <input 
                         type="email"
                         placeholder="Email "
                         className="w-full pt-6 pb-2 px-4 outline-none text-slate-900 placeholder:text-transparent peer bg-transparent z-10 relative"
                         id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                         />
                         <label 
@@ -46,6 +76,8 @@ export const Login: React.FC = () => {
                         placeholder="Senha"
                         className="w-full pt-6 pb-2 px-4 outline-none text-slate-900 placeholder:text-transparent peer bg-transparent z-10 relative"
                         id="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                         />
                         <label 
@@ -55,8 +87,8 @@ export const Login: React.FC = () => {
                         Senha
                         </label>
                         
-                        <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-600 transition-colors z-20">
-                            <ArrowRight size={24} />
+                        <button type="submit" disabled={loading} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-600 transition-colors z-20 disabled:opacity-50">
+                            {loading ? <Loader2 size={24} className="animate-spin" /> : <ArrowRight size={24} />}
                         </button>
                     </div>
                 </div>

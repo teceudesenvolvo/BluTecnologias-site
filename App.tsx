@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
@@ -13,12 +13,16 @@ import { Login } from './pages/Login';
 import { BluEscolar } from './pages/softwares/BluEscolar';
 import { Contact } from './pages/Contact';
 import { ProductDetails } from './pages/softwares/ProductDetails';
+import { BlogPost } from './pages/BlogPost';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const location = useLocation();
+  const hideFooter = ['/login', '/admin'].includes(location.pathname);
+  const hideNavbar = ['/login', '/admin'].includes(location.pathname);
+
   return (
-    <Router>
       <div className="font-sans text-slate-900 bg-slate-100 min-h-screen flex flex-col">
-        <Navbar />
+        {!hideNavbar && <Navbar />}
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -29,13 +33,21 @@ const App: React.FC = () => {
             <Route path="/products/4" element={<BluEscolar />} />
             <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/contact" element={<Contact />} />
           </Routes>
         </main>
-        <Footer />
+        {!hideFooter && <Footer />}
       </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 };
