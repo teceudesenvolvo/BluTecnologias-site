@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, signInWithEmailAndPassword } from '../services/firebase';
+import { auth, signInWithEmailAndPassword, onAuthStateChanged } from '../services/firebase';
 import { ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { ScrollReveal } from '../components/ScrollReveal';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
@@ -11,6 +11,15 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/admin');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

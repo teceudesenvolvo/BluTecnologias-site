@@ -44,7 +44,8 @@ export const Clients: React.FC = () => {
     sessaoOrdinaria: '',
     endereco: '',
     presidente: '',
-    files: []
+    files: [],
+    visited: false
   });
 
   const [billingForm, setBillingForm] = useState({
@@ -203,7 +204,8 @@ export const Clients: React.FC = () => {
         sessaoOrdinaria: prospect.sessaoOrdinaria,
         endereco: prospect.endereco,
         presidente: prospect.presidente,
-        files: prospect.files || []
+        files: prospect.files || [],
+        visited: prospect.visited || false
       });
     } else {
       setEditingProspect(null);
@@ -214,7 +216,8 @@ export const Clients: React.FC = () => {
         sessaoOrdinaria: '',
         endereco: '',
         presidente: '',
-        files: []
+        files: [],
+        visited: false
       });
     }
     setIsProspectModalOpen(true);
@@ -427,12 +430,7 @@ export const Clients: React.FC = () => {
           <h3 className="text-xl font-bold text-slate-700">Gestão de Clientes e Leads</h3>
           
           <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button 
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Todos
-            </button>
+            
             <button 
               onClick={() => setFilter('active')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'active' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -522,9 +520,17 @@ export const Clients: React.FC = () => {
                 <div key={prospect.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <h4 className="font-bold text-slate-800 text-lg">{prospect.municipio} - {prospect.estado}</h4>
                         <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">{prospect.tipoOrgao}</span>
+                        {prospect.visited && (
+                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-green-100 text-green-700 flex items-center gap-1">
+                            <CheckCircle size={12} /> Visitado
+                          </span>
+                        )}
+                        {prospect.tipoOrgao === 'camara' && prospect.sessaoOrdinaria && (
+                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">Sessão: {prospect.sessaoOrdinaria}</span>
+                        )}
                       </div>
                       <p className="text-slate-500 text-sm mb-2 capitalize">{prospect.tipoOrgao === 'prefeitura' ? 'Prefeito(a)' : prospect.tipoOrgao === 'secretaria' ? 'Secretário(a)' : 'Presidente'}: {prospect.presidente}</p>
                       <p className="text-slate-500 text-sm">Sede: {prospect.endereco}</p>
@@ -691,13 +697,26 @@ export const Clients: React.FC = () => {
               <button onClick={() => setIsProspectModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
             </div>
             <form onSubmit={handleProspectSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Órgão</label>
-                <select required className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white" value={prospectFormData.tipoOrgao} onChange={e => setProspectFormData({...prospectFormData, tipoOrgao: e.target.value as any})}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Órgão</label>
+                  <select required className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white" value={prospectFormData.tipoOrgao} onChange={e => setProspectFormData({...prospectFormData, tipoOrgao: e.target.value as any})}>
                     <option value="camara">Câmara Municipal</option>
                     <option value="prefeitura">Prefeitura</option>
                     <option value="secretaria">Secretaria Municipal</option>
-                </select>
+                  </select>
+                </div>
+                <div className="pt-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="rounded text-blue-600 h-5 w-5 focus:ring-blue-500"
+                      checked={!!prospectFormData.visited}
+                      onChange={e => setProspectFormData({...prospectFormData, visited: e.target.checked})}
+                    />
+                    <span className="font-medium text-slate-700">Visitado</span>
+                  </label>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

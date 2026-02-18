@@ -118,6 +118,7 @@ export interface Prospect {
   presidente: string;
   files: ProspectFile[];
   userId?: string;
+  visited?: boolean;
 }
 
 export interface Task {
@@ -163,6 +164,17 @@ export interface FinancialSettings {
   }[];
   updatedBy?: string;
   updatedAt?: string;
+}
+
+export interface Quote {
+  id: string;
+  requestingEntity: string;
+  description: string;
+  requestDate: string; // Data do pedido
+  creationDate: string; // Data da solicitação (no sistema)
+  status: 'aberto' | 'em_andamento' | 'concluido' | 'cancelado';
+  items: { description: string; quantity: number; unit: string }[];
+  userId?: string;
 }
 
 export const blogService = {
@@ -262,6 +274,57 @@ export const blogService = {
       return false;
     }
   }
+};
+
+export const quoteService = {
+  async getAll(): Promise<Quote[]> {
+    try {
+      const response = await fetch(`${DB_URL}/quotes.json`);
+      const data = await response.json();
+      if (!data) return [];
+      return Object.entries(data).map(([id, quote]: [string, any]) => ({
+        id,
+        ...quote,
+      })).reverse();
+    } catch (error) {
+      console.error('Erro ao buscar pedidos de cotação:', error);
+      return [];
+    }
+  },
+
+  async create(quote: Omit<Quote, 'id' | 'creationDate'>): Promise<boolean> {
+    try {
+      const user = auth.currentUser;
+      const quoteData = {
+        ...quote,
+        creationDate: new Date().toISOString(),
+        userId: user?.uid,
+      };
+      const response = await fetch(`${DB_URL}/quotes.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteData),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao criar pedido de cotação:', error);
+      return false;
+    }
+  },
+
+  async update(id: string, quote: Partial<Quote>): Promise<boolean> {
+    try {
+      const response = await fetch(`${DB_URL}/quotes/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quote),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao atualizar pedido de cotação:', error);
+      return false;
+    }
+  },
 };
 
 export const prospectService = {

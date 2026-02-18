@@ -3,15 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase';
 import { 
   FileText, 
-  LogOut,
   DollarSign,
   CheckSquare,
   Users,
   FileBadge,
   Landmark,
-  User
+  User,
+  ShoppingBag,
+  Briefcase,
+  FileCheck,
+  FileSignature,
+  ClipboardList,
+  Target
 } from 'lucide-react';
-import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
+import { Sidebar } from '../components/Sidebar';
 import { News } from './admin/News';
 import { Financial } from './admin/Financial';
 import { FinancialData } from './admin/FinancialData';
@@ -19,10 +24,16 @@ import { Tasks } from './admin/Tasks';
 import { Clients } from './admin/Clients';
 import { Certificates } from './admin/Certificates';
 import { Profile } from './admin/Profile';
+import { Quotes } from './admin/Quotes';
+import { Procurements } from './admin/Procurements';
+import { CRCs } from './admin/CRCs';
+import { ContractsPage } from './admin/ContractsPage';
+import { ARPs } from './admin/ARPs';
+import { InterestAreas } from './admin/InterestAreas';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'blog' | 'financial' | 'financial-data' | 'tasks' | 'clients' | 'certificates' | 'profile'>('blog');
+  const [activeTab, setActiveTab] = useState<string>('blog');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -41,70 +52,46 @@ export const Admin: React.FC = () => {
     navigate('/login');
   };
 
-  const menuItems = [
-    { id: 'blog', label: 'Novidades', icon: FileText, component: News },
-    { id: 'financial', label: 'Financeiro', icon: DollarSign, component: Financial },
-    { id: 'financial-data', label: 'Dados Financeiros', icon: Landmark, component: FinancialData },
-    { id: 'tasks', label: 'Tarefas', icon: CheckSquare, component: Tasks },
-    { id: 'clients', label: 'Clientes', icon: Users, component: Clients },
-    { id: 'certificates', label: 'Documentos', icon: FileBadge, component: Certificates },
-    { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile },
+  const allTabs = [
+    { id: 'blog', label: 'Novidades', icon: FileText, component: News, showInMenu: true },
+    { id: 'financial', label: 'Financeiro', icon: DollarSign, component: Financial, showInMenu: true },
+    { id: 'financial-data', label: 'Dados Financeiros', icon: Landmark, component: FinancialData, showInMenu: false },
+    { id: 'tasks', label: 'Tarefas', icon: CheckSquare, component: Tasks, showInMenu: true },
+    { id: 'clients', label: 'Clientes', icon: Users, component: Clients, showInMenu: true },
+    { id: 'certificates', label: 'Documentos', icon: FileBadge, component: Certificates, showInMenu: true },
+    { id: 'quotes', label: 'Pedidos de Cotação', icon: ShoppingBag, component: Quotes, showInMenu: true },
+    { id: 'procurements', label: 'Contratações', icon: Briefcase, component: Procurements, showInMenu: true },
+    { id: 'crcs', label: 'CRCs', icon: FileCheck, component: CRCs, showInMenu: true },
+    { id: 'contracts', label: 'Contratos', icon: FileSignature, component: ContractsPage, showInMenu: true },
+    { id: 'arps', label: 'ARPs', icon: ClipboardList, component: ARPs, showInMenu: true },
+    { id: 'interest-areas', label: 'Áreas de Interesse', icon: Target, component: InterestAreas, showInMenu: true },
+    { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile, showInMenu: true },
   ];
 
-  const ActiveComponent = menuItems.find(item => item.id === activeTab)?.component || News;
+  const menuItems = allTabs.filter(tab => tab.showInMenu);
+  const ActiveComponent = (allTabs.find(item => item.id === activeTab)?.component || News) as any;
 
   return (
     <div className="min-h-screen bg-slate-100 flex font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 fixed h-full flex flex-col z-20">
-        <div className="p-8 border-b border-slate-100 flex flex-col items-center text-center">
-            <img src={Logo} alt="Blu Admin" style={{ borderRadius: '20%' }} className="h-12 w-auto mb-3" />
-            <p className="text-xs text-slate-400 mt-1">Painel de Gestão</p>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${
-                activeTab === item.id 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <item.icon size={18} />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-100">
-          <div className="px-4 py-3 mb-2">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Usuário</p>
-              <p className="text-sm text-slate-700 truncate">{user?.email}</p>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all font-medium text-sm"
-          >
-            <LogOut size={18} />
-            Sair
-          </button>
-        </div>
-      </aside>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        user={user} 
+        handleLogout={handleLogout} 
+        menuItems={menuItems} 
+      />
 
       {/* Main Content */}
       <main className="flex-1 ml-64 p-8 md:p-12">
         <div className="max-w-6xl mx-auto">
             <header className="mb-10">
-              <h2 className="text-3xl font-bold text-slate-800">
-                {menuItems.find(i => i.id === activeTab)?.label}
+              <h2 className="text-3xl font-bold text-slate-800 capitalize">
+                {allTabs.find(i => i.id === activeTab)?.label.replace(/dados d(a|os) /i, '')}
               </h2>
               <p className="text-slate-500">Gerencie as informações do sistema.</p>
             </header>
 
-            <ActiveComponent />
+            <ActiveComponent setActiveTab={setActiveTab} />
           </div>
       </main>
     </div>

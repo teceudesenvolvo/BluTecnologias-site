@@ -6,11 +6,40 @@ import AppCamaraImg from '../assets/HomeAppCamara.png';
 import PortalServicosImg from '../assets/DashPortalServicos.png';
 import PortalLegislativoImg from '../assets/PortalLegis.png';
 import BluEscolarImg from '../assets/dashBluEscolar.png';
+import DashSistemaFinImg from '../assets/dashSistemaFin.png';
 
 export const Home: React.FC = () => {
   return (
     <div className="bg-white font-sans text-slate-900 pt-14">
       
+      {/* Main Hero: Governança 360 */}
+      <section className="relative bg-slate-50 flex flex-col items-center justify-start pt-24 md:pt-32 pb-20 overflow-hidden">
+        <ScrollReveal className="z-10 text-center px-6">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
+            Governança 360° com <span className="text-blue-600">Inteligência Artificial</span> e Transparência Real.
+          </h1>
+          <p className="text-xl md:text-2xl font-medium text-slate-500 mb-10 max-w-4xl mx-auto">
+            Elimine erros em editais, evite conflitos de contratos e automatize seus pagamentos. Uma solução completa de ERP para órgãos públicos que buscam eficiência máxima e risco zero.
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <Link to="/login" className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:bg-blue-700 transition-all shadow-lg">
+              Entrar
+            </Link>
+            <Link to="/products/5" className="text-slate-600 hover:text-blue-600 font-medium flex items-center gap-1">
+              Saiba Mais <ChevronRight size={18} />
+            </Link>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={200} className="mt-20 w-[90%] max-w-6xl h-full bg-white rounded-t-2xl shadow-2xl border border-slate-200 mx-auto relative top-10 flex flex-col overflow-hidden">
+           <div className="h-10 bg-slate-100 border-b border-slate-200 rounded-t-2xl flex items-center px-4 gap-2 flex-shrink-0">
+             <div className="w-3 h-3 rounded-full bg-red-400" />
+             <div className="w-3 h-3 rounded-full bg-yellow-400" />
+             <div className="w-3 h-3 rounded-full bg-green-400" />
+           </div>
+           <img src={DashSistemaFinImg} alt="Dashboard do Sistema de Governança" className="w-full h-full object-cover object-top" />
+        </ScrollReveal>
+      </section>
+
       {/* Hero 1: App da Câmara (Dark Theme - iPhone Pro style) */}
       <section className="relative h-[85vh] bg-gradient-to-b from-blue-50 to-white text-slate-900 flex flex-col items-center justify-start pt-16 md:pt-24 overflow-hidden">
         <ScrollReveal className="z-10 text-center px-6">
@@ -119,7 +148,7 @@ export const Home: React.FC = () => {
            <ScrollReveal delay={200} className="h-full">
              <div className="bg-gradient-to-b from-blue-100 to-white text-slate-900 h-[500px] rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.01] duration-500 border border-blue-50">
                 <h3 className="text-4xl font-bold mb-4 z-10">Área do Cliente</h3>
-                <p className="text-xl text-slate-500 mb-6 z-10">Gerencie seus produtos.</p>
+                <p className="text-xl text-slate-500 mb-6 z-10">Seja bem-vindo!</p>
                 <Link to="/admin" className="text-blue-600 hover:underline z-10 flex items-center gap-1 font-medium">Acessar <ChevronRight size={16}/></Link>
              </div>
            </ScrollReveal>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { financialService, Transaction, auth } from '../../services/firebase';
 
-export const Financial: React.FC = () => {
+export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -138,6 +138,12 @@ export const Financial: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <h3 className="text-xl font-bold text-slate-700">Fluxo de Caixa</h3>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setActiveTab('financial-data')}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+            >
+              <Settings size={18} /> Dados Financeiros
+            </button>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20"
