@@ -16,7 +16,7 @@ export const FinancialData: React.FC = () => {
   const [banks, setBanks] = useState<any[]>([]);
 
   useEffect(() => {
-    loadSettings();
+    loadSettings(); 
     fetchBanks();
   }, []);
 
@@ -57,7 +57,7 @@ export const FinancialData: React.FC = () => {
   };
 
   const addBankAccount = () => {
-    const newAccount = { id: Date.now().toString(), bankCode: '', bankName: '', agency: '', accountNumber: '' };
+    const newAccount = { id: Date.now().toString(), bankCode: '', bankName: '', agency: '', accountNumber: '', userId: auth.currentUser?.uid };
     handleSettingsChange('bankAccounts', [...(settings.bankAccounts || []), newAccount]);
   };
 
@@ -66,7 +66,7 @@ export const FinancialData: React.FC = () => {
   };
 
   const addPixKey = () => {
-    const newKey = { id: Date.now().toString(), type: 'cnpj', key: '' };
+    const newKey = { id: Date.now().toString(), type: 'cnpj', key: '', userId: auth.currentUser?.uid };
     handleSettingsChange('pixKeys', [...(settings.pixKeys || []), newKey]);
   };
 
@@ -82,7 +82,8 @@ export const FinancialData: React.FC = () => {
       number: '', 
       neighborhood: '', 
       city: '', 
-      state: '' 
+      state: '',
+      userId: auth.currentUser?.uid
     };
     handleSettingsChange('billingAddresses', [...(settings.billingAddresses || []), newAddress]);
   };

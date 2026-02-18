@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download } from 'lucide-react';
-import { certificateService, Certificate } from '../../services/firebase';
+import { certificateService, Certificate, auth } from '../../services/firebase';
 
 export const Certificates: React.FC = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -11,6 +11,7 @@ export const Certificates: React.FC = () => {
   const [selectedType, setSelectedType] = useState('Todos');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'expiryDate' | 'issueDate'>('expiryDate');
+  const [fileName, setFileName] = useState('');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -45,9 +46,12 @@ export const Certificates: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      setFileName(file.name);
       const reader = new FileReader();
       reader.onload = () => {
-        setFormData(prev => ({ ...prev, fileUrl: reader.result as string }));
+        const result = reader.result as string;
+        const base64 = result.split(',')[1] || result;
+        setFormData(prev => ({ ...prev, fileUrl: base64 }));
       };
       reader.readAsDataURL(file);
     }
@@ -57,16 +61,18 @@ export const Certificates: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     
+    const payload = { ...formData, userId: auth.currentUser?.uid };
     let success = false;
     if (editingId) {
-      success = await certificateService.update(editingId, formData);
+      success = await certificateService.update(editingId, payload);
     } else {
-      success = await certificateService.create(formData);
+      success = await certificateService.create(payload);
     }
 
     if (success) {
       setIsModalOpen(false);
       setFormData({ name: '', issueDate: '', expiryDate: '', fileUrl: '' });
+      setFileName('');
       setEditingId(null);
       loadCertificates();
     }
@@ -88,12 +94,14 @@ export const Certificates: React.FC = () => {
       expiryDate: cert.expiryDate,
       fileUrl: cert.fileUrl || ''
     });
+    setFileName('');
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
+    setFileName('');
     setFormData({ name: '', issueDate: '', expiryDate: '', fileUrl: '' });
   };
 
@@ -208,7 +216,7 @@ export const Certificates: React.FC = () => {
                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {cert.fileUrl && (
                         <a 
-                          href={cert.fileUrl} 
+                          href={cert.fileUrl.startsWith('data:') || cert.fileUrl.startsWith('http') ? cert.fileUrl : `data:application/pdf;base64,${cert.fileUrl}`}
                           download={`${cert.name}.pdf`}
                           className="text-slate-400 hover:text-blue-600 p-2 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Baixar PDF"
@@ -272,7 +280,7 @@ export const Certificates: React.FC = () => {
                     />
                     <div className="flex flex-col items-center gap-2 text-slate-500">
                       <Upload size={24} />
-                      <span className="text-sm font-medium">{formData.fileUrl ? 'Arquivo selecionado (Clique para alterar)' : 'Clique para fazer upload do PDF'}</span>
+                      <span className="text-sm font-medium">{fileName || (formData.fileUrl ? 'Arquivo PDF Anexado (Clique para alterar)' : 'Clique para fazer upload do PDF')}</span>
                     </div>
                 </div>
               </div>

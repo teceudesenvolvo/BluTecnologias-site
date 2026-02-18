@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckSquare, Plus, X, Loader2, User } from 'lucide-react';
-import { taskService, Task } from '../../services/firebase';
+import { taskService, Task, auth } from '../../services/firebase';
 
 export const Tasks: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -34,7 +34,11 @@ export const Tasks: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     
-    const taskData = { ...formData, team: formData.team || selectedTeam } as Omit<Task, 'id'>;
+    const taskData = { 
+      ...formData, 
+      team: formData.team || selectedTeam,
+      userId: auth.currentUser?.uid
+    } as Omit<Task, 'id'>;
     
     const success = await taskService.create(taskData);
     if (success) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { financialService, Transaction } from '../../services/firebase';
+import { financialService, Transaction, auth } from '../../services/firebase';
 
 export const Financial: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -54,6 +54,7 @@ export const Financial: React.FC = () => {
       amount: Number(newTransaction.amount),
       type: newTransaction.type as 'income' | 'expense',
       date: newTransaction.date || new Date().toISOString().split('T')[0],
+      userId: auth.currentUser?.uid
     };
 
     const success = await financialService.add(transaction);

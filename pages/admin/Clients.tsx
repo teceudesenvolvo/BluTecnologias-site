@@ -112,11 +112,12 @@ export const Clients: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     
+    const payload = { ...formData, userId: auth.currentUser?.uid };
     let success = false;
     if (editingClient) {
-      success = await clientService.update(editingClient.id, formData);
+      success = await clientService.update(editingClient.id, payload);
     } else {
-      success = await clientService.create(formData);
+      success = await clientService.create(payload);
     }
 
     if (success) {
@@ -154,11 +155,12 @@ export const Clients: React.FC = () => {
   const handleProspectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const payload = { ...prospectFormData, userId: auth.currentUser?.uid };
     let success = false;
     if (editingProspect) {
-      success = await prospectService.update(editingProspect.id, prospectFormData);
+      success = await prospectService.update(editingProspect.id, payload);
     } else {
-      success = await prospectService.create(prospectFormData);
+      success = await prospectService.create(payload);
     }
 
     if (success) {
@@ -457,14 +459,12 @@ export const Clients: React.FC = () => {
              <div className="flex justify-center py-20 text-slate-400">
                <Loader2 className="animate-spin" />
              </div>
-          ) : filteredContacts.length === 0 ? (
-             <div className="text-center py-20 text-slate-400">Nenhum contato encontrado.</div>
           ) : (
             filteredContacts.map((contact) => (
               <div key={contact.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between gap-6">
                  <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h4 className="font-bold text-slate-800 text-lg">{contact.name}</h4>
+                      <h4 className="font-bold text-slate-800 text-lg">{contact.razaoSocial}</h4>
                       <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${contact.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {contact.status === 'active' ? 'Cliente' : 'Lead'}
                       </span>

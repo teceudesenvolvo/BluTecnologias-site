@@ -8,7 +8,8 @@ import {
   CheckSquare,
   Users,
   FileBadge,
-  Landmark
+  Landmark,
+  User
 } from 'lucide-react';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 import { News } from './admin/News';
@@ -17,10 +18,11 @@ import { FinancialData } from './admin/FinancialData';
 import { Tasks } from './admin/Tasks';
 import { Clients } from './admin/Clients';
 import { Certificates } from './admin/Certificates';
+import { Profile } from './admin/Profile';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'blog' | 'financial' | 'financial-data' | 'tasks' | 'clients' | 'certificates'>('blog');
+  const [activeTab, setActiveTab] = useState<'blog' | 'financial' | 'financial-data' | 'tasks' | 'clients' | 'certificates' | 'profile'>('blog');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export const Admin: React.FC = () => {
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare, component: Tasks },
     { id: 'clients', label: 'Clientes', icon: Users, component: Clients },
     { id: 'certificates', label: 'Documentos', icon: FileBadge, component: Certificates },
+    { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile },
   ];
 
   const ActiveComponent = menuItems.find(item => item.id === activeTab)?.component || News;
