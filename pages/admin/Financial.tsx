@@ -13,7 +13,7 @@ export const Financial: React.FC = () => {
     type: 'income',
     date: new Date().toISOString().split('T')[0],
     description: '',
-    amount: 0
+    amount: 0 
   });
 
   useEffect(() => {
@@ -136,12 +136,14 @@ export const Financial: React.FC = () => {
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
         <div className="flex justify-between items-center mb-8">
           <h3 className="text-xl font-bold text-slate-700">Fluxo de Caixa</h3>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20"
-          >
-            <Plus size={18} /> Nova Transação
-          </button>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20"
+            >
+              <Plus size={18} /> Nova Transação
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

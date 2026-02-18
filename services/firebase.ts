@@ -1,7 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions } from 'firebase/functions';
+import { getDatabase } from 'firebase/database';
 import { BlogPost } from '../types';
 
 // Configuração do Firebase - Substitua pelos dados do seu projeto no Console do Firebase
@@ -21,6 +22,7 @@ export const auth = getAuth(app);
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+export const rtdb = getDatabase(app);
 
 const DB_URL = 'https://blutecnologias-site-default-rtdb.firebaseio.com';
 
@@ -30,6 +32,7 @@ export interface Transaction {
   amount: number;
   type: 'income' | 'expense';
   date: string;
+  userId?: string;
 }
 
 export interface ClientContract {
@@ -94,9 +97,11 @@ export interface ContactLead {
   status: 'lead' | 'active';
   contracts?: ClientContract[];
   adjustments?: ClientAdjustment[];
+  cobrancas?: any[];
   invoices?: ClientInvoice[];
   proposals?: ClientProposal[];
   reports?: ClientReport[];
+  userId?: string;
 }
 
 export interface ProspectFile {
@@ -112,6 +117,7 @@ export interface Prospect {
   endereco: string;
   presidente: string;
   files: ProspectFile[];
+  userId?: string;
 }
 
 export interface Task {
@@ -121,6 +127,7 @@ export interface Task {
   status: 'todo' | 'in_progress' | 'done';
   team: string;
   assignee?: string;
+  userId?: string;
 }
 
 export interface Certificate {
@@ -129,6 +136,33 @@ export interface Certificate {
   issueDate: string;
   expiryDate: string;
   fileUrl?: string;
+  userId?: string;
+}
+
+export interface FinancialSettings {
+  bankAccounts?: {
+    id: string;
+    bankCode?: string;
+    bankName: string;
+    agency: string;
+    accountNumber: string;
+  }[];
+  pixKeys?: {
+    id: string;
+    type: 'cnpj' | 'email' | 'phone' | 'random';
+    key: string;
+  }[];
+  billingAddresses?: {
+    id: string;
+    cep: string;
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+  }[];
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
 export const blogService = {
@@ -177,15 +211,16 @@ export const blogService = {
   async create(post: Omit<BlogPost, 'id'>): Promise<boolean> {
     try {
       const user = auth.currentUser;
+      if (!user) return false;
       const token = user ? await user.getIdToken() : null;
       const url = token ? `${DB_URL}/posts.json?auth=${token}` : `${DB_URL}/posts.json`;
-
+      const postWithUser = { ...post, userId: user.uid };
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(post),
+        body: JSON.stringify(postWithUser),
       });
       return response.ok;
     } catch (error) {
@@ -247,10 +282,11 @@ export const prospectService = {
 
   async create(prospect: Omit<Prospect, 'id'>): Promise<boolean> {
     try {
+      const user = auth.currentUser;
       const response = await fetch(`${DB_URL}/prospects.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prospect),
+        body: JSON.stringify({ ...prospect, userId: user?.uid }),
       });
       return response.ok;
     } catch (error) {
@@ -304,10 +340,11 @@ export const certificateService = {
 
   async create(cert: Omit<Certificate, 'id'>): Promise<boolean> {
     try {
+      const user = auth.currentUser;
       const response = await fetch(`${DB_URL}/certificates.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cert),
+        body: JSON.stringify({ ...cert, userId: user?.uid }),
       });
       return response.ok;
     } catch (error) {
@@ -363,10 +400,11 @@ export const taskService = {
 
   async create(task: Omit<Task, 'id'>): Promise<boolean> {
     try {
+      const user = auth.currentUser;
       const response = await fetch(`${DB_URL}/tasks.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
+        body: JSON.stringify({ ...task, userId: user?.uid }),
       });
       return response.ok;
     } catch (error) {
@@ -405,10 +443,12 @@ export const taskService = {
 export const contactService = {
   async create(lead: Omit<ContactLead, 'id' | 'date' | 'status'>): Promise<boolean> {
     try {
+      const user = auth.currentUser;
       const leadData = {
         ...lead,
         date: new Date().toISOString(),
-        status: 'lead'
+        status: 'lead',
+        userId: user?.uid,
       };
       
       const response = await fetch(`${DB_URL}/contacts.json`, {
@@ -464,11 +504,12 @@ export const financialService = {
       const user = auth.currentUser;
       const token = user ? await user.getIdToken() : null;
       const url = token ? `${DB_URL}/transactions.json?auth=${token}` : `${DB_URL}/transactions.json`;
+      const transactionWithUser = { ...transaction, userId: user?.uid };
 
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify(transactionWithUser),
       });
       return response.ok;
     } catch (error) {
@@ -497,10 +538,12 @@ export const financialService = {
 export const clientService = {
   async create(client: Omit<ContactLead, 'id' | 'date' | 'status'>): Promise<boolean> {
     try {
+      const user = auth.currentUser;
       const clientData = {
         ...client,
         date: new Date().toISOString(),
-        status: 'active'
+        status: 'active',
+        userId: user?.uid,
       };
       
       const response = await fetch(`${DB_URL}/contacts.json`, {
@@ -557,8 +600,27 @@ export const clientService = {
 
   async sendBilling(clientId: string, billingData: any): Promise<boolean> {
     try {
-      const sendEmail = httpsCallable(functions, 'sendBillingEmail');
-      await sendEmail({ clientId, ...billingData });
+      // Prefer HTTP CORS-enabled endpoint to avoid browser preflight 403 issues
+      const url = `https://us-central1-blutecnologias-site.cloudfunctions.net/sendBillingEmailHttp`;
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ clientId, ...billingData })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('sendBilling HTTP error', response.status, err);
+        // Surface server message to caller
+        throw new Error(err?.message || `HTTP ${response.status}`);
+      }
+
       return true;
     } catch (error) {
       console.error('Erro ao enviar cobrança via Cloud Functions:', error);

@@ -126,7 +126,7 @@ export const Certificates: React.FC = () => {
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 min-h-[600px] relative">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <div>
+          <div> 
             <h3 className="text-xl font-bold text-slate-700">Gestão de Documentação</h3>
             <p className="text-slate-500 text-sm">Monitore a vigência de CNDs e documentos legais.</p>
           </div>

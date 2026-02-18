@@ -1,0 +1,27 @@
+# Ignore node modules and build artifacts to keep deployment package small
+# lib/ intentionally included in deploy so precompiled JS is available to Cloud Build
+node_modules/
+dist/
+build/
+
+# Local editor and system files
+.vscode/
+.idea/
+.DS_Store
+
+# Git
+.git/
+
+# Logs and temporary
+*.log
+*.tmp
+
+# Source maps
+*.map
+
+# Assets not needed in functions
+assets/
+
+# Test and coverage
+coverage/
+**/__tests__/

@@ -7,18 +7,20 @@ import {
   DollarSign,
   CheckSquare,
   Users,
-  FileBadge
+  FileBadge,
+  Landmark
 } from 'lucide-react';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 import { News } from './admin/News';
 import { Financial } from './admin/Financial';
+import { FinancialData } from './admin/FinancialData';
 import { Tasks } from './admin/Tasks';
 import { Clients } from './admin/Clients';
 import { Certificates } from './admin/Certificates';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'blog' | 'financial' | 'tasks' | 'clients' | 'certificates'>('blog');
+  const [activeTab, setActiveTab] = useState<'blog' | 'financial' | 'financial-data' | 'tasks' | 'clients' | 'certificates'>('blog');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export const Admin: React.FC = () => {
   const menuItems = [
     { id: 'blog', label: 'Novidades', icon: FileText, component: News },
     { id: 'financial', label: 'Financeiro', icon: DollarSign, component: Financial },
+    { id: 'financial-data', label: 'Dados Financeiros', icon: Landmark, component: FinancialData },
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare, component: Tasks },
     { id: 'clients', label: 'Clientes', icon: Users, component: Clients },
     { id: 'certificates', label: 'Documentos', icon: FileBadge, component: Certificates },

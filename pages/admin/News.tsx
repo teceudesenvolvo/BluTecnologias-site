@@ -13,7 +13,7 @@ const RichTextEditor = ({ value, onChange }: { value: string, onChange: (val: st
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = value;
     }
-  }, [value]);
+  }, [value]); 
 
   const execCommand = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);

@@ -15,7 +15,7 @@ export const Tasks: React.FC = () => {
     status: 'todo',
     team: 'Desenvolvimento',
     assignee: ''
-  });
+  }); 
 
   const teams = ['Desenvolvimento', 'Marketing', 'Vendas', 'Suporte', 'Financeiro'];
 
