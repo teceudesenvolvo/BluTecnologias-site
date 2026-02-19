@@ -52,9 +52,6 @@ export const BluGov: React.FC = () => {
             <Link to="/contact" className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-blue-700 transition-all shadow-xl hover:shadow-blue-500/30 hover:-translate-y-1">
               Agendar Demo
             </Link>
-            <a href="#overview" className="text-blue-600 px-8 py-4 rounded-full font-bold text-lg hover:bg-blue-50 transition-all flex items-center gap-2">
-              Saiba mais <ChevronRight size={20} />
-            </a>
           </div>
         </ScrollReveal>
 
