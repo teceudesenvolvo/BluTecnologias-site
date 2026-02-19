@@ -2,18 +2,26 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+
+// Sem Login
 import { Home } from './pages/Home';
 import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
-import { Admin } from './pages/Admin';
+import { Login } from './pages/Login';
+
+// Produtos
+import { BluGov } from './pages/softwares/BluGov';
 import { PortalServicos } from './pages/softwares/PortalServicos';
 import { PortalLegislativo } from './pages/softwares/PortalLegislativo';
 import { AppCamara } from './pages/softwares/AppCamara';
-import { Login } from './pages/Login';
 import { BluEscolar } from './pages/softwares/BluEscolar';
 import { Contact } from './pages/Contact';
 import { ProductDetails } from './pages/softwares/ProductDetails';
 import { BlogPost } from './pages/BlogPost';
+
+// Com Login
+import { Admin } from './pages/Admin';
+
 
 const AppContent: React.FC = () => {
   const location = useLocation();
@@ -25,18 +33,22 @@ const AppContent: React.FC = () => {
         {!hideNavbar && <Navbar />}
         <main className="flex-grow">
           <Routes>
+            {/* Sem Login */}
             <Route path="/" element={<Home />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/contact" element={<Contact />} />
+           {/* Produtos */}
             <Route path="/products" element={<Products />} />
             <Route path="/products/1" element={<PortalServicos />} />
             <Route path="/products/2" element={<PortalLegislativo />} />
             <Route path="/products/3" element={<AppCamara />} />
             <Route path="/products/4" element={<BluEscolar />} />
+            <Route path="/products/5" element={<BluGov />} />
             <Route path="/products/:id" element={<ProductDetails />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:id" element={<BlogPost />} />
-            <Route path="/login" element={<Login />} />
+            {/* Com Login */}
             <Route path="/admin" element={<Admin />} />
-            <Route path="/contact" element={<Contact />} />
           </Routes>
         </main>
         {!hideFooter && <Footer />}

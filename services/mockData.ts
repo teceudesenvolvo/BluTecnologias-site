@@ -32,6 +32,14 @@ export const initialSoftwares: Software[] = [
     icone_3d: 'GraduationCap',
     link_demo: '#',
     features: ['Matrícula Online', 'Diário Digital', 'Gestão de Transportes']
+  },
+  {
+    id: '5',
+    nome_produto: 'Governança 360°',
+    descricao_venda: 'Uma solução completa de ERP e Fintech para órgãos públicos que buscam eficiência máxima e risco zero.',
+    icone_3d: 'Sparkles',
+    link_demo: '#',
+    features: ['Análise de Editais com IA', 'Gestão de Contratos', 'Automação de Pagamentos']
   }
 ];
 

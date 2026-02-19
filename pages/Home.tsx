@@ -19,7 +19,7 @@ export const Home: React.FC = () => {
             Governança 360° com <span className="text-blue-600">Inteligência Artificial</span> e Transparência Real.
           </h1>
           <p className="text-xl md:text-2xl font-medium text-slate-500 mb-10 max-w-4xl mx-auto">
-            Elimine erros em editais, evite conflitos de contratos e automatize seus pagamentos. Uma solução completa de ERP para órgãos públicos que buscam eficiência máxima e risco zero.
+            Elimine erros em editais, evite conflitos de contratos e automatize seus pagamentos. Uma solução completa de ERP e Fintech para órgãos públicos que buscam eficiência máxima e risco zero.
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link to="/login" className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:bg-blue-700 transition-all shadow-lg">
@@ -30,13 +30,20 @@ export const Home: React.FC = () => {
             </Link>
           </div>
         </ScrollReveal>
-        <ScrollReveal delay={200} className="mt-20 w-[90%] max-w-6xl h-full bg-white rounded-t-2xl shadow-2xl border border-slate-200 mx-auto relative top-10 flex flex-col overflow-hidden">
-           <div className="h-10 bg-slate-100 border-b border-slate-200 rounded-t-2xl flex items-center px-4 gap-2 flex-shrink-0">
-             <div className="w-3 h-3 rounded-full bg-red-400" />
-             <div className="w-3 h-3 rounded-full bg-yellow-400" />
-             <div className="w-3 h-3 rounded-full bg-green-400" />
+        <ScrollReveal delay={200} className="mt-24 w-[90%] max-w-5xl mx-auto relative">
+           {/* MacBook Mockup */}
+           <div className="relative mx-auto">
+              {/* Screen */}
+              <div className="relative mx-auto border-slate-800 bg-slate-800 border-[8px] rounded-t-2xl aspect-video shadow-2xl">
+                 <div className="rounded-lg overflow-hidden h-full w-full bg-black flex items-center justify-center">
+                    <img src={DashSistemaFinImg} className="w-full h-full object-contain" alt="Dashboard do Sistema de Governança" />
+                 </div>
+              </div>
+              {/* Base */}
+              <div className="relative mx-auto bg-slate-700 rounded-b-xl h-5 shadow-2xl">
+                 <div className="absolute left-1/2 top-0 -translate-x-1/2 w-24 h-2 bg-slate-900/50 rounded-b-md"></div>
+              </div>
            </div>
-           <img src={DashSistemaFinImg} alt="Dashboard do Sistema de Governança" className="w-full h-full object-cover object-top" />
         </ScrollReveal>
       </section>
 
