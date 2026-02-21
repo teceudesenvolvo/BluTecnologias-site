@@ -988,7 +988,9 @@ export const Clients: React.FC = () => {
                  <div className="mt-8">
                    <h4 className="font-bold text-slate-700 mb-4">Histórico de Cobranças Enviadas</h4>
                    <div className="space-y-3">
-                     {(managingClient.cobrancas || []).slice().reverse().map((item: any, idx: number) => (
+                     {(managingClient.cobrancas || []).slice().reverse().map((item: any, idx: number) => {
+                        if (!item) return null;
+                        return (
                         <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
                            <div className="flex justify-between items-start">
                              <div>
@@ -1002,7 +1004,8 @@ export const Clients: React.FC = () => {
                              </span>
                            </div>
                         </div>
-                     ))}
+                        );
+                     })}
                      {(!managingClient.cobrancas || managingClient.cobrancas.length === 0) && (
                        <p className="text-center text-slate-400 py-4">Nenhuma cobrança enviada ainda.</p>
                      )}
@@ -1016,7 +1019,9 @@ export const Clients: React.FC = () => {
                  {(managingClient[manageTab] || []).length === 0 ? (
                    <p className="text-center text-slate-400 py-8">Nenhum registro encontrado.</p>
                  ) : (
-                   (managingClient[manageTab] as any[]).map((item, idx) => (
+                   (managingClient[manageTab] as any[]).map((item, idx) => {
+                     if (!item) return null;
+                     return (
                      <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="flex-1">
                           {manageTab === 'contracts' && (
@@ -1066,7 +1071,8 @@ export const Clients: React.FC = () => {
                           </a>
                         )}
                      </div>
-                   ))
+                   );
+                   })
                  )}
                </div>
                )}

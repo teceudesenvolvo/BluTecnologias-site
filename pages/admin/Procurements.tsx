@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { Briefcase, Gavel, Handshake, Layers } from 'lucide-react';
+import { MinhasContratacoes } from './contratacoes/MinhasContratacoes';
+import { Licitacoes } from './contratacoes/Licitacoes';
+import { ContratacoesDiretas } from './contratacoes/ContratacoesDiretas';
+import { ProcedimentosAuxiliares } from './contratacoes/ProcedimentosAuxiliares';
 
 export const Procurements: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'my_procurements' | 'biddings' | 'direct_contracting' | 'auxiliary_procedures'>('my_procurements');
@@ -35,30 +39,10 @@ export const Procurements: React.FC = () => {
 
       {/* Content */}
       <div className="min-h-[400px]">
-        {activeTab === 'my_procurements' && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Briefcase size={48} className="mb-4 opacity-20" />
-            <p>Nenhuma contratação encontrada.</p>
-          </div>
-        )}
-        {activeTab === 'biddings' && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Gavel size={48} className="mb-4 opacity-20" />
-            <p>Nenhuma licitação encontrada.</p>
-          </div>
-        )}
-        {activeTab === 'direct_contracting' && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Handshake size={48} className="mb-4 opacity-20" />
-            <p>Nenhuma contratação direta encontrada.</p>
-          </div>
-        )}
-        {activeTab === 'auxiliary_procedures' && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Layers size={48} className="mb-4 opacity-20" />
-            <p>Nenhum procedimento auxiliar encontrado.</p>
-          </div>
-        )}
+        {activeTab === 'my_procurements' && <MinhasContratacoes />}
+        {activeTab === 'biddings' && <Licitacoes />}
+        {activeTab === 'direct_contracting' && <ContratacoesDiretas />}
+        {activeTab === 'auxiliary_procedures' && <ProcedimentosAuxiliares />}
       </div>
     </div>
   );
