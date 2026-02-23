@@ -93,7 +93,7 @@ function getTransporter() {
   } catch (e) {
     console.error('getTransporter: error creating transporter', String(e));
     return { transporter: null, from: fromEmail };
-  } 
+  }
 }
 
 async function saveReportToStorageAndDb(clientId: string, reportFile: string, title: string, userId?: string) {
@@ -155,14 +155,14 @@ function fetchUrlToBuffer(url: string): Promise<Buffer> {
  */
 export const sendBillingEmail = functions.https.onCall(async (data, context) => {
   try {
-  const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data || {};
+    const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data || {};
 
-    console.log('sendBillingEmail called with:', { 
-      clientId, 
-      hasInvoice: !!invoiceFile, 
-      hasReport: !!reportFile, 
+    console.log('sendBillingEmail called with:', {
+      clientId,
+      hasInvoice: !!invoiceFile,
+      hasReport: !!reportFile,
       certFilesCount: certificateFiles?.length,
-      selectedCertsCount: selectedCertificates?.length 
+      selectedCertsCount: selectedCertificates?.length
     });
 
     if (!clientId) throw new functions.https.HttpsError('invalid-argument', 'clientId is required');
@@ -175,13 +175,13 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
     const to = client.email || client.financialContact || null;
     if (!to) throw new functions.https.HttpsError('failed-precondition', 'Client has no email to send to');
 
-  // Build or get cached transporter
+    // Build or get cached transporter
     const { transporter, from: computedFrom } = getTransporter();
     if (!transporter) {
       console.error('sendBillingEmail: transporter not available; host/user/pass missing at runtime');
       throw new functions.https.HttpsError('failed-precondition', 'SMTP configuration is missing or invalid.');
     }
-  const effectiveFrom = computedFrom;
+    const effectiveFrom = computedFrom;
     // Debug info (avoid logging secrets)
     console.log('sendBillingEmail: sending via transporter, from=', effectiveFrom);
 
@@ -194,35 +194,35 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
       const parsed = parseDataUrl(reportFile);
       if (parsed) attachments.push({ filename: 'report', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
     }
-      // certificateFiles: optional array of { filename, dataUrl } OR selectedCertificates { name, fileUrl }
-      const certs = certificateFiles || selectedCertificates;
-      if (Array.isArray(certs)) {
-        for (const cf of certs) {
-          if (cf) {
-            const fname = cf.filename || cf.name || 'documento.pdf';
-            // Check for dataUrl or fileUrl being a data URI
-            const rawDataUrl = cf.dataUrl || (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('data:') ? cf.fileUrl : null);
+    // certificateFiles: optional array of { filename, dataUrl } OR selectedCertificates { name, fileUrl }
+    const certs = certificateFiles || selectedCertificates;
+    if (Array.isArray(certs)) {
+      for (const cf of certs) {
+        if (cf) {
+          const fname = cf.filename || cf.name || 'documento.pdf';
+          // Check for dataUrl or fileUrl being a data URI
+          const rawDataUrl = cf.dataUrl || (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('data:') ? cf.fileUrl : null);
 
-            if (typeof rawDataUrl === 'string') {
-              const parsed = parseDataUrl(rawDataUrl);
-              if (parsed) {
-                attachments.push({ filename: fname, content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
-                console.log(`Attached certificate (Base64): ${fname}`);
-              } else {
-                console.warn(`Failed to parse Data URI for certificate: ${fname}`);
-              }
-            } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('http')) {
-              try {
-                const buffer = await fetchUrlToBuffer(cf.fileUrl);
-                attachments.push({ filename: fname, content: buffer });
-                console.log(`Attached certificate (URL): ${fname}`);
-              } catch (fetchErr) {
-                console.error(`Failed to fetch certificate ${fname}:`, fetchErr);
-              }
+          if (typeof rawDataUrl === 'string') {
+            const parsed = parseDataUrl(rawDataUrl);
+            if (parsed) {
+              attachments.push({ filename: fname, content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+              console.log(`Attached certificate (Base64): ${fname}`);
+            } else {
+              console.warn(`Failed to parse Data URI for certificate: ${fname}`);
+            }
+          } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('http')) {
+            try {
+              const buffer = await fetchUrlToBuffer(cf.fileUrl);
+              attachments.push({ filename: fname, content: buffer });
+              console.log(`Attached certificate (URL): ${fname}`);
+            } catch (fetchErr) {
+              console.error(`Failed to fetch certificate ${fname}:`, fetchErr);
             }
           }
         }
       }
+    }
 
     const html = `
       <p>Olá, Prezados</p>
@@ -381,8 +381,8 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
         <p> Este é um email automático, por favor, não responda. </p>
       `;
 
-  const mailOptions = { from: effectiveFrom, to, subject: `${title || 'Nova Notificação Financeira'}`, html, attachments } as any;
-  console.log('sendBillingEmailHttp: sending mail', { to, from: effectiveFrom, attachments: attachments.length });
+      const mailOptions = { from: effectiveFrom, to, subject: `${title || 'Nova Notificação Financeira'}`, html, attachments } as any;
+      console.log('sendBillingEmailHttp: sending mail', { to, from: effectiveFrom, attachments: attachments.length });
       try {
         await transporter.sendMail(mailOptions);
       } catch (sendErr: any) {
@@ -404,3 +404,160 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+export const handleInboundEmail = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  try {
+    const { to, from, subject, text, html } = req.body;
+    if (!to) {
+      res.status(400).send('Missing "to" field');
+      return;
+    }
+
+    // Simplify "to" to pure email if it's formatted like "Name <email@domain.com>"
+    const match = to.match(/<([^>]+)>/);
+    const toEmail = match ? match[1] : to;
+
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(toEmail);
+    } catch (e) {
+      console.log(`Email rejected: No user found for ${toEmail}`);
+      res.status(200).send('Ignored: recipient not registered');
+      return;
+    }
+
+    const uid = userRecord.uid;
+    const dbRef = admin.database().ref(`users/${uid}/emails`);
+
+    await dbRef.push({
+      to,
+      from: from || 'Desconhecido',
+      subject: subject || 'Sem assunto',
+      body: html || text || '',
+      folder: 'inbox',
+      read: false,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`Inbound email saved for user ${uid}`);
+    res.status(200).send('Success');
+  } catch (err: any) {
+    console.error('handleInboundEmail error:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+export const processMailQueue = functions.database.ref('/mail_queue/{pushId}').onCreate(async (snapshot, context) => {
+  const mailData = snapshot.val();
+  const pushId = context.params.pushId;
+
+  // Prevent processing if already processed or missing basic info
+  if (!mailData || mailData.delivery || !mailData.to || !mailData.message) {
+    console.log(`Skipping mailQueue ${pushId}: invalid or already processed.`);
+    return null;
+  }
+
+  const { to, message, userId } = mailData;
+  const { subject, html, text, attachments } = message;
+
+  // Mark as processing
+  await snapshot.ref.update({
+    delivery: {
+      state: 'PROCESSING',
+      startTime: admin.database.ServerValue.TIMESTAMP
+    }
+  });
+
+  try {
+    let transporter: nodemailer.Transporter | null = null;
+    let computedFrom = 'Eu <contato@blutecnologias.com>';
+
+    // Se o userId foi enviado na fila (como feito pelo EmailComposer do Webmail)
+    if (userId) {
+      const userSmtpSnap = await admin.database().ref(`users/${userId}/smtpSettings`).once('value');
+      const smtpSettings = userSmtpSnap.val();
+
+      if (smtpSettings && smtpSettings.host && smtpSettings.port && smtpSettings.user && smtpSettings.pass) {
+        // Criar transporter customizado para este usuário
+        transporter = nodemailer.createTransport({
+          host: smtpSettings.host,
+          port: Number(smtpSettings.port),
+          secure: Number(smtpSettings.port) === 465,
+          auth: {
+            user: smtpSettings.user,
+            pass: smtpSettings.pass
+          }
+        });
+
+        // Buscar o nome de exibição do usuário ou fallback pro email
+        const userProfSnap = await admin.database().ref(`users/${userId}`).once('value');
+        const userProfile = userProfSnap.val();
+        const displName = userProfile?.displayName || smtpSettings.user;
+        computedFrom = `${displName} <${smtpSettings.user}>`;
+      }
+    }
+
+    // Fallback para getTransporter global caso o SMTP do usuário não exista ou não seja do Webmail
+    if (!transporter) {
+      const globalSmtp = getTransporter();
+      transporter = globalSmtp.transporter;
+      computedFrom = globalSmtp.from;
+    }
+
+    if (!transporter) {
+      throw new Error('SMTP configuration missing: cannot dispatch email.');
+    }
+
+    const mailOptions: any = {
+      from: computedFrom,
+      to: Array.isArray(to) ? to.join(',') : to,
+      subject: subject || 'Sem assunto',
+      html: html || '',
+      text: text || ''
+    };
+
+    if (attachments && Array.isArray(attachments)) {
+      mailOptions.attachments = attachments.map((att: any) => {
+        // Simple case: attach directly using path as the dataUrl string
+        if (typeof att.path === 'string' && att.path.startsWith('data:')) {
+          return { path: att.path, filename: att.filename };
+        }
+        return att;
+      });
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Successfully dispatched email ${pushId}: ${info.messageId}`);
+
+    // Mark as success
+    await snapshot.ref.update({
+      delivery: {
+        state: 'SUCCESS',
+        endTime: admin.database.ServerValue.TIMESTAMP,
+        info: info.response || 'OK'
+      }
+    });
+
+    return null;
+
+  } catch (error: any) {
+    console.error(`Error sending email ${pushId}:`, error);
+
+    // Mark as error
+    await snapshot.ref.update({
+      delivery: {
+        state: 'ERROR',
+        endTime: admin.database.ServerValue.TIMESTAMP,
+        error: error.message || String(error)
+      }
+    });
+
+    return null;
+  }
+});
+

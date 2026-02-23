@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase';
-import { 
-  FileText, 
+import {
+  FileText,
   DollarSign,
   CheckSquare,
   Users,
@@ -14,7 +14,8 @@ import {
   FileCheck,
   FileSignature,
   ClipboardList,
-  Target
+  Target,
+  Mail
 } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { News } from './admin/News';
@@ -30,6 +31,7 @@ import { CRCs } from './admin/CRCs';
 import { ContractsPage } from './admin/ContractsPage';
 import { ARPs } from './admin/ARPs';
 import { InterestAreas } from './admin/InterestAreas';
+import { Webmail } from './admin/Webmail';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -65,6 +67,7 @@ export const Admin: React.FC = () => {
     { id: 'contracts', label: 'Contratos', icon: FileSignature, component: ContractsPage, showInMenu: true },
     { id: 'arps', label: 'ARPs', icon: ClipboardList, component: ARPs, showInMenu: true },
     { id: 'interest-areas', label: 'Áreas de Interesse', icon: Target, component: InterestAreas, showInMenu: true },
+    { id: 'webmail', label: 'Webmail', icon: Mail, component: Webmail, showInMenu: true },
     { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile, showInMenu: true },
   ];
 
@@ -73,26 +76,26 @@ export const Admin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex font-sans">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        user={user} 
-        handleLogout={handleLogout} 
-        menuItems={menuItems} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        user={user}
+        handleLogout={handleLogout}
+        menuItems={menuItems}
       />
 
       {/* Main Content */}
       <main className="flex-1 ml-64 p-8 md:p-12">
         <div className="max-w-6xl mx-auto">
-            <header className="mb-10">
-              <h2 className="text-3xl font-bold text-slate-800 capitalize">
-                {allTabs.find(i => i.id === activeTab)?.label.replace(/dados d(a|os) /i, '')}
-              </h2>
-              <p className="text-slate-500">Gerencie as informações do sistema.</p>
-            </header>
+          <header className="mb-10">
+            <h2 className="text-3xl font-bold text-slate-800 capitalize">
+              {allTabs.find(i => i.id === activeTab)?.label.replace(/dados d(a|os) /i, '')}
+            </h2>
+            <p className="text-slate-500">Gerencie as informações do sistema.</p>
+          </header>
 
-            <ActiveComponent setActiveTab={setActiveTab} />
-          </div>
+          <ActiveComponent setActiveTab={setActiveTab} />
+        </div>
       </main>
     </div>
   );

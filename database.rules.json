@@ -1,0 +1,17 @@
+{
+    "rules": {
+        ".read": "now < 1740000000000",
+        ".write": "now < 1740000000000",
+        "users": {
+            "$userId": {
+                "emails": {
+                    ".read": "auth != null && auth.uid === $userId",
+                    ".write": "auth != null && auth.uid === $userId"
+                }
+            }
+        },
+        "mail_queue": {
+            ".write": "auth != null"
+        }
+    }
+}

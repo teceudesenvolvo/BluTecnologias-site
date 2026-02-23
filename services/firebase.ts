@@ -3,11 +3,12 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { getDatabase } from 'firebase/database';
+import { getFirestore } from 'firebase/firestore';
 import { BlogPost } from '../types';
 
 // Configuração do Firebase - Substitua pelos dados do seu projeto no Console do Firebase
 const firebaseConfig = {
-   apiKey: "AIzaSyBwyV2KFRfT_Hsh10A8sXoJusuLIAUQ35Y",
+  apiKey: "AIzaSyBwyV2KFRfT_Hsh10A8sXoJusuLIAUQ35Y",
   authDomain: "blutecnologias-site.firebaseapp.com",
   databaseURL: "https://blutecnologias-site-default-rtdb.firebaseio.com",
   projectId: "blutecnologias-site",
@@ -23,6 +24,7 @@ export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
+export const db = getFirestore(app);
 
 const DB_URL = 'https://blutecnologias-site-default-rtdb.firebaseio.com';
 
@@ -182,7 +184,7 @@ export const blogService = {
     try {
       const response = await fetch(`${DB_URL}/posts.json`);
       const data = await response.json();
-      
+
       if (!data) return [];
 
       // O Firebase retorna um objeto onde as chaves são os IDs. Convertemos para array.
@@ -388,7 +390,7 @@ export const certificateService = {
     try {
       const response = await fetch(`${DB_URL}/certificates.json`);
       const data = await response.json();
-      
+
       if (!data) return [];
 
       return Object.entries(data).map(([id, cert]: [string, any]) => ({
@@ -448,7 +450,7 @@ export const taskService = {
     try {
       const response = await fetch(`${DB_URL}/tasks.json`);
       const data = await response.json();
-      
+
       if (!data) return [];
 
       return Object.entries(data).map(([id, task]: [string, any]) => ({
@@ -513,7 +515,7 @@ export const contactService = {
         status: 'lead',
         userId: user?.uid,
       };
-      
+
       const response = await fetch(`${DB_URL}/contacts.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -530,7 +532,7 @@ export const contactService = {
     try {
       const response = await fetch(`${DB_URL}/contacts.json`);
       const data = await response.json();
-      
+
       if (!data) return [];
 
       return Object.entries(data).map(([id, contact]: [string, any]) => ({
@@ -549,7 +551,7 @@ export const financialService = {
     try {
       const response = await fetch(`${DB_URL}/transactions.json`);
       const data = await response.json();
-      
+
       if (!data) return [];
 
       return Object.entries(data).map(([id, transaction]: [string, any]) => ({
@@ -608,7 +610,7 @@ export const clientService = {
         status: 'active',
         userId: user?.uid,
       };
-      
+
       const response = await fetch(`${DB_URL}/contacts.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

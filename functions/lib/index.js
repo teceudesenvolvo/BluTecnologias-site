@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.helloWorld = void 0;
+exports.processMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.helloWorld = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -92,7 +92,7 @@ function getTransporter() {
         return { transporter: null, from: fromEmail };
     }
 }
-async function saveReportToStorageAndDb(clientId, reportFile, title) {
+async function saveReportToStorageAndDb(clientId, reportFile, title, userId) {
     try {
         if (!reportFile || !reportFile.startsWith('data:'))
             return;
@@ -102,7 +102,8 @@ async function saveReportToStorageAndDb(clientId, reportFile, title) {
             title: title || 'Relatório',
             month: new Date().toISOString().slice(0, 7),
             fileUrl: reportFile,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            userId: userId || null
         });
         console.log('Report saved successfully (base64):', reportRef.key);
     }
@@ -110,7 +111,7 @@ async function saveReportToStorageAndDb(clientId, reportFile, title) {
         console.error('Error saving report:', e);
     }
 }
-async function saveInvoiceToStorageAndDb(clientId, invoiceFile, value) {
+async function saveInvoiceToStorageAndDb(clientId, invoiceFile, value, userId) {
     try {
         if (!invoiceFile || !invoiceFile.startsWith('data:'))
             return;
@@ -121,7 +122,8 @@ async function saveInvoiceToStorageAndDb(clientId, invoiceFile, value) {
             amount: Number(value || 0),
             status: 'sent',
             fileUrl: invoiceFile,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            userId: userId || null
         });
         console.log('Invoice saved successfully (base64):', ref.key);
     }
@@ -148,7 +150,7 @@ function fetchUrlToBuffer(url) {
  */
 exports.sendBillingEmail = functions.https.onCall(async (data, context) => {
     try {
-        const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect } = data || {};
+        const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data || {};
         console.log('sendBillingEmail called with:', {
             clientId,
             hasInvoice: !!invoiceFile,
@@ -242,10 +244,10 @@ exports.sendBillingEmail = functions.https.onCall(async (data, context) => {
         };
         await transporter.sendMail(mailOptions);
         if (reportFile && typeof reportFile === 'string') {
-            await saveReportToStorageAndDb(clientId, reportFile, `Relatório - ${title || 'Cobrança'}`);
+            await saveReportToStorageAndDb(clientId, reportFile, `Relatório - ${title || 'Cobrança'}`, userId || context.auth?.uid);
         }
         if (invoiceFile && typeof invoiceFile === 'string') {
-            await saveInvoiceToStorageAndDb(clientId, invoiceFile, value);
+            await saveInvoiceToStorageAndDb(clientId, invoiceFile, value, userId || context.auth?.uid);
         }
         return { success: true };
     }
@@ -278,7 +280,7 @@ exports.sendBillingEmailHttp = functions.https.onRequest((req, res) => {
         }
         try {
             const data = req.body || {};
-            const { clientId, to: directTo, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect } = data;
+            const { clientId, to: directTo, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data;
             // Allow testing by passing `to` directly in the POST body. If `to` is
             // provided we skip the Realtime Database lookup. Otherwise `clientId` is required.
             if (!directTo && !clientId)
@@ -381,10 +383,10 @@ exports.sendBillingEmailHttp = functions.https.onRequest((req, res) => {
                 return res.status(500).json({ success: false, message: `sendMail error: ${sendErr?.message || 'unknown'}` });
             }
             if (reportFile && typeof reportFile === 'string' && clientId) {
-                await saveReportToStorageAndDb(clientId, reportFile, `Relatório - ${title || 'Cobrança'}`);
+                await saveReportToStorageAndDb(clientId, reportFile, `Relatório - ${title || 'Cobrança'}`, userId);
             }
             if (invoiceFile && typeof invoiceFile === 'string' && clientId) {
-                await saveInvoiceToStorageAndDb(clientId, invoiceFile, value);
+                await saveInvoiceToStorageAndDb(clientId, invoiceFile, value, userId);
             }
             return res.json({ success: true });
         }
@@ -393,5 +395,139 @@ exports.sendBillingEmailHttp = functions.https.onRequest((req, res) => {
             return res.status(500).json({ success: false, message: err?.message || 'Unknown error' });
         }
     });
+});
+exports.handleInboundEmail = functions.https.onRequest(async (req, res) => {
+    if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+    }
+    try {
+        const { to, from, subject, text, html } = req.body;
+        if (!to) {
+            res.status(400).send('Missing "to" field');
+            return;
+        }
+        // Simplify "to" to pure email if it's formatted like "Name <email@domain.com>"
+        const match = to.match(/<([^>]+)>/);
+        const toEmail = match ? match[1] : to;
+        let userRecord;
+        try {
+            userRecord = await admin.auth().getUserByEmail(toEmail);
+        }
+        catch (e) {
+            console.log(`Email rejected: No user found for ${toEmail}`);
+            res.status(200).send('Ignored: recipient not registered');
+            return;
+        }
+        const uid = userRecord.uid;
+        const dbRef = admin.database().ref(`users/${uid}/emails`);
+        await dbRef.push({
+            to,
+            from: from || 'Desconhecido',
+            subject: subject || 'Sem assunto',
+            body: html || text || '',
+            folder: 'inbox',
+            read: false,
+            timestamp: new Date().toISOString()
+        });
+        console.log(`Inbound email saved for user ${uid}`);
+        res.status(200).send('Success');
+    }
+    catch (err) {
+        console.error('handleInboundEmail error:', err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+exports.processMailQueue = functions.database.ref('/mail_queue/{pushId}').onCreate(async (snapshot, context) => {
+    const mailData = snapshot.val();
+    const pushId = context.params.pushId;
+    // Prevent processing if already processed or missing basic info
+    if (!mailData || mailData.delivery || !mailData.to || !mailData.message) {
+        console.log(`Skipping mailQueue ${pushId}: invalid or already processed.`);
+        return null;
+    }
+    const { to, message, userId } = mailData;
+    const { subject, html, text, attachments } = message;
+    // Mark as processing
+    await snapshot.ref.update({
+        delivery: {
+            state: 'PROCESSING',
+            startTime: admin.database.ServerValue.TIMESTAMP
+        }
+    });
+    try {
+        let transporter = null;
+        let computedFrom = 'Eu <contato@blutecnologias.com>';
+        // Se o userId foi enviado na fila (como feito pelo EmailComposer do Webmail)
+        if (userId) {
+            const userSmtpSnap = await admin.database().ref(`users/${userId}/smtpSettings`).once('value');
+            const smtpSettings = userSmtpSnap.val();
+            if (smtpSettings && smtpSettings.host && smtpSettings.port && smtpSettings.user && smtpSettings.pass) {
+                // Criar transporter customizado para este usuário
+                transporter = nodemailer.createTransport({
+                    host: smtpSettings.host,
+                    port: Number(smtpSettings.port),
+                    secure: Number(smtpSettings.port) === 465,
+                    auth: {
+                        user: smtpSettings.user,
+                        pass: smtpSettings.pass
+                    }
+                });
+                // Buscar o nome de exibição do usuário ou fallback pro email
+                const userProfSnap = await admin.database().ref(`users/${userId}`).once('value');
+                const userProfile = userProfSnap.val();
+                const displName = userProfile?.displayName || smtpSettings.user;
+                computedFrom = `${displName} <${smtpSettings.user}>`;
+            }
+        }
+        // Fallback para getTransporter global caso o SMTP do usuário não exista ou não seja do Webmail
+        if (!transporter) {
+            const globalSmtp = getTransporter();
+            transporter = globalSmtp.transporter;
+            computedFrom = globalSmtp.from;
+        }
+        if (!transporter) {
+            throw new Error('SMTP configuration missing: cannot dispatch email.');
+        }
+        const mailOptions = {
+            from: computedFrom,
+            to: Array.isArray(to) ? to.join(',') : to,
+            subject: subject || 'Sem assunto',
+            html: html || '',
+            text: text || ''
+        };
+        if (attachments && Array.isArray(attachments)) {
+            mailOptions.attachments = attachments.map((att) => {
+                // Simple case: attach directly using path as the dataUrl string
+                if (typeof att.path === 'string' && att.path.startsWith('data:')) {
+                    return { path: att.path, filename: att.filename };
+                }
+                return att;
+            });
+        }
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`Successfully dispatched email ${pushId}: ${info.messageId}`);
+        // Mark as success
+        await snapshot.ref.update({
+            delivery: {
+                state: 'SUCCESS',
+                endTime: admin.database.ServerValue.TIMESTAMP,
+                info: info.response || 'OK'
+            }
+        });
+        return null;
+    }
+    catch (error) {
+        console.error(`Error sending email ${pushId}:`, error);
+        // Mark as error
+        await snapshot.ref.update({
+            delivery: {
+                state: 'ERROR',
+                endTime: admin.database.ServerValue.TIMESTAMP,
+                error: error.message || String(error)
+            }
+        });
+        return null;
+    }
 });
 //# sourceMappingURL=index.js.map
