@@ -37,7 +37,7 @@ export const Clients: React.FC = () => {
     message: ''
   });
 
-  const [prospectFormData, setProspectFormData] = useState<Omit<Prospect, 'id'>>({
+  const [prospectFormData, setProspectFormData] = useState<any>({
     municipio: '',
     estado: '',
     tipoOrgao: 'camara',
@@ -45,7 +45,8 @@ export const Clients: React.FC = () => {
     endereco: '',
     presidente: '',
     files: [],
-    visited: false
+    visited: false,
+    visitDate: ''
   });
 
   const [billingForm, setBillingForm] = useState({
@@ -205,7 +206,8 @@ export const Clients: React.FC = () => {
         endereco: prospect.endereco,
         presidente: prospect.presidente,
         files: prospect.files || [],
-        visited: prospect.visited || false
+        visited: prospect.visited || false,
+        visitDate: (prospect as any).visitDate || ''
       });
     } else {
       setEditingProspect(null);
@@ -217,7 +219,8 @@ export const Clients: React.FC = () => {
         endereco: '',
         presidente: '',
         files: [],
-        visited: false
+        visited: false,
+        visitDate: ''
       });
     }
     setIsProspectModalOpen(true);
@@ -706,7 +709,7 @@ export const Clients: React.FC = () => {
                     <option value="secretaria">Secretaria Municipal</option>
                   </select>
                 </div>
-                <div className="pt-6">
+                <div className="pt-6 flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -716,6 +719,14 @@ export const Clients: React.FC = () => {
                     />
                     <span className="font-medium text-slate-700">Visitado</span>
                   </label>
+                  {prospectFormData.visited && (
+                    <input 
+                      type="date"
+                      className="px-4 py-2 rounded-xl border border-slate-200"
+                      value={prospectFormData.visitDate || ''}
+                      onChange={e => setProspectFormData({...prospectFormData, visitDate: e.target.value})}
+                    />
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
