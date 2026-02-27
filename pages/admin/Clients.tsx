@@ -3,12 +3,13 @@ import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone
 import { auth, contactService, clientService, prospectService, certificateService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
 import { ref, get } from 'firebase/database';
 import { initialSoftwares } from '../../services/mockData';
+import { ProspectsMap } from './ProspectsMap';
 
 export const Clients: React.FC = () => {
   const [contacts, setContacts] = useState<ContactLead[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'lead' | 'active' | 'prospecting'>('all');
+  const [filter, setFilter] = useState<'all' | 'lead' | 'active' | 'prospecting' | 'prospecting-map'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProspectModalOpen, setIsProspectModalOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -417,7 +418,7 @@ export const Clients: React.FC = () => {
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 min-h-[600px] relative">
         <div className="flex justify-end mb-6 gap-4">
-            {filter === 'prospecting' && (
+            {(filter === 'prospecting' || filter === 'prospecting-map') && (
               <button onClick={() => openProspectModal()} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5">
                 <Plus size={18} /> Nova Prospecção
               </button>
@@ -452,11 +453,17 @@ export const Clients: React.FC = () => {
             >
               Prospecção
             </button>
+            <button 
+              onClick={() => setFilter('prospecting-map')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'prospecting-map' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Mapa
+            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {loading && filter !== 'prospecting' ? (
+          {loading && !filter.startsWith('prospecting') ? (
              <div className="flex justify-center py-20 text-slate-400">
                <Loader2 className="animate-spin" />
              </div>
@@ -556,6 +563,10 @@ export const Clients: React.FC = () => {
               ))
             )}
           </div>
+        )}
+
+        {filter === 'prospecting-map' && (
+          <ProspectsMap prospects={prospects} />
         )}
 
         {/* Modal de Novo Cliente */}
