@@ -19,6 +19,7 @@ interface GeocodedProspect extends Prospect {
   lng: number;
 }
 
+
 interface ProspectsMapProps {
   prospects: Prospect[];
 }
