@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { Prospect } from '../../services/firebase';
 import { Loader2, MapPin, CheckCircle } from 'lucide-react';
 
+
 // Corrige o problema do ícone padrão do Leaflet que pode não aparecer corretamente com alguns bundlers.
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
