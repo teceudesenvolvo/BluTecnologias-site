@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download } from 'lucide-react';
+import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download, Building2 } from 'lucide-react';
 import { certificateService, Certificate, auth } from '../../services/firebase';
 
 interface ExtendedCertificate extends Certificate {
   type?: string;
+  company?: string;
 }
 
 export const Certificates: React.FC = () => {
@@ -13,6 +14,7 @@ export const Certificates: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState('Todos');
+  const [activeTab, setActiveTab] = useState<'vigente' | 'vencidas'>('vigente');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'expiryDate' | 'issueDate'>('expiryDate');
   const [fileName, setFileName] = useState('');
@@ -20,6 +22,7 @@ export const Certificates: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     type: '',
+    company: '',
     issueDate: '',
     expiryDate: '',
     fileUrl: ''
@@ -76,7 +79,7 @@ export const Certificates: React.FC = () => {
 
     if (success) {
       setIsModalOpen(false);
-      setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' });
+      setFormData({ name: '', type: '', company: '', issueDate: '', expiryDate: '', fileUrl: '' });
       setFileName('');
       setEditingId(null);
       loadCertificates();
@@ -96,6 +99,7 @@ export const Certificates: React.FC = () => {
     setFormData({
       name: cert.name,
       type: cert.type || (docTypes.includes(cert.name) ? cert.name : ''),
+      company: cert.company || '',
       issueDate: cert.issueDate,
       expiryDate: cert.expiryDate,
       fileUrl: cert.fileUrl || ''
@@ -108,10 +112,11 @@ export const Certificates: React.FC = () => {
     setIsModalOpen(false);
     setEditingId(null);
     setFileName('');
-    setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' });
+    setFormData({ name: '', type: '', company: '', issueDate: '', expiryDate: '', fileUrl: '' });
   };
 
-  const getStatus = (expiryDate: string) => {
+  const getStatus = (expiryDate?: string) => {
+    if (!expiryDate) return { label: 'Vigente', color: 'text-green-600 bg-green-50', icon: CheckCircle, border: 'border-slate-200' };
     const today = new Date();
     const expiry = new Date(expiryDate);
     const diffTime = expiry.getTime() - today.getTime();
@@ -127,15 +132,30 @@ export const Certificates: React.FC = () => {
     : certificates.filter(cert => (cert.type || cert.name) === selectedType);
 
   const filteredCertificates = filteredByType.filter(cert => {
-    if (!dateFilter.start && !dateFilter.end) {
-      return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let isExpired = false;
+    if (cert.expiryDate) {
+      const [y, m, d] = cert.expiryDate.split('-').map(Number);
+      const expiry = new Date(y, m - 1, d);
+      if (expiry < today) isExpired = true;
     }
-    const dateToCompare = cert[dateFilterType];
-    const startOk = !dateFilter.start || dateToCompare >= dateFilter.start;
-    const endOk = !dateFilter.end || dateToCompare <= dateFilter.end;
 
-    return startOk && endOk;
+    if (activeTab === 'vencidas' && !isExpired) return false;
+    if (activeTab === 'vigente' && isExpired) return false;
+
+    if (dateFilter.start || dateFilter.end) {
+      const dateToCompare = cert[dateFilterType];
+      const startOk = !dateFilter.start || (dateToCompare && dateToCompare >= dateFilter.start);
+      const endOk = !dateFilter.end || (dateToCompare && dateToCompare <= dateFilter.end);
+      if (!startOk || !endOk) return false;
+    }
+
+    return true;
   });
+
+  const isCND = formData.type.toUpperCase().includes('CND');
 
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 min-h-[600px] relative">
@@ -145,10 +165,28 @@ export const Certificates: React.FC = () => {
             <p className="text-slate-500 text-sm">Monitore a vigência de CNDs e documentos legais.</p>
           </div>
           <button 
-            onClick={() => { setEditingId(null); setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
+            onClick={() => { setEditingId(null); setFormData({ name: '', type: '', company: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5"
           >
             <Plus size={18} /> Novo Documento
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 border-b border-slate-100">
+          <button 
+            onClick={() => setActiveTab('vigente')}
+            className={`pb-3 px-2 font-bold text-sm transition-colors relative ${activeTab === 'vigente' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Vigentes
+            {activeTab === 'vigente' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
+          </button>
+          <button 
+            onClick={() => setActiveTab('vencidas')}
+            className={`pb-3 px-2 font-bold text-sm transition-colors relative ${activeTab === 'vencidas' ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Vencidas
+            {activeTab === 'vencidas' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600 rounded-t-full"></div>}
           </button>
         </div>
 
@@ -215,9 +253,14 @@ export const Certificates: React.FC = () => {
                    
                    {cert.type && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{cert.type}</span>}
                    <h4 className="font-bold text-slate-800 mb-1 text-lg">{cert.name}</h4>
+                   {cert.company && <p className="text-sm text-slate-600 mb-2 flex items-center gap-1"><Building2 size={12} /> {cert.company}</p>}
                    <div className="text-sm text-slate-500 space-y-1">
                      <p>Emissão: {new Date(cert.issueDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
-                     <p className="font-medium">Vencimento: {new Date(cert.expiryDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+                     {cert.expiryDate ? (
+                        <p className="font-medium">Vencimento: {new Date(cert.expiryDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+                     ) : (
+                        <p className="font-medium text-slate-400">Sem vencimento</p>
+                     )}
                    </div>
 
                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -268,17 +311,24 @@ export const Certificates: React.FC = () => {
                   {docTypes.map(t => <option key={t} value={t} />)}
                 </datalist>
               </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Empresa</label>
+                <input required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
+                  value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} placeholder="Nome da empresa" />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Data de Emissão</label>
                   <input type="date" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
                     value={formData.issueDate} onChange={e => setFormData({...formData, issueDate: e.target.value})} />
                 </div>
+                {isCND && (
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Data de Vencimento</label>
                   <input type="date" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
                     value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} />
                 </div>
+                )}
               </div>
               
               <div>
