@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download } from 'lucide-react';
 import { certificateService, Certificate, auth } from '../../services/firebase';
 
+interface ExtendedCertificate extends Certificate {
+  type?: string;
+}
+
 export const Certificates: React.FC = () => {
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [certificates, setCertificates] = useState<ExtendedCertificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -15,6 +19,7 @@ export const Certificates: React.FC = () => {
   
   const [formData, setFormData] = useState({
     name: '',
+    type: '',
     issueDate: '',
     expiryDate: '',
     fileUrl: ''
@@ -39,7 +44,7 @@ export const Certificates: React.FC = () => {
   const loadCertificates = async () => {
     setLoading(true);
     const data = await certificateService.getAll();
-    setCertificates(data);
+    setCertificates(data as ExtendedCertificate[]);
     setLoading(false);
   };
 
@@ -71,7 +76,7 @@ export const Certificates: React.FC = () => {
 
     if (success) {
       setIsModalOpen(false);
-      setFormData({ name: '', issueDate: '', expiryDate: '', fileUrl: '' });
+      setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' });
       setFileName('');
       setEditingId(null);
       loadCertificates();
@@ -86,10 +91,11 @@ export const Certificates: React.FC = () => {
     }
   };
 
-  const handleEdit = (cert: Certificate) => {
+  const handleEdit = (cert: ExtendedCertificate) => {
     setEditingId(cert.id);
     setFormData({
       name: cert.name,
+      type: cert.type || (docTypes.includes(cert.name) ? cert.name : ''),
       issueDate: cert.issueDate,
       expiryDate: cert.expiryDate,
       fileUrl: cert.fileUrl || ''
@@ -102,7 +108,7 @@ export const Certificates: React.FC = () => {
     setIsModalOpen(false);
     setEditingId(null);
     setFileName('');
-    setFormData({ name: '', issueDate: '', expiryDate: '', fileUrl: '' });
+    setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' });
   };
 
   const getStatus = (expiryDate: string) => {
@@ -118,7 +124,7 @@ export const Certificates: React.FC = () => {
 
   const filteredByType = selectedType === 'Todos' 
     ? certificates 
-    : certificates.filter(cert => cert.name === selectedType);
+    : certificates.filter(cert => (cert.type || cert.name) === selectedType);
 
   const filteredCertificates = filteredByType.filter(cert => {
     if (!dateFilter.start && !dateFilter.end) {
@@ -139,7 +145,7 @@ export const Certificates: React.FC = () => {
             <p className="text-slate-500 text-sm">Monitore a vigência de CNDs e documentos legais.</p>
           </div>
           <button 
-            onClick={() => { setEditingId(null); setFormData({ name: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
+            onClick={() => { setEditingId(null); setFormData({ name: '', type: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5"
           >
             <Plus size={18} /> Novo Documento
@@ -207,7 +213,8 @@ export const Certificates: React.FC = () => {
                       </span>
                    </div>
                    
-                   <h4 className="font-bold text-slate-800 mb-1">{cert.name}</h4>
+                   {cert.type && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{cert.type}</span>}
+                   <h4 className="font-bold text-slate-800 mb-1 text-lg">{cert.name}</h4>
                    <div className="text-sm text-slate-500 space-y-1">
                      <p>Emissão: {new Date(cert.issueDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
                      <p className="font-medium">Vencimento: {new Date(cert.expiryDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
@@ -249,9 +256,14 @@ export const Certificates: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Nome do Documento</label>
+                <input required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
+                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ex: CND da Empresa" />
+              </div>
+              <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Documento</label>
                 <input list="docTypes" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
-                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Selecione ou digite..." />
+                  value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} placeholder="Selecione ou digite..." />
                 <datalist id="docTypes">
                   {docTypes.map(t => <option key={t} value={t} />)}
                 </datalist>
