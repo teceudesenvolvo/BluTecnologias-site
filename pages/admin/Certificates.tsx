@@ -14,6 +14,7 @@ export const Certificates: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState('Todos');
+  const [selectedCompany, setSelectedCompany] = useState('Todas');
   const [activeTab, setActiveTab] = useState<'vigente' | 'vencidas'>('vigente');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'expiryDate' | 'issueDate'>('expiryDate');
@@ -47,7 +48,10 @@ export const Certificates: React.FC = () => {
   const loadCertificates = async () => {
     setLoading(true);
     const data = await certificateService.getAll();
-    setCertificates(data as ExtendedCertificate[]);
+    const sortedData = (data as ExtendedCertificate[]).sort((b, a) => {
+      return new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime();
+    });
+    setCertificates(sortedData);
     setLoading(false);
   };
 
@@ -127,11 +131,15 @@ export const Certificates: React.FC = () => {
     return { label: 'Vigente', color: 'text-green-600 bg-green-50', icon: CheckCircle, border: 'border-slate-200' };
   };
 
+  const uniqueCompanies = Array.from(new Set(certificates.map(c => c.company).filter((c): c is string => !!c))).sort();
+
   const filteredByType = selectedType === 'Todos' 
     ? certificates 
     : certificates.filter(cert => (cert.type || cert.name) === selectedType);
 
   const filteredCertificates = filteredByType.filter(cert => {
+    if (selectedCompany !== 'Todas' && cert.company !== selectedCompany) return false;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -194,6 +202,16 @@ export const Certificates: React.FC = () => {
         <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
           <span className="font-medium text-sm text-slate-600">Filtrar por:</span>
           <select 
+              value={selectedCompany} 
+              onChange={e => setSelectedCompany(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          >
+              <option value="Todas">Todas as Empresas</option>
+              {uniqueCompanies.map(c => (
+                  <option key={c} value={c}>{c}</option>
+              ))}
+          </select>
+          <select 
               value={selectedType} 
               onChange={e => setSelectedType(e.target.value)}
               className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
@@ -227,7 +245,7 @@ export const Certificates: React.FC = () => {
               onChange={e => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
               className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm"
           />
-          <button onClick={() => { setDateFilter({ start: '', end: '' }); setSelectedType('Todos'); }} className="text-sm font-medium text-blue-600 hover:underline">Limpar Filtros</button>
+          <button onClick={() => { setDateFilter({ start: '', end: '' }); setSelectedType('Todos'); setSelectedCompany('Todas'); }} className="text-sm font-medium text-blue-600 hover:underline">Limpar Filtros</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
