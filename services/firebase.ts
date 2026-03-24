@@ -182,6 +182,7 @@ export interface Quote {
 export interface PrivacyPolicy {
   id: string;
   appName: string;
+  iconUrl?: string;
   companyName: string;
   email: string;
   content: string;

@@ -40,9 +40,14 @@ export const PrivacyPolicyPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+        <div className="max-w-3xl mx-auto mb-8 text-center" style={{height: "20px"}}>
+          
+        </div>
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-900 p-8 text-center">
-           <img src={Logo} alt="Blu Tecnologias" className="h-12 w-auto mx-auto mb-4 brightness-0 invert opacity-80" />
+           {policy.iconUrl && (
+             <img src={policy.iconUrl} alt={policy.appName} className="w-24 h-24 mx-auto mb-6 rounded-[1.5rem] shadow-xl border-4 border-slate-800 object-cover bg-white" />
+           )}
            <h1 className="text-2xl font-bold text-white mb-1">{policy.appName}</h1>
            <p className="text-slate-400 text-sm">Política de Privacidade</p>
         </div>

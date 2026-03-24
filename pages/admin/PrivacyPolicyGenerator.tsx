@@ -1,6 +1,6 @@
 // pages/admin/PrivacyPolicyGenerator.tsx
 import React, { useState, useEffect } from 'react';
-import { Copy, RefreshCw, FileText, Check, Save, Trash2, Edit2, Plus, X, Loader2, ExternalLink } from 'lucide-react';
+import { Copy, RefreshCw, FileText, Check, Save, Trash2, Edit2, Plus, X, Loader2, ExternalLink, Upload } from 'lucide-react';
 import { privacyPolicyService, PrivacyPolicy } from '../../services/firebase';
 
 export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => void }> = () => {
@@ -13,6 +13,7 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
   const [formData, setFormData] = useState({
     appName: '',
     companyName: '',
+    iconUrl: '',
     email: '',
     location: false,
     camera: false,
@@ -46,6 +47,7 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
       setFormData({
         appName: policyToEdit.appName,
         companyName: policyToEdit.companyName,
+        iconUrl: policyToEdit.iconUrl || '',
         email: policyToEdit.email,
         location: policyToEdit.permissions.location,
         camera: policyToEdit.permissions.camera,
@@ -55,12 +57,23 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
       });
     } else {
       setEditingId(null);
-      setFormData({
-        appName: '', companyName: '', email: '',
+      setFormData({ 
+        appName: '', companyName: '', email: '', iconUrl: '',
         location: false, camera: false, storage: false, contacts: false, cookies: false,
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData(prev => ({ ...prev, iconUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const generateText = () => {
@@ -107,6 +120,7 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
     const policyData = {
       appName: formData.appName,
       companyName: formData.companyName,
+      iconUrl: formData.iconUrl,
       email: formData.email,
       content: policy,
       lastUpdated: new Date().toISOString(),
@@ -202,6 +216,38 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
                 <form onSubmit={handleSave} className="space-y-4">
+                  
+                  {/* Upload do Ícone */}
+                  <div className="flex justify-center mb-6">
+                    <div className="relative group cursor-pointer">
+                        <div className={`w-24 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors ${formData.iconUrl ? 'border-blue-500 bg-white' : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50'}`}>
+                            {formData.iconUrl ? (
+                                <img src={formData.iconUrl} alt="Ícone" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="text-center p-2 text-slate-400">
+                                    <Upload size={24} className="mx-auto mb-1" />
+                                    <span className="text-[10px] font-bold uppercase">Ícone</span>
+                                </div>
+                            )}
+                        </div>
+                        <input 
+                            type="file" 
+                            accept="image/png, image/jpeg" 
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={handleIconChange}
+                        />
+                        {formData.iconUrl && (
+                            <button 
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); setFormData({...formData, iconUrl: ''}); }}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors z-10"
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                  </div>
+
                   <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Nome do App</label>
                       <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none" value={formData.appName} onChange={e => setFormData({...formData, appName: e.target.value})} required placeholder="Ex: Meu App" />
