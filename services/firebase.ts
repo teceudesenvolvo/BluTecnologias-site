@@ -179,6 +179,23 @@ export interface Quote {
   userId?: string;
 }
 
+export interface PrivacyPolicy {
+  id: string;
+  appName: string;
+  companyName: string;
+  email: string;
+  content: string;
+  lastUpdated: string;
+  permissions: {
+    location: boolean;
+    camera: boolean;
+    storage: boolean;
+    contacts: boolean;
+    cookies: boolean;
+  };
+  userId?: string;
+}
+
 export const blogService = {
   async getAll(): Promise<BlogPost[]> {
     try {
@@ -579,6 +596,57 @@ export const financialService = {
       return response.ok;
     } catch (error) {
       console.error('Erro ao adicionar transação:', error);
+      return false;
+    }
+  }
+};
+
+export const privacyPolicyService = {
+  async getAll(): Promise<PrivacyPolicy[]> {
+    try {
+      const response = await fetch(`${DB_URL}/privacy_policies.json`);
+      const data = await response.json();
+      if (!data) return [];
+      return Object.entries(data).map(([id, policy]: [string, any]) => ({
+        id,
+        ...policy
+      })).reverse();
+    } catch (error) {
+      console.error('Erro ao buscar políticas:', error);
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<PrivacyPolicy | null> {
+    try {
+      const response = await fetch(`${DB_URL}/privacy_policies/${id}.json`);
+      const data = await response.json();
+      if (!data) return null;
+      return { id, ...data };
+    } catch (error) {
+      console.error('Erro ao buscar política:', error);
+      return null;
+    }
+  },
+
+  async save(policy: Omit<PrivacyPolicy, 'id'>, id?: string): Promise<boolean> {
+    try {
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+      const method = id ? 'PATCH' : 'POST';
+      const url = id 
+        ? `${DB_URL}/privacy_policies/${id}.json?auth=${token}` 
+        : `${DB_URL}/privacy_policies.json?auth=${token}`;
+      
+      const payload = { ...policy, userId: user?.uid };
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao salvar política:', error);
       return false;
     }
   },

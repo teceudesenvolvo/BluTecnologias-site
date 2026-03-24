@@ -15,7 +15,8 @@ import {
   FileSignature,
   ClipboardList,
   Target,
-  Mail
+  Mail,
+  Shield
 } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { News } from './admin/News';
@@ -32,6 +33,7 @@ import { ContractsPage } from './admin/ContractsPage';
 import { ARPs } from './admin/ARPs';
 import { InterestAreas } from './admin/InterestAreas';
 import { Webmail } from './admin/Webmail';
+import { PrivacyPolicyGenerator } from './admin/PrivacyPolicyGenerator';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -69,6 +71,7 @@ export const Admin: React.FC = () => {
     { id: 'interest-areas', label: 'Áreas de Interesse', icon: Target, component: InterestAreas, showInMenu: true },
     { id: 'webmail', label: 'Webmail', icon: Mail, component: Webmail, showInMenu: true },
     { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile, showInMenu: true },
+    { id: 'privacy', label: 'Política de Privacidade', icon: Shield, component: PrivacyPolicyGenerator, showInMenu: true }
   ];
 
   const menuItems = allTabs.filter(tab => tab.showInMenu);

@@ -18,6 +18,7 @@ import { BluEscolar } from './pages/softwares/BluEscolar';
 import { Contact } from './pages/Contact';
 import { ProductDetails } from './pages/softwares/ProductDetails';
 import { BlogPost } from './pages/BlogPost';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 
 // Com Login
 import { Admin } from './pages/Admin';
@@ -47,6 +48,7 @@ const AppContent: React.FC = () => {
             <Route path="/products/4" element={<BluEscolar />} />
             <Route path="/products/5" element={<BluGov />} />
             <Route path="/products/:id" element={<ProductDetails />} />
+            <Route path="/privacy/:id" element={<PrivacyPolicyPage />} />
             {/* Com Login */}
             <Route path="/admin" element={<Admin />} />
           </Routes>
