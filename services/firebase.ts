@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { getDatabase } from 'firebase/database';
 import { getFirestore } from 'firebase/firestore';
@@ -196,6 +196,23 @@ export interface PrivacyPolicy {
   };
   userId?: string;
 }
+
+export const storageService = {
+  async uploadBase64(base64: string, path: string, contentType: string = 'application/pdf'): Promise<string | null> {
+    try {
+      const storageRef = ref(storage, path);
+      
+      // Detecta se é uma Data URL (com prefixo) ou Base64 puro
+      const format = base64.startsWith('data:') ? 'data_url' : 'base64';
+      const snapshot = await uploadString(storageRef, base64, format, { contentType });
+      
+      return await getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error('Error uploading base64 to storage:', error);
+      return null;
+    }
+  }
+};
 
 export const blogService = {
   async getAll(): Promise<BlogPost[]> {

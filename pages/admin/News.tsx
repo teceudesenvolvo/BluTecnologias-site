@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { blogService, auth } from '../../services/firebase';
+import { blogService, storageService, auth } from '../../services/firebase';
 import { BlogPost } from '../../types';
 import { 
   Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Loader2, Upload, 
@@ -134,7 +134,19 @@ export const News: React.FC = () => {
     e.preventDefault();
     setSaving(true);
 
-    const imageUrl = images.length > 0 ? images[0] : '';
+    // Faz upload de todas as imagens que estão em Base64
+    const uploadedImages = [];
+    for (const img of images) {
+      if (img.startsWith('data:')) {
+        const path = `blog/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        const url = await storageService.uploadBase64(img, path, 'image/jpeg');
+        if (url) uploadedImages.push(url);
+      } else {
+        uploadedImages.push(img);
+      }
+    }
+
+    const imageUrl = uploadedImages.length > 0 ? uploadedImages[0] : '';
 
     const user = auth.currentUser;
     let authorName = 'Equipe Blu';
@@ -147,7 +159,7 @@ export const News: React.FC = () => {
     const postData = {
       ...formData,
       imagem_capa: imageUrl,
-      images: images,
+      images: uploadedImages,
       author: authorName,
       date: new Date().toISOString().split('T')[0]
     };

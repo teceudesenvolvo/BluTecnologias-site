@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download, Building2 } from 'lucide-react';
-import { certificateService, Certificate, auth } from '../../services/firebase';
+import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download, Building2, RefreshCw } from 'lucide-react';
+import { certificateService, storageService, Certificate, auth } from '../../services/firebase';
 
 interface ExtendedCertificate extends Certificate {
   type?: string;
@@ -19,6 +19,7 @@ export const Certificates: React.FC = () => {
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'expiryDate' | 'issueDate'>('expiryDate');
   const [fileName, setFileName] = useState('');
+  const [migrating, setMigrating] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -62,18 +63,57 @@ export const Certificates: React.FC = () => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        const base64 = result.split(',')[1] || result;
-        setFormData(prev => ({ ...prev, fileUrl: base64 }));
+        setFormData(prev => ({ ...prev, fileUrl: result }));
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleMigrateAll = async () => {
+    const toMigrate = certificates.filter(c => c.fileUrl && c.fileUrl.length > 1000 && !c.fileUrl.startsWith('http'));
+    if (toMigrate.length === 0) {
+      alert('Não há arquivos em base64 para migrar.');
+      return;
+    }
+
+    if (!confirm(`Deseja migrar ${toMigrate.length} arquivos base64 para o Firebase Storage?`)) return;
+    
+    setMigrating(true);
+    let successCount = 0;
+
+    for (const cert of toMigrate) {
+      try {
+        const base64 = cert.fileUrl!.split(',')[1] || cert.fileUrl!;
+        const path = `certificates/${cert.id}_${cert.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+        const downloadUrl = await storageService.uploadBase64(base64, path);
+        
+        if (downloadUrl) {
+          await certificateService.update(cert.id, { fileUrl: downloadUrl });
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`Erro ao migrar certidão ${cert.id}:`, err);
+      }
+    }
+
+    alert(`${successCount} arquivos migrados com sucesso!`);
+    loadCertificates();
+    setMigrating(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     
-    const payload = { ...formData, userId: auth.currentUser?.uid };
+    let finalFileUrl = formData.fileUrl;
+    if (formData.fileUrl.startsWith('data:')) {
+      const base64 = formData.fileUrl.split(',')[1];
+      const path = `certificates/${Date.now()}_${formData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      const url = await storageService.uploadBase64(base64, path);
+      if (url) finalFileUrl = url;
+    }
+
+    const payload = { ...formData, fileUrl: finalFileUrl, userId: auth.currentUser?.uid };
     let success = false;
     if (editingId) {
       success = await certificateService.update(editingId, payload);
@@ -172,12 +212,23 @@ export const Certificates: React.FC = () => {
             <h3 className="text-xl font-bold text-slate-700">Gestão de Documentação</h3>
             <p className="text-slate-500 text-sm">Monitore a vigência de CNDs e documentos legais.</p>
           </div>
-          <button 
-            onClick={() => { setEditingId(null); setFormData({ name: '', type: '', company: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5"
-          >
-            <Plus size={18} /> Novo Documento
-          </button>
+          <div className="flex gap-3">
+            {/* <button 
+              onClick={handleMigrateAll}
+              disabled={migrating || loading}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all disabled:opacity-50"
+              title="Migra arquivos antigos do banco para o Storage"
+            >
+              {migrating ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />} 
+              {migrating ? 'Migrando...' : 'Migrar p/ Storage'}
+            </button> */}
+            <button 
+              onClick={() => { setEditingId(null); setFormData({ name: '', type: '', company: '', issueDate: '', expiryDate: '', fileUrl: '' }); setIsModalOpen(true); }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5"
+            >
+              <Plus size={18} /> Novo Documento
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

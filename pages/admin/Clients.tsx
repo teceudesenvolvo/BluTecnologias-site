@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck } from 'lucide-react';
-import { auth, contactService, clientService, prospectService, certificateService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
+import { auth, contactService, clientService, prospectService, certificateService, storageService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
 import { ref, get } from 'firebase/database';
 import { initialSoftwares } from '../../services/mockData';
 import { ProspectsMap } from './ProspectsMap';
@@ -158,7 +158,19 @@ export const Clients: React.FC = () => {
   const handleProspectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const payload = { ...prospectFormData, userId: auth.currentUser?.uid };
+
+    const uploadedFiles = [];
+    for (const file of prospectFormData.files) {
+      if (file.base64.startsWith('data:')) {
+        const path = `prospects/${Date.now()}_${file.name}`;
+        const url = await storageService.uploadBase64(file.base64, path);
+        if (url) uploadedFiles.push({ name: file.name, base64: url });
+      } else {
+        uploadedFiles.push(file);
+      }
+    }
+
+    const payload = { ...prospectFormData, files: uploadedFiles, userId: auth.currentUser?.uid };
     let success = false;
     if (editingProspect) {
       success = await prospectService.update(editingProspect.id, payload);
@@ -234,7 +246,15 @@ export const Clients: React.FC = () => {
 
     const type = manageTab;
     const currentList = managingClient[type] || [];
-    const newItem = { ...subItemForm, id: Date.now().toString(), userId: auth.currentUser?.uid };
+    
+    let finalFileUrl = subItemForm.fileUrl;
+    if (finalFileUrl && finalFileUrl.startsWith('data:')) {
+      const path = `client_docs/${managingClient.id}/${Date.now()}_doc.pdf`;
+      const url = await storageService.uploadBase64(finalFileUrl, path);
+      if (url) finalFileUrl = url;
+    }
+
+    const newItem = { ...subItemForm, fileUrl: finalFileUrl, id: Date.now().toString(), userId: auth.currentUser?.uid };
     const newList = [...currentList, newItem];
 
     const success = await clientService.update(managingClient.id, { [type]: newList });

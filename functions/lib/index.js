@@ -92,20 +92,42 @@ function getTransporter() {
         return { transporter: null, from: fromEmail };
     }
 }
+async function uploadBase64ToStorage(dataUrl, path) {
+    try {
+        const parsed = parseDataUrl(dataUrl);
+        if (!parsed)
+            return null;
+        const bucket = admin.storage().bucket();
+        const file = bucket.file(path);
+        const buffer = Buffer.from(parsed.base64, 'base64');
+        await file.save(buffer, {
+            metadata: { contentType: parsed.mime },
+        });
+        // Torna o arquivo público para gerar uma URL de acesso direto
+        await file.makePublic();
+        return `https://storage.googleapis.com/${bucket.name}/${path}`;
+    }
+    catch (error) {
+        console.error('Error uploading to storage:', error);
+        return null;
+    }
+}
 async function saveReportToStorageAndDb(clientId, reportFile, title, userId) {
     try {
         if (!reportFile || !reportFile.startsWith('data:'))
             return;
+        const path = `reports/${clientId}/${Date.now()}_report.pdf`;
+        const fileUrl = await uploadBase64ToStorage(reportFile, path) || reportFile;
         const reportRef = admin.database().ref(`contacts/${clientId}/reports`).push();
         await reportRef.set({
             id: reportRef.key,
             title: title || 'Relatório',
             month: new Date().toISOString().slice(0, 7),
-            fileUrl: reportFile,
+            fileUrl: fileUrl,
             date: new Date().toISOString(),
             userId: userId || null
         });
-        console.log('Report saved successfully (base64):', reportRef.key);
+        console.log('Report saved successfully to storage:', reportRef.key);
     }
     catch (e) {
         console.error('Error saving report:', e);
@@ -115,17 +137,19 @@ async function saveInvoiceToStorageAndDb(clientId, invoiceFile, value, userId) {
     try {
         if (!invoiceFile || !invoiceFile.startsWith('data:'))
             return;
+        const path = `invoices/${clientId}/${Date.now()}_invoice.pdf`;
+        const fileUrl = await uploadBase64ToStorage(invoiceFile, path) || invoiceFile;
         const ref = admin.database().ref(`contacts/${clientId}/invoices`).push();
         await ref.set({
             id: ref.key,
             month: new Date().toISOString().slice(0, 7),
             amount: Number(value || 0),
             status: 'sent',
-            fileUrl: invoiceFile,
+            fileUrl: fileUrl,
             date: new Date().toISOString(),
             userId: userId || null
         });
-        console.log('Invoice saved successfully (base64):', ref.key);
+        console.log('Invoice saved successfully to storage:', ref.key);
     }
     catch (e) {
         console.error('Error saving invoice:', e);
