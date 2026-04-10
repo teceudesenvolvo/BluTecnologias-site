@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck } from 'lucide-react';
-import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
+import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb, Company } from '../../services/firebase';
 import { ref, get } from 'firebase/database';
 import { initialSoftwares } from '../../services/mockData';
 import { ProspectsMap } from './ProspectsMap';
@@ -18,6 +18,7 @@ export const Clients: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [editingClient, setEditingClient] = useState<ContactLead | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [myCompanies, setMyCompanies] = useState<Company[]>([]);
   const [financialSettings, setFinancialSettings] = useState<FinancialSettings | null>(null);
 
   const [formData, setFormData] = useState({
@@ -75,6 +76,7 @@ export const Clients: React.FC = () => {
     loadProspects();
     loadCertificates();
     loadFinancialSettings();
+    loadMyCompanies();
   }, []);
 
   const loadContacts = async () => {
@@ -96,7 +98,17 @@ export const Clients: React.FC = () => {
     setCertificates(data);
   };
 
-  const uniqueCompanies = Array.from(new Set(certificates.map(c => (c as any).company).filter(Boolean))).sort() as string[];
+  const loadMyCompanies = async () => {
+    try {
+      const snapshot = await get(ref(rtdb, 'settings/companies'));
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setMyCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar minhas empresas:', error);
+    }
+  };
 
   const loadFinancialSettings = async () => {
     try {
@@ -1004,8 +1016,8 @@ export const Clients: React.FC = () => {
                         }}
                       >
                         <option value="">Empresa Emitente</option>
-                        {uniqueCompanies.map(company => (
-                          <option key={company} value={company}>{company}</option>
+                        {myCompanies.map(c => (
+                          <option key={c.id} value={c.razaoSocial}>{c.razaoSocial}</option>
                         ))}
                       </select>
                       <select 

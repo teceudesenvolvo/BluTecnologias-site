@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight, Settings, FileDown, Edit2 } from 'lucide-react';
-import { financialService, Transaction, auth } from '../../services/firebase';
+import { financialService, Transaction, auth, rtdb, Company } from '../../services/firebase';
+import { ref, get } from 'firebase/database';
 import Logo from '../../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 
 export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -23,6 +25,7 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
 
   useEffect(() => {
     loadTransactions();
+    loadCompanies();
   }, []);
 
   const loadTransactions = async () => {
@@ -30,6 +33,18 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
     const data = await financialService.getAll();
     setTransactions(data);
     setLoading(false);
+  };
+
+  const loadCompanies = async () => {
+    try {
+      const snapshot = await get(ref(rtdb, 'settings/companies'));
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar empresas:", error);
+    }
   };
 
   const prevPeriod = () => {
@@ -47,8 +62,6 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
       setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1));
     }
   };
-
-  const uniqueCompanies = Array.from(new Set(transactions.map(t => (t as any).company).filter(Boolean))).sort() as string[];
 
   const filteredTransactions = transactions.filter(t => {
     const [year, month] = t.date.split('-').map(Number);
@@ -194,17 +207,17 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
 
       {/* Transactions List */}
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 print:border-none print:shadow-none print:p-0 print:w-full">
-          <h3 className="text-xl font-bold text-slate-700">Fluxo de Caixa</h3>
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-slate-700">Fluxo de Caixa</h3>
             <select 
               value={companyFilter}
               onChange={e => setCompanyFilter(e.target.value)}
               className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none print:hidden"
             >
               <option value="all">Todas as Empresas</option>
-              {uniqueCompanies.map(company => (
-                <option key={company} value={company}>{company}</option>
+              {companies.map(c => (
+                <option key={c.id} value={c.razaoSocial}>{c.razaoSocial}</option>
               ))}
             </select>
             <div className="flex bg-slate-100 p-1 rounded-xl print:hidden">
@@ -225,13 +238,13 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
               onClick={handleExportPDF}
               className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors print:hidden"
             >
-              <FileDown size={18} /> Exportar PDF
+              <FileDown size={18} />
             </button>
             <button 
               onClick={() => setActiveTab('financial-data')}
               className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors print:hidden"
             >
-              <Settings size={18} /> Dados Financeiros
+              <Settings size={18} /> 
             </button>
             <button 
               onClick={() => {
@@ -348,8 +361,8 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
                   onChange={e => setNewTransaction({...newTransaction, company: e.target.value} as any)}
                 >
                   <option value="">Selecione a Empresa</option>
-                  {uniqueCompanies.map(company => (
-                    <option key={company} value={company}>{company}</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.razaoSocial}>{c.razaoSocial}</option>
                   ))}
                 </select>
               </div>

@@ -37,6 +37,33 @@ export interface Transaction {
   userId?: string;
 }
 
+export interface Company {
+  id: string;
+  cnpj: string;
+  razaoSocial: string;
+  nomeFantasia?: string;
+  porte?: string;
+  naturezaJuridica?: string;
+  inscricaoEstadual?: string;
+  inscricaoMunicipal?: string;
+  email?: string;
+  telefoneFixo?: string;
+  telefoneCelular?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  municipio?: string;
+  uf?: string;
+  socios?: any[];
+  representantes?: any[];
+  atividades?: any[];
+  demonstrativos?: any[];
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
 export interface ClientContract {
   id: string;
   title: string;
