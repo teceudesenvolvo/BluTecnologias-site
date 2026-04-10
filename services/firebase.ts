@@ -616,6 +616,40 @@ export const financialService = {
       console.error('Erro ao adicionar transação:', error);
       return false;
     }
+  },
+
+  async update(id: string, transaction: Partial<Transaction>): Promise<boolean> {
+    try {
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+      const url = token ? `${DB_URL}/transactions/${id}.json?auth=${token}` : `${DB_URL}/transactions/${id}.json`;
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transaction),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      return false;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+      const url = token ? `${DB_URL}/transactions/${id}.json?auth=${token}` : `${DB_URL}/transactions/${id}.json`;
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Erro ao deletar transação:', error);
+      return false;
+    }
   }
 };
 
@@ -673,14 +707,14 @@ export const privacyPolicyService = {
     try {
       const user = auth.currentUser;
       const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/transactions/${id}.json?auth=${token}` : `${DB_URL}/transactions/${id}.json`;
+      const url = token ? `${DB_URL}/privacy_policies/${id}.json?auth=${token}` : `${DB_URL}/privacy_policies/${id}.json`;
 
       const response = await fetch(url, {
         method: 'DELETE',
       });
       return response.ok;
     } catch (error) {
-      console.error('Erro ao deletar transação:', error);
+      console.error('Erro ao deletar política:', error);
       return false;
     }
   }

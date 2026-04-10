@@ -79,18 +79,21 @@ export const Admin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex font-sans">
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        user={user}
-        handleLogout={handleLogout}
-        menuItems={menuItems}
-      />
+      <div className="print:hidden">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          className="print:hidden"
+          user={user}
+          handleLogout={handleLogout}
+          menuItems={menuItems}
+        />
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-8 md:p-12">
-        <div className="max-w-6xl mx-auto">
-          <header className="mb-10">
+      <main className="flex-1 ml-64 p-8 md:p-12 print:ml-0 print:p-0 print:bg-white w-full">
+        <div className="max-w-6xl mx-auto print:max-w-full">
+          <header className="mb-10 print:hidden">
             <h2 className="text-3xl font-bold text-slate-800 capitalize">
               {allTabs.find(i => i.id === activeTab)?.label.replace(/dados d(a|os) /i, '')}
             </h2>

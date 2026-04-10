@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck } from 'lucide-react';
-import { auth, contactService, clientService, prospectService, certificateService, storageService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
+import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb } from '../../services/firebase';
 import { ref, get } from 'firebase/database';
 import { initialSoftwares } from '../../services/mockData';
 import { ProspectsMap } from './ProspectsMap';
@@ -59,7 +59,8 @@ export const Clients: React.FC = () => {
     reportFile: '',
     selectedCertificates: [] as string[],
     emailText: '',
-    solutionSelect: ''
+    solutionSelect: '',
+    senderCompany: ''
   });
 
   // State for sub-items forms
@@ -95,6 +96,8 @@ export const Clients: React.FC = () => {
     setCertificates(data);
   };
 
+  const uniqueCompanies = Array.from(new Set(certificates.map(c => (c as any).company).filter(Boolean))).sort() as string[];
+
   const loadFinancialSettings = async () => {
     try {
       const snapshot = await get(ref(rtdb, 'settings/financial'));
@@ -111,11 +114,33 @@ export const Clients: React.FC = () => {
     }
   };
 
+  const handleConvertProspect = (prospect: Prospect) => {
+    setEditingClient(null);
+    setFormData({
+      name: prospect.presidente || '',
+      razaoSocial: `${prospect.tipoOrgao === 'camara' ? 'Câmara Municipal' : prospect.tipoOrgao === 'prefeitura' ? 'Prefeitura' : 'Secretaria'} de ${prospect.municipio}`,
+      cnpj: '',
+      inscricaoMunicipal: '',
+      role: prospect.tipoOrgao === 'camara' ? 'Presidente' : prospect.tipoOrgao === 'prefeitura' ? 'Prefeito(a)' : 'Secretário(a)',
+      email: '',
+      phone: '',
+      city: prospect.municipio,
+      state: prospect.estado,
+      address: prospect.endereco || '',
+      cep: '',
+      complement: '',
+      financialContact: '',
+      solution: '',
+      message: `Convertido de Prospecção técnica.`
+    });
+    setIsModalOpen(true);
+  };
+
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     
-    const payload = { ...formData, userId: auth.currentUser?.uid };
+    const payload = { ...formData, status: 'active', userId: auth.currentUser?.uid };
     let success = false;
     if (editingClient) {
       success = await clientService.update(editingClient.id, payload);
@@ -272,13 +297,33 @@ export const Clients: React.FC = () => {
     e.preventDefault();
     if (!managingClient) return;
     setSaving(true);
+
+    try {
+      // Upload Nota Fiscal para o Storage se for Base64
+      let finalInvoiceUrl = billingForm.invoiceFile;
+      if (finalInvoiceUrl && finalInvoiceUrl.startsWith('data:')) {
+        const base64 = finalInvoiceUrl.split(',')[1];
+        const path = `invoices/${managingClient.id}/${Date.now()}_invoice.pdf`;
+        const url = await storageService.uploadBase64(base64, path);
+        if (url) finalInvoiceUrl = url;
+      }
+
+      // Upload Relatório para o Storage se for Base64
+      let finalReportUrl = billingForm.reportFile;
+      if (finalReportUrl && finalReportUrl.startsWith('data:')) {
+        const base64 = finalReportUrl.split(',')[1];
+        const path = `reports/${managingClient.id}/${Date.now()}_report.pdf`;
+        const url = await storageService.uploadBase64(base64, path);
+        if (url) finalReportUrl = url;
+      }
+
     // Prepare invoice object
     const newInvoice: any = {
       id: Date.now().toString(),
       month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
       amount: Number(billingForm.value),
       status: 'sent',
-      fileUrl: billingForm.invoiceFile,
+      fileUrl: finalInvoiceUrl,
       date: new Date().toISOString(),
       userId: auth.currentUser?.uid
     };
@@ -288,14 +333,15 @@ export const Clients: React.FC = () => {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       ...billingForm,
+      invoiceFile: finalInvoiceUrl,
+      reportFile: finalReportUrl,
       status: 'sent',
       userId: auth.currentUser?.uid
     };
 
-    try {
       // If the user selected certificate IDs, fetch their file URLs and
       // convert to data URLs so they can be attached to the email.
-      let certificateFiles: { filename: string; dataUrl: string; path: string }[] = [];
+      let certificateFiles: { filename: string; fileUrl: string; name: string }[] = [];
       let selectedCertificatesDetails: { name: string; issueDate: string; expiryDate: string; }[] = [];
       if (billingForm.selectedCertificates && billingForm.selectedCertificates.length > 0) {
         const selectedCerts = certificates.filter(c => billingForm.selectedCertificates.includes(c.id));
@@ -306,49 +352,25 @@ export const Clients: React.FC = () => {
           expiryDate: new Date(cert.expiryDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
         }));
 
-        const fetchToDataUrl = async (url: string) => {
-          try {
-            const resp = await fetch(url);
-            const blob = await resp.blob();
-            return new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-          } catch (e) {
-            console.error('Erro ao baixar certidão para anexo (verifique CORS):', url, e);
-            return null;
-          }
-        };
-
         const promises = selectedCerts.map(async cert => {
           if (cert.fileUrl) {
-            let dataUrl = '';
-            if (cert.fileUrl.startsWith('data:')) {
-              dataUrl = cert.fileUrl;
-            } else if (cert.fileUrl.startsWith('http')) {
-              const fetched = await fetchToDataUrl(cert.fileUrl);
-              if (fetched) dataUrl = fetched;
-            } else {
-              dataUrl = `data:application/pdf;base64,${cert.fileUrl}`;
-            }
-
-            if (dataUrl) {
-              const safeName = cert.name ? cert.name.replace(/[^a-z0-9\.\-\_]/gi, '_') : `cert_${cert.id}`;
-              // Enviamos tanto dataUrl quanto path para garantir compatibilidade com o backend (Nodemailer usa 'path' para data URIs)
-              return { filename: `${safeName}.pdf`, dataUrl, path: dataUrl };
-            }
+            const safeName = cert.name ? cert.name.replace(/[^a-z0-9\.\-\_]/gi, '_') : `cert_${cert.id}`;
+            return { 
+              filename: `${safeName}.pdf`, 
+              fileUrl: cert.fileUrl,
+              name: safeName
+            };
           }
           return null;
         });
 
         const results = await Promise.all(promises);
-        certificateFiles = results.filter((r): r is { filename: string; dataUrl: string; path: string } => r !== null);
+        certificateFiles = results.filter((r): r is { filename: string; fileUrl: string; name: string } => r !== null);
         console.log('Certidões processadas e prontas para envio:', certificateFiles);
       }
 
       // Build payload including any certificateFiles
-      const payload = { ...billingForm, certificateFiles, selectedCertificatesDetails, userId: auth.currentUser?.uid };
+      const payload = { ...billingForm, invoiceFile: finalInvoiceUrl, reportFile: finalReportUrl, certificateFiles, selectedCertificatesDetails, userId: auth.currentUser?.uid };
 
       // First, attempt to send the billing email via Cloud Function
       const sent = await clientService.sendBilling(managingClient.id, payload);
@@ -369,12 +391,12 @@ export const Clients: React.FC = () => {
       };
       let newReportsList = managingClient.reports || [];
 
-      if (billingForm.reportFile) {
+      if (finalReportUrl) {
         const newReport = {
           id: Date.now().toString(),
           title: billingForm.title ? `Relatório - ${billingForm.title}` : 'Relatório',
           month: new Date().toISOString().slice(0, 7),
-          fileUrl: billingForm.reportFile,
+          fileUrl: finalReportUrl,
           date: new Date().toISOString(),
           userId: auth.currentUser?.uid
         };
@@ -385,6 +407,15 @@ export const Clients: React.FC = () => {
       const updated = await clientService.update(managingClient.id, updates);
       if (!updated) throw new Error('Falha ao salvar a cobrança no banco de dados.');
 
+      // Comunica o envio da cobrança ao módulo financeiro criando uma entrada automática
+      await financialService.add({
+        description: `Faturamento: ${billingForm.title || 'Serviços'} - ${managingClient.razaoSocial}`,
+        amount: Number(billingForm.value),
+        type: 'income',
+        date: new Date().toISOString().split('T')[0],
+        company: billingForm.senderCompany
+      });
+
       alert('Cobrança enviada com sucesso!');
       setManageTab('invoices');
       setManagingClient({ ...managingClient, invoices: newInvoicesList, reports: newReportsList, cobrancas: newCobrancasList });
@@ -393,6 +424,24 @@ export const Clients: React.FC = () => {
       alert(err?.message || 'Erro ao enviar cobrança. Tente novamente.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendToFinancial = async (cobranca: any) => {
+    if (!managingClient) return;
+    if (confirm(`Deseja lançar esta cobrança ("${cobranca.title}") no módulo financeiro?`)) {
+      const success = await financialService.add({
+        description: `Faturamento: ${cobranca.title || 'Serviços'} - ${managingClient.razaoSocial}`,
+        amount: Number(cobranca.value),
+        type: 'income',
+        date: cobranca.date ? cobranca.date.split('T')[0] : new Date().toISOString().split('T')[0],
+        company: cobranca.senderCompany
+      });
+      if (success) {
+        alert('Lançamento realizado com sucesso!');
+      } else {
+        alert('Erro ao realizar o lançamento.');
+      }
     }
   };
 
@@ -418,7 +467,23 @@ export const Clients: React.FC = () => {
       });
     } else {
       setEditingClient(null);
-      // Reset form data... (already done in handleCreateClient success or initial state)
+      setFormData({
+        name: '',
+        razaoSocial: '',
+        cnpj: '',
+        inscricaoMunicipal: '',
+        role: '',
+        email: '',
+        phone: '',
+        city: '',
+        state: '',
+        address: '',
+        cep: '',
+        complement: '',
+        financialContact: '',
+        solution: '',
+        message: ''
+      });
     }
     setIsModalOpen(true);
   };
@@ -444,7 +509,7 @@ export const Clients: React.FC = () => {
               </button>
             )}
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => openClientModal()}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5"
             >
               <UserPlus size={18} /> {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
@@ -526,7 +591,7 @@ export const Clients: React.FC = () => {
                      "{contact.message}" <br/>
                      {contact.status === 'lead' && (
                         <button 
-                          onClick={() => handleConvert(contact.id)}
+                          onClick={() => handleConvert(contact)}
                           className="mt-2 text-blue-600 font-bold text-xs flex items-center gap-1 hover:underline"
                         >
                           <CheckCircle size={12} /> Converter em Cliente
@@ -579,6 +644,12 @@ export const Clients: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  <button 
+                    onClick={() => handleConvertProspect(prospect)}
+                    className="mt-4 text-blue-600 font-bold text-xs flex items-center gap-1 hover:underline bg-blue-50 px-3 py-2 rounded-lg transition-colors"
+                  >
+                    <CheckCircle size={14} /> Converter em Cliente Ativo
+                  </button>
                 </div>
               ))
             )}
@@ -924,6 +995,20 @@ export const Clients: React.FC = () => {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <select 
+                        required
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white"
+                        value={billingForm.senderCompany}
+                        onChange={e => {
+                          const company = e.target.value;
+                          setBillingForm({...billingForm, senderCompany: company, selectedCertificates: []});
+                        }}
+                      >
+                        <option value="">Empresa Emitente</option>
+                        {uniqueCompanies.map(company => (
+                          <option key={company} value={company}>{company}</option>
+                        ))}
+                      </select>
+                      <select 
                         className="px-4 py-2 rounded-lg border border-slate-200 bg-white"
                         value={billingForm.solutionSelect}
                         onChange={e => setBillingForm({...billingForm, solutionSelect: e.target.value})}
@@ -980,7 +1065,10 @@ export const Clients: React.FC = () => {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Anexar Documentação (Certidões Vigentes)</label>
                       <div className="flex flex-wrap gap-2">
-                        {certificates.filter(cert => {
+                        {!billingForm.senderCompany ? (
+                          <p className="text-sm text-slate-400 italic">Selecione uma empresa para filtrar as certidões.</p>
+                        ) : certificates.filter(cert => {
+                          if ((cert as any).company !== billingForm.senderCompany) return false;
                           if (!cert.expiryDate) return false;
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
@@ -1041,9 +1129,17 @@ export const Clients: React.FC = () => {
                                 <p className="text-sm text-slate-500">Valor: R$ {Number(item.value).toFixed(2)}</p>
                                 <p className="text-xs text-slate-400 mt-1">{new Date(item.date).toLocaleDateString('pt-BR')} às {new Date(item.date).toLocaleTimeString('pt-BR')}</p>
                              </div>
-                             <span className="text-xs px-2 py-1 rounded-full font-bold uppercase bg-green-100 text-green-700 flex items-center gap-1">
-                               <CheckCircle size={12} /> Enviada
-                             </span>
+                             <div className="flex flex-col items-end gap-2">
+                               <span className="text-xs px-2 py-1 rounded-full font-bold uppercase bg-green-100 text-green-700 flex items-center gap-1">
+                                 <CheckCircle size={12} /> Enviada
+                               </span>
+                               <button 
+                                 onClick={() => handleSendToFinancial(item)}
+                                 className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                               >
+                                 <TrendingUp size={10} /> Lançar no Financeiro
+                               </button>
+                             </div>
                            </div>
                         </div>
                         );

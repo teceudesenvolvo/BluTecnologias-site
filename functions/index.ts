@@ -183,7 +183,7 @@ function fetchUrlToBuffer(url: string): Promise<Buffer> {
  */
 export const sendBillingEmail = functions.https.onCall(async (data, context) => {
   try {
-    const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data || {};
+    const { clientId, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId, senderCompany } = data || {};
 
     console.log('sendBillingEmail called with:', {
       clientId,
@@ -214,22 +214,37 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
     console.log('sendBillingEmail: sending via transporter, from=', effectiveFrom);
 
     const attachments: any[] = [];
-    if (invoiceFile && typeof invoiceFile === 'string') {
-      const parsed = parseDataUrl(invoiceFile);
-      if (parsed) attachments.push({ filename: 'invoice', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+    if (invoiceFile && typeof invoiceFile === 'string' && invoiceFile.length > 0) {
+      if (invoiceFile.startsWith('data:')) {
+        const parsed = parseDataUrl(invoiceFile);
+        if (parsed) attachments.push({ filename: 'Nota_Fiscal.pdf', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+      } else if (invoiceFile.startsWith('http')) {
+        try {
+          const buffer = await fetchUrlToBuffer(invoiceFile);
+          attachments.push({ filename: 'Nota_Fiscal.pdf', content: buffer });
+        } catch (err) { console.error('Error attaching invoice from URL:', err); }
+      }
     }
-    if (reportFile && typeof reportFile === 'string') {
-      const parsed = parseDataUrl(reportFile);
-      if (parsed) attachments.push({ filename: 'report', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+    if (reportFile && typeof reportFile === 'string' && reportFile.length > 0) {
+      if (reportFile.startsWith('data:')) {
+        const parsed = parseDataUrl(reportFile);
+        if (parsed) attachments.push({ filename: 'Relatorio.pdf', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+      } else if (reportFile.startsWith('http')) {
+        try {
+          const buffer = await fetchUrlToBuffer(reportFile);
+          attachments.push({ filename: 'Relatorio.pdf', content: buffer });
+        } catch (err) { console.error('Error attaching report from URL:', err); }
+      }
     }
     // certificateFiles: optional array of { filename, dataUrl } OR selectedCertificates { name, fileUrl }
     const certs = certificateFiles || selectedCertificates;
     if (Array.isArray(certs)) {
       for (const cf of certs) {
         if (cf) {
-          const fname = cf.filename || cf.name || 'documento.pdf';
+          const fname = cf.filename || (cf.name ? `${cf.name}.pdf` : 'documento.pdf');
           // Check for dataUrl or fileUrl being a data URI
           const rawDataUrl = cf.dataUrl || (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('data:') ? cf.fileUrl : null);
+          const remoteUrl = cf.fileUrl || (typeof cf.path === 'string' && cf.path.startsWith('http') ? cf.path : null);
 
           if (typeof rawDataUrl === 'string') {
             const parsed = parseDataUrl(rawDataUrl);
@@ -239,14 +254,18 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
             } else {
               console.warn(`Failed to parse Data URI for certificate: ${fname}`);
             }
-          } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('http')) {
+          } else if (typeof remoteUrl === 'string' && remoteUrl.startsWith('http')) {
             try {
-              const buffer = await fetchUrlToBuffer(cf.fileUrl);
+              const buffer = await fetchUrlToBuffer(remoteUrl);
               attachments.push({ filename: fname, content: buffer });
               console.log(`Attached certificate (URL): ${fname}`);
             } catch (fetchErr) {
               console.error(`Failed to fetch certificate ${fname}:`, fetchErr);
             }
+          } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.length > 50) {
+            // Fallback: trata como base64 sem prefixo se for uma string longa
+            attachments.push({ filename: fname, content: Buffer.from(cf.fileUrl, 'base64'), contentType: 'application/pdf' });
+            console.log(`Attached certificate (Raw Base64): ${fname}`);
           }
         }
       }
@@ -264,9 +283,12 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
         ${pixKey ? `<li><strong>Chave PIX:</strong> ${pixKey}</li>` : ''}
       </ul>
       <p>${emailText || ''}</p>
-      <p>Atenciosamente, LAVORO SERVIÇOS. <br/>
+      <p>Atenciosamente, ${senderCompany || 'Blu Tecnologias'}. <br/>
       
-      <br/>Enviado utilizando o sistema Blu</p>
+      <br/>
+      <strong>Enviado utilizando o sistema Blu</strong></p>
+      <p> Para dúvidas ou suporte, entre em contato conosco através dos nossos canais oficiais. </p>
+      <p> Este é um email automático, por favor, não responda. </p>
     `;
 
     const mailOptions = {
@@ -317,7 +339,7 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
 
     try {
       const data = req.body || {};
-      const { clientId, to: directTo, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId } = data;
+      const { clientId, to: directTo, title, value, bankAccount, pixKey, invoiceFile, reportFile, emailText, certificateFiles, selectedCertificates, solutionSelect, userId, senderCompany } = data;
 
       // Allow testing by passing `to` directly in the POST body. If `to` is
       // provided we skip the Realtime Database lookup. Otherwise `clientId` is required.
@@ -350,13 +372,27 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
       const effectiveFrom = computedFrom;
 
       const attachments: any[] = [];
-      if (invoiceFile && typeof invoiceFile === 'string') {
-        const parsed = parseDataUrl(invoiceFile);
-        if (parsed) attachments.push({ filename: 'invoice', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+      if (invoiceFile && typeof invoiceFile === 'string' && invoiceFile.length > 0) {
+        if (invoiceFile.startsWith('data:')) {
+          const parsed = parseDataUrl(invoiceFile);
+          if (parsed) attachments.push({ filename: 'Nota_Fiscal.pdf', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+        } else if (invoiceFile.startsWith('http')) {
+          try {
+            const buffer = await fetchUrlToBuffer(invoiceFile);
+            attachments.push({ filename: 'Nota_Fiscal.pdf', content: buffer });
+          } catch (err) { console.error('Error attaching invoice from URL:', err); }
+        }
       }
-      if (reportFile && typeof reportFile === 'string') {
-        const parsed = parseDataUrl(reportFile);
-        if (parsed) attachments.push({ filename: 'report', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+      if (reportFile && typeof reportFile === 'string' && reportFile.length > 0) {
+        if (reportFile.startsWith('data:')) {
+          const parsed = parseDataUrl(reportFile);
+          if (parsed) attachments.push({ filename: 'Relatorio.pdf', content: Buffer.from(parsed.base64, 'base64'), contentType: parsed.mime });
+        } else if (reportFile.startsWith('http')) {
+          try {
+            const buffer = await fetchUrlToBuffer(reportFile);
+            attachments.push({ filename: 'Relatorio.pdf', content: buffer });
+          } catch (err) { console.error('Error attaching report from URL:', err); }
+        }
       }
 
       // certificateFiles: optional array of { filename, dataUrl } OR selectedCertificates { name, fileUrl }
@@ -364,9 +400,10 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
       if (Array.isArray(certs)) {
         for (const cf of certs) {
           if (cf) {
-            const fname = cf.filename || cf.name || 'documento.pdf';
+            const fname = cf.filename || (cf.name ? `${cf.name}.pdf` : 'documento.pdf');
             // Check for dataUrl or fileUrl being a data URI
             const rawDataUrl = cf.dataUrl || (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('data:') ? cf.fileUrl : null);
+            const remoteUrl = cf.fileUrl || (typeof cf.path === 'string' && cf.path.startsWith('http') ? cf.path : null);
 
             if (typeof rawDataUrl === 'string') {
               const parsed = parseDataUrl(rawDataUrl);
@@ -376,14 +413,17 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
               } else {
                 console.warn(`Failed to parse Data URI for certificate: ${fname}`);
               }
-            } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.startsWith('http')) {
+            } else if (typeof remoteUrl === 'string' && remoteUrl.startsWith('http')) {
               try {
-                const buffer = await fetchUrlToBuffer(cf.fileUrl);
+                const buffer = await fetchUrlToBuffer(remoteUrl);
                 attachments.push({ filename: fname, content: buffer });
                 console.log(`Attached certificate (URL): ${fname}`);
               } catch (fetchErr) {
                 console.error(`Failed to fetch certificate ${fname}:`, fetchErr);
               }
+            } else if (typeof cf.fileUrl === 'string' && cf.fileUrl.length > 50) {
+              attachments.push({ filename: fname, content: Buffer.from(cf.fileUrl, 'base64'), contentType: 'application/pdf' });
+              console.log(`Attached certificate (Raw Base64): ${fname}`);
             }
           }
         }
@@ -401,9 +441,9 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
           ${pixKey ? `<li><strong>Chave PIX:</strong> ${pixKey}</li>` : ''}
         </ul>
         <p>${emailText || ''}</p>
-        <p>Atenciosamente, LAVORO SERVIÇOS. <br/>
+        <p>Atenciosamente, ${senderCompany || 'Blu Tecnologias'}. <br/>
         
-        <br/>
+        <br />
         <strong>Enviado utilizando o sistema Blu</strong></p>
         <p> Para dúvidas ou suporte, entre em contato conosco através dos nossos canais oficiais. </p>
         <p> Este é um email automático, por favor, não responda. </p>
