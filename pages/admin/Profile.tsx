@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, Loader2, Shield, Building2, Users, FileText, Briefcase, Upload, Trash2, Plus, Search, MapPin, Send, Edit2, X } from 'lucide-react';
-import { auth, rtdb, Company } from '../../services/firebase';
+import { auth, rtdb, Company, storageService } from '../../services/firebase';
 import { updateProfile, updatePassword } from 'firebase/auth';
 import { ref, get, update, push, remove, set } from 'firebase/database';
 
@@ -29,7 +29,9 @@ export const Profile: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null); // Company being edited
   const [currentCompanyFormData, setCurrentCompanyFormData] = useState<Partial<Company>>({ // Data for the modal form
+    cnpj: '',
     razaoSocial: '',
+    logoUrl: '',
     nomeFantasia: '',
     porte: '',
     naturezaJuridica: '',
@@ -95,8 +97,18 @@ export const Profile: React.FC = () => {
     setMessage(null);
 
     try {
+      let finalLogoUrl = currentCompanyFormData.logoUrl;
+
+      // Se for uma imagem nova em base64 (preview), faz o upload real para o Storage
+      if (finalLogoUrl && finalLogoUrl.startsWith('data:')) {
+        const path = `logos/${Date.now()}_logo.jpg`;
+        const url = await storageService.uploadBase64(finalLogoUrl, path, 'image/jpeg');
+        if (url) finalLogoUrl = url;
+      }
+
       const companyToSave = {
         ...currentCompanyFormData,
+        logoUrl: finalLogoUrl,
         updatedBy: user?.uid,
         updatedAt: new Date().toISOString()
       };
@@ -114,7 +126,7 @@ export const Profile: React.FC = () => {
       setIsCompanyModalOpen(false);
       setEditingCompany(null);
       setCurrentCompanyFormData({ // Reset form
-        cnpj: '', razaoSocial: '', nomeFantasia: '', porte: '', naturezaJuridica: '',
+        cnpj: '', razaoSocial: '', logoUrl: '', nomeFantasia: '', porte: '', naturezaJuridica: '',
         inscricaoEstadual: '', inscricaoMunicipal: '', email: '', telefoneFixo: '',
         telefoneCelular: '', cep: '', logradouro: '', numero: '', complemento: '',
         bairro: '', municipio: '', uf: '', socios: [], representantes: [], atividades: [], demonstrativos: []
@@ -214,6 +226,17 @@ export const Profile: React.FC = () => {
       } finally {
         setSaving(false);
       }
+    }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCurrentCompanyFormData(prev => ({ ...prev, logoUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -391,6 +414,11 @@ export const Profile: React.FC = () => {
               {companies.map(company => (
                 <div key={company.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors flex flex-col justify-between relative group">
                   <div>
+                    {company.logoUrl && (
+                      <div className="w-16 h-16 rounded-xl overflow-hidden mb-4 border border-slate-200 bg-white">
+                        <img src={company.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    )}
                     <h5 className="font-bold text-slate-800 text-lg mb-1">{company.razaoSocial}</h5>
                     <p className="text-sm text-slate-500">{company.nomeFantasia}</p>
                     <p className="text-xs text-slate-400 mt-2">CNPJ: {company.cnpj}</p>
@@ -421,6 +449,37 @@ export const Profile: React.FC = () => {
               </div>
 
               <form onSubmit={handleSaveCompany} className="p-6 space-y-6">
+                {/* Seletor de Logomarca */}
+                <div className="flex justify-center mb-6">
+                  <div className="relative group cursor-pointer">
+                    <div className={`w-32 h-32 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors ${currentCompanyFormData.logoUrl ? 'border-blue-500 bg-white' : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50'}`}>
+                      {currentCompanyFormData.logoUrl ? (
+                        <img src={currentCompanyFormData.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-center p-2 text-slate-400">
+                          <Upload size={32} className="mx-auto mb-2" />
+                          <span className="text-xs font-bold uppercase">Logomarca</span>
+                        </div>
+                      )}
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleLogoChange}
+                    />
+                    {currentCompanyFormData.logoUrl && (
+                      <button 
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setCurrentCompanyFormData({...currentCompanyFormData, logoUrl: ''}); }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors z-10"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Dados Gerais */}
                 <div>
                   <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Building2 size={18} /> Dados Gerais</h4>

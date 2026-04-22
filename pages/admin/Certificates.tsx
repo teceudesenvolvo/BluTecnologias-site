@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download, Building2, RefreshCw } from 'lucide-react';
-import { certificateService, storageService, Certificate, auth } from '../../services/firebase';
+import { certificateService, storageService, Certificate, auth, rtdb, Company } from '../../services/firebase';
+import { ref, get } from 'firebase/database';
 
 interface ExtendedCertificate extends Certificate {
   type?: string;
@@ -10,6 +11,7 @@ interface ExtendedCertificate extends Certificate {
 export const Certificates: React.FC = () => {
   const [certificates, setCertificates] = useState<ExtendedCertificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export const Certificates: React.FC = () => {
 
   useEffect(() => {
     loadCertificates();
+    loadCompanies();
   }, []);
 
   const loadCertificates = async () => {
@@ -54,6 +57,18 @@ export const Certificates: React.FC = () => {
     });
     setCertificates(sortedData);
     setLoading(false);
+  };
+
+  const loadCompanies = async () => {
+    try {
+      const snapshot = await get(ref(rtdb, 'settings/companies'));
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar empresas:", error);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,8 +397,17 @@ export const Certificates: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Empresa</label>
-                <input required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
-                  value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} placeholder="Nome da empresa" />
+                <select 
+                  required 
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all bg-white" 
+                  value={formData.company} 
+                  onChange={e => setFormData({...formData, company: e.target.value})}
+                >
+                  <option value="">Selecione a empresa</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.razaoSocial}>{c.razaoSocial}</option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

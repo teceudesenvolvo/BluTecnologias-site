@@ -41,6 +41,7 @@ export interface Company {
   id: string;
   cnpj: string;
   razaoSocial: string;
+  logoUrl?: string;
   nomeFantasia?: string;
   porte?: string;
   naturezaJuridica?: string;

@@ -214,6 +214,7 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
               value={companyFilter}
               onChange={e => setCompanyFilter(e.target.value)}
               className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none print:hidden"
+              style={{width: "34%"}}
             >
               <option value="all">Todas as Empresas</option>
               {companies.map(c => (
