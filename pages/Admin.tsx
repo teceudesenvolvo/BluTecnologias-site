@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, onAuthStateChanged, signOut } from '../services/firebase';
 import {
   FileText,
@@ -37,7 +37,8 @@ import { PrivacyPolicyGenerator } from './admin/PrivacyPolicyGenerator';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<string>('blog');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTabState] = useState<string>(() => searchParams.get('tab') || 'blog');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -73,6 +74,20 @@ export const Admin: React.FC = () => {
     { id: 'profile', label: 'Meu Perfil', icon: User, component: Profile, showInMenu: true },
     { id: 'privacy', label: 'Política de Privacidade', icon: Shield, component: PrivacyPolicyGenerator, showInMenu: true }
   ];
+
+  const validTabs = new Set(allTabs.map((tab) => tab.id));
+  const setActiveTab = (tab: string) => {
+    const nextTab = validTabs.has(tab) ? tab : 'blog';
+    setActiveTabState(nextTab);
+    setSearchParams({ tab: nextTab }, { replace: true });
+  };
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && validTabs.has(requestedTab) && requestedTab !== activeTab) {
+      setActiveTabState(requestedTab);
+    }
+  }, [searchParams, activeTab]);
 
   const menuItems = allTabs.filter(tab => tab.showInMenu);
   const ActiveComponent = (allTabs.find(item => item.id === activeTab)?.component || News) as any;

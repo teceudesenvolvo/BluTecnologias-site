@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, Paperclip, X } from 'lucide-react';
-import { ref, push, set } from 'firebase/database';
-import { rtdb, auth } from '../../../services/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import { db, auth } from '../../../services/firebase';
 
 interface EmailComposerProps {
     onClose: () => void;
@@ -42,9 +42,8 @@ export const EmailComposer: React.FC<EmailComposerProps> = ({ onClose }) => {
             if (!auth.currentUser) throw new Error("Usuário não autenticado");
 
             // Save to 'emails' collection in 'sent' folder for local UI
-            const emailsRef = ref(rtdb, `users/${auth.currentUser.uid}/emails`);
-            const newEmailRef = push(emailsRef);
-            await set(newEmailRef, {
+            const emailsRef = collection(db, 'users', auth.currentUser.uid, 'emails');
+            await addDoc(emailsRef, {
                 to,
                 from: auth.currentUser.email || 'Eu',
                 subject,
@@ -56,9 +55,7 @@ export const EmailComposer: React.FC<EmailComposerProps> = ({ onClose }) => {
             });
 
             // Optional: If using Firebase Trigger Email extension via RTDB, also write to 'mail_queue'
-            const mailQueueRef = ref(rtdb, 'mail_queue');
-            const newQueueRef = push(mailQueueRef);
-            await set(newQueueRef, {
+            await addDoc(collection(db, 'mail_queue'), {
                 to: [to],
                 userId: auth.currentUser.uid,
                 message: {

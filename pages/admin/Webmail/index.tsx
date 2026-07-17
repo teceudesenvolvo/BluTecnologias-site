@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ref, get } from 'firebase/database';
-import { auth, rtdb } from '../../../services/firebase';
+import { auth } from '../../../services/firebase';
+import { userSettingsService } from '../../../services/firestoreSettingsService';
 import { WebmailSidebar } from './WebmailSidebar';
 import { MessageList } from './MessageList';
 import { EmailViewer } from './EmailViewer';
@@ -20,9 +20,8 @@ export const Webmail: React.FC = () => {
             const user = auth.currentUser;
             if (user) {
                 try {
-                    const snapshot = await get(ref(rtdb, `users/${user.uid}/smtpSettings`));
-                    if (snapshot.exists()) {
-                        const data = snapshot.val();
+                    const data = await userSettingsService.getSmtp();
+                    if (data) {
                         if (data.host && data.port && data.user && data.pass) {
                             setHasSmtpSettings(true);
                         } else {

@@ -2,6 +2,143 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function companyUser(companyId) {
+      return isSignedIn() && (
+        companyId == 'company-' + request.auth.uid ||
+        exists(/databases/$(database)/documents/companyUsers/$(companyId + '_' + request.auth.uid))
+      );
+    }
+
+    function sameCompany() {
+      return companyUser(resource.data.companyId);
+    }
+
+    function createsForOwnCompany() {
+      return request.resource.data.companyId is string && companyUser(request.resource.data.companyId);
+    }
+
+    match /companies/{companyId} {
+      allow read, update: if companyUser(companyId);
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      match /opportunityFavorites/{favoriteId} {
+        allow read, write: if companyUser(companyId);
+      }
+      match /settings/{settingId} {
+        allow read, write: if companyUser(companyId);
+      }
+    }
+
+    match /companyUsers/{membershipId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.invitationId is string
+        && exists(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId))
+        && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+        && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.companyId == request.resource.data.companyId;
+    }
+
+    match /teamInvitations/{invitationId} {
+      allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow update: if isSignedIn()
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.email == resource.data.email;
+    }
+
+    match /teamMembers/{memberId} {
+      allow read: if sameCompany() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid
+        || (isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.invitationId is string
+          && exists(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId))
+          && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+          && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.companyId == request.resource.data.companyId);
+      allow update, delete: if sameCompany();
+    }
+
+    // Configurações financeiras: leitura segregada por empresa. Toda escrita
+    // passa pela Cloud Function, que valida papel, tenant e registra auditoria.
+    match /{financialCollection}/{documentId} {
+      allow read: if financialCollection in ['financialCategories', 'financialConfigurationItems', 'financialApprovalFlows', 'dreAccounts'] && sameCompany();
+      allow write: if false;
+    }
+
+    match /financialAuditLogs/{logId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+
+    match /bankAccounts/{accountId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /bankAccountSecrets/{accountId} {
+      allow read, write: if false;
+    }
+    match /bankTransfers/{transferId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /idempotencyKeys/{keyId} {
+      allow read, write: if false;
+    }
+    match /costCenters/{costCenterId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /financialAllocations/{allocationId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /projects/{projectId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /projectMembers/{memberId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      match /settings/{settingId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if sameCompany();
+    }
+
+    // Catálogo global, sem segredos. Escritas somente por processo administrativo futuro.
+    match /integrationProviders/{providerId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Coleções de integração segregadas por empresa. Tokens, senhas, certificados,
+    // cookies e client secrets não podem ser gravados nestes documentos.
+    match /{integrationCollection}/{documentId} {
+      allow read, delete: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && sameCompany();
+      allow create: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+    }
+
+    match /{collection}/{documentId} {
+      allow read, delete: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers']) && sameCompany();
+      allow create: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers']) && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers']) && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+    }
+
     // Permitir aos usuários ler e escrever em sua própria coleção de e-mails
     match /users/{userId}/emails/{emailId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;

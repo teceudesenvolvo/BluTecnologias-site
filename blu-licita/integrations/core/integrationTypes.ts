@@ -1,0 +1,24 @@
+export interface ConnectorConfiguration { companyId: string; connectionName: string; environment: 'PRODUCTION' | 'SANDBOX'; enabled: boolean; states?: string[]; keywords?: string[]; schedule?: 'MANUAL' | 'DAILY' | 'WEEKLY'; nonSensitiveSettings?: Record<string, string | number | boolean>; }
+export interface ValidationResult { valid: boolean; errors: string[]; warnings: string[]; }
+export interface ConnectionTestResult { success: boolean; message: string; checkedAt: string; latencyMs?: number; }
+export interface PaginatedResult<T> { data: T[]; nextCursor?: string; total?: number; }
+export interface OpportunityQuery { startDate: string; endDate: string; state?: string; municipalityCode?: string; organizationCnpj?: string; modalityCode?: number; keyword?: string; pageSize?: number; }
+export interface ContractQuery { startDate?: string; endDate?: string; organizationCnpj?: string; pageSize?: number; }
+export interface ExternalOpportunity { externalId: string; source: string; sourceUrl?: string; organizationName: string; organizationCnpj?: string; raw: unknown; processNumber?: string; procurementNumber?: string; object: string; estimatedValue?: number; publicationDate?: string; openingDate?: string; status?: string; }
+export interface ExternalBiddingItem { externalId: string; number?: number; description: string; quantity?: number; unit?: string; estimatedUnitValue?: number; raw?: unknown; }
+export interface ExternalDocument { externalId: string; name: string; type?: string; url?: string; publishedAt?: string; raw?: unknown; }
+export interface ExternalBiddingResult { externalId: string; status: string; suppliers: ExternalSupplier[]; raw?: unknown; }
+export interface ExternalSupplier { id?: string; document?: string; name: string; value?: number; }
+export interface ExternalContract { externalId: string; source: string; organizationName: string; number?: string; object: string; value?: number; startDate?: string; endDate?: string; raw: unknown; }
+
+export interface NormalizedBiddingItem { id: string; sourceId: string; number?: number; description: string; quantity?: number; unit?: string; estimatedUnitValue?: number; }
+export interface NormalizedDocument { id: string; sourceId: string; name: string; type?: string; url?: string; publishedAt?: string; }
+export interface NormalizedSupplier { id?: string; document?: string; name: string; value?: number; }
+export interface NormalizedBiddingResult { status: string; suppliers: NormalizedSupplier[]; updatedAt: string; }
+export interface NormalizedContractItem { id: string; description: string; quantity?: number; unitValue?: number; totalValue?: number; }
+export interface NormalizedContract { id: string; source: string; sourceId: string; sourceUrl?: string; organization: { cnpj?: string; name: string }; number?: string; object: string; value?: number; startDate?: string; endDate?: string; items: NormalizedContractItem[]; importedAt: string; updatedAt: string; rawData?: unknown; }
+export interface NormalizedOpportunity { id: string; source: string; sourceId: string; sourceUrl?: string; organization: { id?: string; cnpj?: string; name: string; governmentLevel?: 'FEDERAL' | 'STATE' | 'MUNICIPAL' | 'OTHER'; city?: string; state?: string }; processNumber?: string; procurementNumber?: string; modality?: string; disputeMode?: string; judgmentCriterion?: string; object: string; summary?: string; estimatedValue?: number; currency: 'BRL'; publicationDate?: string; proposalStartDate?: string; proposalEndDate?: string; openingDate?: string; status: 'DRAFT' | 'PUBLISHED' | 'RECEIVING_PROPOSALS' | 'OPEN' | 'SUSPENDED' | 'CANCELLED' | 'CLOSED' | 'AWARDED' | 'UNKNOWN'; exclusiveForSmallBusiness?: boolean; hasLocalPreference?: boolean; electronicDispute?: boolean; items: NormalizedBiddingItem[]; documents: NormalizedDocument[]; rawData?: unknown; importedAt: string; updatedAt: string; }
+export interface OpportunityIdentity { pncpControlNumber?: string; organizationCnpj?: string; processNumber?: string; procurementNumber?: string; year?: number; source: string; sourceId: string; fingerprint: string; }
+export interface SourceReference { providerId: string; sourceId: string; sourceUrl?: string; sourcePublishedAt?: string; sourceUpdatedAt?: string; importedAt: string; lastSyncedAt: string; connectorVersion: string; rawDataHash: string; }
+export interface SyncError { code: string; message: string; retryable: boolean; recordId?: string; }
+export interface SyncJob { id: string; companyId: string; providerId: string; type: 'OPPORTUNITIES' | 'DOCUMENTS' | 'RESULTS' | 'CONTRACTS' | 'FULL'; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'CANCELLED'; startedAt?: string; completedAt?: string; recordsRead: number; recordsCreated: number; recordsUpdated: number; recordsSkipped: number; errors: SyncError[]; }

@@ -8,6 +8,18 @@
     ],
     "rewrites": [
       {
+        "source": "/api/pncp/**",
+        "function": "pncpProxy"
+      },
+      {
+        "source": "/api/compras-gov/**",
+        "function": "comprasGovProxy"
+      },
+      {
+        "source": "/api/tce-ce/**",
+        "function": "tceCeProxy"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

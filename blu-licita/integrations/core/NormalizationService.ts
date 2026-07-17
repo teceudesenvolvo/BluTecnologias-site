@@ -1,0 +1,7 @@
+import type { NormalizedOpportunity, OpportunityIdentity } from './integrationTypes';
+const clean = (value?: string) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+const simpleHash = (value: string) => { let hash = 0; for (let index = 0; index < value.length; index += 1) hash = Math.imul(31, hash) + value.charCodeAt(index) | 0; return Math.abs(hash).toString(36); };
+export class NormalizationService {
+  createIdentity(opportunity: NormalizedOpportunity): OpportunityIdentity { const basis = [opportunity.organization.cnpj, opportunity.processNumber, opportunity.procurementNumber, opportunity.object, opportunity.openingDate].map(clean).join('|'); return { pncpControlNumber: opportunity.source === 'pncp' ? opportunity.sourceId : undefined, organizationCnpj: opportunity.organization.cnpj, processNumber: opportunity.processNumber, procurementNumber: opportunity.procurementNumber, year: Number(opportunity.publicationDate?.slice(0, 4)) || undefined, source: opportunity.source, sourceId: opportunity.sourceId, fingerprint: simpleHash(basis) }; }
+  compare(a: OpportunityIdentity, b: OpportunityIdentity): 'EXACT' | 'POSSIBLE' | 'DIFFERENT' { if (a.pncpControlNumber && a.pncpControlNumber === b.pncpControlNumber) return 'EXACT'; if (a.organizationCnpj && a.organizationCnpj === b.organizationCnpj && a.processNumber && clean(a.processNumber) === clean(b.processNumber)) return 'EXACT'; return a.fingerprint === b.fingerprint ? 'POSSIBLE' : 'DIFFERENT'; }
+}

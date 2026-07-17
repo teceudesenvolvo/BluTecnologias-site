@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { ArrowLeft, Reply, Trash2, Clock, User } from 'lucide-react';
-import { ref, update } from 'firebase/database';
-import { rtdb, auth } from '../../../services/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../../../services/firebase';
 
 interface EmailViewerProps {
     email: any;
@@ -15,8 +15,7 @@ export const EmailViewer: React.FC<EmailViewerProps> = ({ email, onBack }) => {
         const markAsRead = async () => {
             if (email && !email.read && auth.currentUser) {
                 try {
-                    const emailRef = ref(rtdb, `users/${auth.currentUser.uid}/emails/${email.id}`);
-                    await update(emailRef, { read: true });
+                    await updateDoc(doc(db, 'users', auth.currentUser.uid, 'emails', email.id), { read: true });
                 } catch (error) {
                     console.error("Error marking email as read:", error);
                 }
@@ -28,8 +27,7 @@ export const EmailViewer: React.FC<EmailViewerProps> = ({ email, onBack }) => {
     const handleDelete = async () => {
         if (!auth.currentUser || !email) return;
         try {
-            const emailRef = ref(rtdb, `users/${auth.currentUser.uid}/emails/${email.id}`);
-            await update(emailRef, { folder: 'trash' });
+            await updateDoc(doc(db, 'users', auth.currentUser.uid, 'emails', email.id), { folder: 'trash' });
             onBack(); // Go back to list after deleting
         } catch (error) {
             console.error("Error deleting email:", error);

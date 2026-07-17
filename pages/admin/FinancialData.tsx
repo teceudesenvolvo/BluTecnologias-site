@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Banknote, KeyRound, Plus, Trash2, Loader2, Search, MapPin, Building2 } from 'lucide-react';
-import { auth, FinancialSettings, rtdb } from '../../services/firebase';
-import { ref, get, update } from 'firebase/database';
+import { auth, FinancialSettings } from '../../services/firebase';
+import { financialSettingsService } from '../../services/firestoreSettingsService';
 
 const initialSettings: any = {
   bankAccounts: [],
@@ -23,8 +23,7 @@ export const FinancialData: React.FC = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const snapshot = await get(ref(rtdb, 'settings/financial'));
-      const data = snapshot.exists() ? snapshot.val() : null;
+      const data = await financialSettingsService.get();
       if (data) setSettings({ ...initialSettings, ...data });
     } catch (error) {
       console.error("Erro ao carregar configurações:", error);
@@ -47,7 +46,7 @@ export const FinancialData: React.FC = () => {
     if (e) e.preventDefault();
     setSaving(true);
     const settingsToSave = { ...settings, updatedBy: auth.currentUser?.uid, updatedAt: new Date().toISOString() };
-    await update(ref(rtdb, 'settings/financial'), settingsToSave);
+    await financialSettingsService.save(settingsToSave);
     setSaving(false);
     alert('Configurações salvas com sucesso!');
   };

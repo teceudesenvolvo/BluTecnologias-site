@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileBadge, Plus, Trash2, Calendar, AlertTriangle, CheckCircle, X, Loader2, FileText, AlertCircle, Edit2, Upload, Download, Building2, RefreshCw } from 'lucide-react';
-import { certificateService, storageService, Certificate, auth, rtdb, Company } from '../../services/firebase';
-import { ref, get } from 'firebase/database';
+import { certificateService, storageService, Certificate, auth, Company } from '../../services/firebase';
+import { companySettingsService } from '../../services/firestoreSettingsService';
 
 interface ExtendedCertificate extends Certificate {
   type?: string;
@@ -61,11 +61,7 @@ export const Certificates: React.FC = () => {
 
   const loadCompanies = async () => {
     try {
-      const snapshot = await get(ref(rtdb, 'settings/companies'));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
-      }
+      setCompanies(await companySettingsService.getAll());
     } catch (error) {
       console.error("Erro ao carregar empresas:", error);
     }

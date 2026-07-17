@@ -1,16 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import { getDatabase } from 'firebase/database';
-import { getFirestore } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { BlogPost } from '../types';
 
 // Configuração do Firebase - Substitua pelos dados do seu projeto no Console do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBwyV2KFRfT_Hsh10A8sXoJusuLIAUQ35Y",
   authDomain: "blutecnologias-site.firebaseapp.com",
-  databaseURL: "https://blutecnologias-site-default-rtdb.firebaseio.com",
   projectId: "blutecnologias-site",
   storageBucket: "blutecnologias-site.firebasestorage.app",
   messagingSenderId: "22963166270",
@@ -23,10 +21,32 @@ export const auth = getAuth(app);
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
-export const rtdb = getDatabase(app);
 export const db = getFirestore(app);
 
-const DB_URL = 'https://blutecnologias-site-default-rtdb.firebaseio.com';
+const currentOwner = () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Usuário não autenticado.');
+  return { userId: user.uid, companyId: `company-${user.uid}` };
+};
+
+const withoutUndefined = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const companyCollection = async <T>(name: string): Promise<T[]> => {
+  const { companyId } = currentOwner();
+  const snapshot = await getDocs(query(collection(db, name), where('companyId', '==', companyId)));
+  return snapshot.docs.map(item => ({ id: item.id, ...item.data() } as T));
+};
+
+const createCompanyDocument = async (name: string, value: Record<string, unknown>) => {
+  const owner = currentOwner();
+  await addDoc(collection(db, name), withoutUndefined({ ...value, ...owner }));
+};
+
+const updateCompanyDocument = async (name: string, id: string, value: Record<string, unknown>) => {
+  await updateDoc(doc(db, name, id), withoutUndefined(value));
+};
+
+const deleteCompanyDocument = async (name: string, id: string) => deleteDoc(doc(db, name, id));
 
 export interface Transaction {
   id: string;
@@ -72,6 +92,13 @@ export interface ClientContract {
   endDate: string;
   value: number;
   fileUrl?: string;
+  source?: 'pncp' | 'manual';
+  sourceId?: string;
+  sourceUrl?: string;
+  processNumber?: string;
+  procurementNumber?: string;
+  supplierCnpj?: string;
+  importedAt?: string;
 }
 
 export interface ClientAdjustment {
@@ -132,6 +159,8 @@ export interface ContactLead {
   proposals?: ClientProposal[];
   reports?: ClientReport[];
   userId?: string;
+  organizationCnpj?: string;
+  source?: 'pncp' | 'manual';
 }
 
 export interface ProspectFile {
@@ -245,16 +274,8 @@ export const storageService = {
 export const blogService = {
   async getAll(): Promise<BlogPost[]> {
     try {
-      const response = await fetch(`${DB_URL}/posts.json`);
-      const data = await response.json();
-
-      if (!data) return [];
-
-      // O Firebase retorna um objeto onde as chaves são os IDs. Convertemos para array.
-      return Object.entries(data).map(([id, post]: [string, any]) => ({
-        id,
-        ...post
-      })).reverse(); // Inverte para mostrar os mais recentes primeiro
+      const snapshot = await getDocs(collection(db, 'blogPosts'));
+      return snapshot.docs.map(item => ({ id: item.id, ...item.data() } as BlogPost)).reverse();
     } catch (error) {
       console.error('Erro ao buscar posts:', error);
       return [];
@@ -275,10 +296,8 @@ export const blogService = {
 
   async getById(id: string): Promise<BlogPost | null> {
     try {
-      const response = await fetch(`${DB_URL}/posts/${id}.json`);
-      const data = await response.json();
-      if (!data) return null;
-      return { id, ...data };
+      const snapshot = await getDoc(doc(db, 'blogPosts', id));
+      return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as BlogPost) : null;
     } catch (error) {
       console.error('Erro ao buscar post:', error);
       return null;
@@ -287,19 +306,8 @@ export const blogService = {
 
   async create(post: Omit<BlogPost, 'id'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      if (!user) return false;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/posts.json?auth=${token}` : `${DB_URL}/posts.json`;
-      const postWithUser = { ...post, userId: user.uid };
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(postWithUser),
-      });
-      return response.ok;
+      await createCompanyDocument('blogPosts', post as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao criar post:', error);
       return false;
@@ -308,16 +316,8 @@ export const blogService = {
 
   async update(id: string, post: Partial<BlogPost>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/posts/${id}.json?auth=${token}` : `${DB_URL}/posts/${id}.json`;
-
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(post),
-      });
-      return response.ok;
+      await updateCompanyDocument('blogPosts', id, post as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar post:', error);
       return false;
@@ -326,14 +326,8 @@ export const blogService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/posts/${id}.json?auth=${token}` : `${DB_URL}/posts/${id}.json`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('blogPosts', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar post:', error);
       return false;
@@ -344,13 +338,7 @@ export const blogService = {
 export const quoteService = {
   async getAll(): Promise<Quote[]> {
     try {
-      const response = await fetch(`${DB_URL}/quotes.json`);
-      const data = await response.json();
-      if (!data) return [];
-      return Object.entries(data).map(([id, quote]: [string, any]) => ({
-        id,
-        ...quote,
-      })).reverse();
+      return (await companyCollection<Quote>('quotes')).reverse();
     } catch (error) {
       console.error('Erro ao buscar pedidos de cotação:', error);
       return [];
@@ -359,18 +347,12 @@ export const quoteService = {
 
   async create(quote: Omit<Quote, 'id' | 'creationDate'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
       const quoteData = {
         ...quote,
         creationDate: new Date().toISOString(),
-        userId: user?.uid,
       };
-      const response = await fetch(`${DB_URL}/quotes.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quoteData),
-      });
-      return response.ok;
+      await createCompanyDocument('quotes', quoteData);
+      return true;
     } catch (error) {
       console.error('Erro ao criar pedido de cotação:', error);
       return false;
@@ -379,12 +361,8 @@ export const quoteService = {
 
   async update(id: string, quote: Partial<Quote>): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/quotes/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quote),
-      });
-      return response.ok;
+      await updateCompanyDocument('quotes', id, quote as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar pedido de cotação:', error);
       return false;
@@ -395,13 +373,7 @@ export const quoteService = {
 export const prospectService = {
   async getAll(): Promise<Prospect[]> {
     try {
-      const response = await fetch(`${DB_URL}/prospects.json`);
-      const data = await response.json();
-      if (!data) return [];
-      return Object.entries(data).map(([id, prospect]: [string, any]) => ({
-        id,
-        ...prospect,
-      })).reverse();
+      return (await companyCollection<Prospect>('prospects')).reverse();
     } catch (error) {
       console.error('Erro ao buscar prospects:', error);
       return [];
@@ -410,13 +382,8 @@ export const prospectService = {
 
   async create(prospect: Omit<Prospect, 'id'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const response = await fetch(`${DB_URL}/prospects.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...prospect, userId: user?.uid }),
-      });
-      return response.ok;
+      await createCompanyDocument('prospects', prospect as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao criar prospect:', error);
       return false;
@@ -425,12 +392,8 @@ export const prospectService = {
 
   async update(id: string, prospect: Partial<Prospect>): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/prospects/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prospect),
-      });
-      return response.ok;
+      await updateCompanyDocument('prospects', id, prospect as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar prospect:', error);
       return false;
@@ -439,8 +402,8 @@ export const prospectService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/prospects/${id}.json`, { method: 'DELETE' });
-      return response.ok;
+      await deleteCompanyDocument('prospects', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar prospect:', error);
       return false;
@@ -451,15 +414,8 @@ export const prospectService = {
 export const certificateService = {
   async getAll(): Promise<Certificate[]> {
     try {
-      const response = await fetch(`${DB_URL}/certificates.json`);
-      const data = await response.json();
-
-      if (!data) return [];
-
-      return Object.entries(data).map(([id, cert]: [string, any]) => ({
-        id,
-        ...cert
-      })).sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+      return (await companyCollection<Certificate>('companyDocuments'))
+        .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
     } catch (error) {
       console.error('Erro ao buscar certificados:', error);
       return [];
@@ -468,13 +424,8 @@ export const certificateService = {
 
   async create(cert: Omit<Certificate, 'id'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const response = await fetch(`${DB_URL}/certificates.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...cert, userId: user?.uid }),
-      });
-      return response.ok;
+      await createCompanyDocument('companyDocuments', cert as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao criar certificado:', error);
       return false;
@@ -483,12 +434,8 @@ export const certificateService = {
 
   async update(id: string, cert: Partial<Certificate>): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/certificates/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cert),
-      });
-      return response.ok;
+      await updateCompanyDocument('companyDocuments', id, cert as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar certificado:', error);
       return false;
@@ -497,10 +444,8 @@ export const certificateService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/certificates/${id}.json`, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('companyDocuments', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar certificado:', error);
       return false;
@@ -511,15 +456,7 @@ export const certificateService = {
 export const taskService = {
   async getAll(): Promise<Task[]> {
     try {
-      const response = await fetch(`${DB_URL}/tasks.json`);
-      const data = await response.json();
-
-      if (!data) return [];
-
-      return Object.entries(data).map(([id, task]: [string, any]) => ({
-        id,
-        ...task
-      }));
+      return companyCollection<Task>('tasks');
     } catch (error) {
       console.error('Erro ao buscar tarefas:', error);
       return [];
@@ -528,13 +465,8 @@ export const taskService = {
 
   async create(task: Omit<Task, 'id'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const response = await fetch(`${DB_URL}/tasks.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...task, userId: user?.uid }),
-      });
-      return response.ok;
+      await createCompanyDocument('tasks', task as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao criar tarefa:', error);
       return false;
@@ -543,12 +475,8 @@ export const taskService = {
 
   async update(id: string, task: Partial<Task>): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/tasks/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
-      });
-      return response.ok;
+      await updateCompanyDocument('tasks', id, task as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar tarefa:', error);
       return false;
@@ -557,10 +485,8 @@ export const taskService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/tasks/${id}.json`, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('tasks', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar tarefa:', error);
       return false;
@@ -571,20 +497,13 @@ export const taskService = {
 export const contactService = {
   async create(lead: Omit<ContactLead, 'id' | 'date' | 'status'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
       const leadData = {
         ...lead,
         date: new Date().toISOString(),
         status: 'lead',
-        userId: user?.uid,
       };
-
-      const response = await fetch(`${DB_URL}/contacts.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(leadData),
-      });
-      return response.ok;
+      await createCompanyDocument('clients', leadData);
+      return true;
     } catch (error) {
       console.error('Erro ao salvar contato:', error);
       return false;
@@ -593,15 +512,7 @@ export const contactService = {
 
   async getAll(): Promise<ContactLead[]> {
     try {
-      const response = await fetch(`${DB_URL}/contacts.json`);
-      const data = await response.json();
-
-      if (!data) return [];
-
-      return Object.entries(data).map(([id, contact]: [string, any]) => ({
-        id,
-        ...contact
-      })).reverse();
+      return (await companyCollection<ContactLead>('clients')).reverse();
     } catch (error) {
       console.error('Erro ao buscar contatos:', error);
       return [];
@@ -612,15 +523,7 @@ export const contactService = {
 export const financialService = {
   async getAll(): Promise<Transaction[]> {
     try {
-      const response = await fetch(`${DB_URL}/transactions.json`);
-      const data = await response.json();
-
-      if (!data) return [];
-
-      return Object.entries(data).map(([id, transaction]: [string, any]) => ({
-        id,
-        ...transaction
-      })).reverse();
+      return (await companyCollection<Transaction>('financialTransactions')).reverse();
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
       return [];
@@ -629,17 +532,8 @@ export const financialService = {
 
   async add(transaction: Omit<Transaction, 'id'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/transactions.json?auth=${token}` : `${DB_URL}/transactions.json`;
-      const transactionWithUser = { ...transaction, userId: user?.uid };
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transactionWithUser),
-      });
-      return response.ok;
+      await createCompanyDocument('financialTransactions', transaction as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao adicionar transação:', error);
       return false;
@@ -648,16 +542,8 @@ export const financialService = {
 
   async update(id: string, transaction: Partial<Transaction>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/transactions/${id}.json?auth=${token}` : `${DB_URL}/transactions/${id}.json`;
-
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
-      });
-      return response.ok;
+      await updateCompanyDocument('financialTransactions', id, transaction as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar transação:', error);
       return false;
@@ -666,14 +552,8 @@ export const financialService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/transactions/${id}.json?auth=${token}` : `${DB_URL}/transactions/${id}.json`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('financialTransactions', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar transação:', error);
       return false;
@@ -684,13 +564,7 @@ export const financialService = {
 export const privacyPolicyService = {
   async getAll(): Promise<PrivacyPolicy[]> {
     try {
-      const response = await fetch(`${DB_URL}/privacy_policies.json`);
-      const data = await response.json();
-      if (!data) return [];
-      return Object.entries(data).map(([id, policy]: [string, any]) => ({
-        id,
-        ...policy
-      })).reverse();
+      return (await companyCollection<PrivacyPolicy>('privacyPolicies')).reverse();
     } catch (error) {
       console.error('Erro ao buscar políticas:', error);
       return [];
@@ -699,10 +573,8 @@ export const privacyPolicyService = {
 
   async getById(id: string): Promise<PrivacyPolicy | null> {
     try {
-      const response = await fetch(`${DB_URL}/privacy_policies/${id}.json`);
-      const data = await response.json();
-      if (!data) return null;
-      return { id, ...data };
+      const snapshot = await getDoc(doc(db, 'privacyPolicies', id));
+      return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as PrivacyPolicy) : null;
     } catch (error) {
       console.error('Erro ao buscar política:', error);
       return null;
@@ -711,20 +583,9 @@ export const privacyPolicyService = {
 
   async save(policy: Omit<PrivacyPolicy, 'id'>, id?: string): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const method = id ? 'PATCH' : 'POST';
-      const url = id 
-        ? `${DB_URL}/privacy_policies/${id}.json?auth=${token}` 
-        : `${DB_URL}/privacy_policies.json?auth=${token}`;
-      
-      const payload = { ...policy, userId: user?.uid };
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      return response.ok;
+      if (id) await updateCompanyDocument('privacyPolicies', id, policy as Record<string, unknown>);
+      else await createCompanyDocument('privacyPolicies', policy as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao salvar política:', error);
       return false;
@@ -733,14 +594,8 @@ export const privacyPolicyService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const user = auth.currentUser;
-      const token = user ? await user.getIdToken() : null;
-      const url = token ? `${DB_URL}/privacy_policies/${id}.json?auth=${token}` : `${DB_URL}/privacy_policies/${id}.json`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('privacyPolicies', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar política:', error);
       return false;
@@ -751,20 +606,13 @@ export const privacyPolicyService = {
 export const clientService = {
   async create(client: Omit<ContactLead, 'id' | 'date' | 'status'>): Promise<boolean> {
     try {
-      const user = auth.currentUser;
       const clientData = {
         ...client,
         date: new Date().toISOString(),
         status: 'active',
-        userId: user?.uid,
       };
-
-      const response = await fetch(`${DB_URL}/contacts.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientData),
-      });
-      return response.ok;
+      await createCompanyDocument('clients', clientData);
+      return true;
     } catch (error) {
       console.error('Erro ao criar cliente:', error);
       return false;
@@ -773,12 +621,8 @@ export const clientService = {
 
   async updateStatus(id: string, status: 'active' | 'lead'): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/contacts/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      return response.ok;
+      await updateCompanyDocument('clients', id, { status });
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar status do cliente:', error);
       return false;
@@ -787,12 +631,8 @@ export const clientService = {
 
   async update(id: string, data: Partial<ContactLead>): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/contacts/${id}.json`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      return response.ok;
+      await updateCompanyDocument('clients', id, data as Record<string, unknown>);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar dados do cliente:', error);
       return false;
@@ -801,10 +641,8 @@ export const clientService = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${DB_URL}/contacts/${id}.json`, {
-        method: 'DELETE',
-      });
-      return response.ok;
+      await deleteCompanyDocument('clients', id);
+      return true;
     } catch (error) {
       console.error('Erro ao deletar cliente:', error);
       return false;

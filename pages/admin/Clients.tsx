@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck } from 'lucide-react';
-import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, rtdb, Company } from '../../services/firebase';
-import { ref, get } from 'firebase/database';
+import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, Company } from '../../services/firebase';
+import { companySettingsService, financialSettingsService } from '../../services/firestoreSettingsService';
 import { initialSoftwares } from '../../services/mockData';
 import { ProspectsMap } from './ProspectsMap';
 
@@ -100,11 +100,7 @@ export const Clients: React.FC = () => {
 
   const loadMyCompanies = async () => {
     try {
-      const snapshot = await get(ref(rtdb, 'settings/companies'));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setMyCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
-      }
+      setMyCompanies(await companySettingsService.getAll());
     } catch (error) {
       console.error('Erro ao carregar minhas empresas:', error);
     }
@@ -112,8 +108,7 @@ export const Clients: React.FC = () => {
 
   const loadFinancialSettings = async () => {
     try {
-      const snapshot = await get(ref(rtdb, 'settings/financial'));
-      if (snapshot.exists()) setFinancialSettings(snapshot.val());
+      setFinancialSettings(await financialSettingsService.get());
     } catch (error) {
       console.error('Erro ao carregar configurações financeiras:', error);
     }
@@ -573,6 +568,7 @@ export const Clients: React.FC = () => {
                       <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${contact.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {contact.status === 'active' ? 'Cliente' : 'Lead'}
                       </span>
+                      {contact.source === 'pncp' && <span className="text-xs px-2 py-1 rounded-full font-bold uppercase bg-blue-100 text-blue-700">Contrato público · PNCP</span>}
                     </div>
                     <p className="text-slate-500 text-sm mb-4">{contact.role} • {contact.solution}</p>
                     
@@ -920,7 +916,6 @@ export const Clients: React.FC = () => {
                  { id: 'invoices', label: 'Notas Fiscais', icon: DollarSign },
                  { id: 'proposals', label: 'Propostas', icon: Paperclip },
                  { id: 'reports', label: 'Relatórios', icon: FileBarChart },
-                 { id: 'billing', label: 'Enviar Cobrança', icon: Send },
                ].map(tab => (
                  <button
                     key={tab.id}
@@ -1176,8 +1171,9 @@ export const Clients: React.FC = () => {
                         <div className="flex-1">
                           {manageTab === 'contracts' && (
                             <div>
-                              <h5 className="font-bold text-slate-800">{item.title}</h5>
-                              <p className="text-sm text-slate-500">{new Date(item.startDate).toLocaleDateString()} até {new Date(item.endDate).toLocaleDateString()} • R$ {item.value}</p>
+                              <div className="flex flex-wrap items-center gap-2"><h5 className="font-bold text-slate-800">{item.title}</h5>{item.source==='pncp'&&<span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">IMPORTADO DO PNCP</span>}</div>
+                              <p className="text-sm text-slate-500">{item.startDate?new Date(`${item.startDate}T12:00:00`).toLocaleDateString('pt-BR'):'Data não informada'}{item.endDate?` até ${new Date(`${item.endDate}T12:00:00`).toLocaleDateString('pt-BR')}`:''} • {Number(item.value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</p>
+                              {item.processNumber&&<p className="mt-1 text-xs text-slate-400">Processo {item.processNumber} · {item.sourceId}</p>}
                             </div>
                           )}
                           {manageTab === 'adjustments' && (

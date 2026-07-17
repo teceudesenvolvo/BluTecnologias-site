@@ -44,10 +44,9 @@ export const sendBillingEmail = functions.https.onCall(async (data, context) => 
 
 		if (!clientId) throw new functions.https.HttpsError('invalid-argument', 'clientId is required');
 
-		// Fetch client from Realtime Database
-		const snap = await admin.database().ref(`/contacts/${clientId}`).get();
-		if (!snap.exists()) throw new functions.https.HttpsError('not-found', 'Client not found');
-		const client = snap.val();
+		const snap = await admin.firestore().doc(`clients/${clientId}`).get();
+		if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Client not found');
+		const client = snap.data() || {};
 
 		const to = client.email || client.financialContact || null;
 		if (!to) throw new functions.https.HttpsError('failed-precondition', 'Client has no email to send to');
@@ -145,9 +144,9 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
 			const { clientId, title, value, bankAccount, invoiceFile, reportFile, emailText, certificateFiles } = data;
 			if (!clientId) return res.status(400).json({ success: false, message: 'clientId is required' });
 
-			const snap = await admin.database().ref(`/contacts/${clientId}`).get();
-			if (!snap.exists()) return res.status(404).json({ success: false, message: 'Client not found' });
-			const client = snap.val();
+			const snap = await admin.firestore().doc(`clients/${clientId}`).get();
+			if (!snap.exists) return res.status(404).json({ success: false, message: 'Client not found' });
+			const client = snap.data() || {};
 
 			const to = client.email || client.financialContact || null;
 			if (!to) return res.status(412).json({ success: false, message: 'Client has no email to send to' });

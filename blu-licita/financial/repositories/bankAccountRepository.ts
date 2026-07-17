@@ -1,0 +1,3 @@
+import type{BankAccount,BankAccountInput,BankMovement,BankTransfer}from'../domain/bankAccountTypes';
+export interface BankContext{companyId:string;userId:string}
+export interface BankAccountRepository{list(context:BankContext):Promise<BankAccount[]>;movements(context:BankContext,accountId?:string):Promise<BankMovement[]>;save(context:BankContext,value:BankAccountInput,id?:string):Promise<string>;inactivate(context:BankContext,id:string):Promise<void>;transfer(context:BankContext,value:BankTransfer):Promise<string>;adjust(context:BankContext,accountId:string,amountCents:number,date:string,reason:string):Promise<void>}

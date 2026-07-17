@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight, Settings, FileDown, Edit2 } from 'lucide-react';
-import { financialService, Transaction, auth, rtdb, Company } from '../../services/firebase';
-import { ref, get } from 'firebase/database';
+import { financialService, Transaction, auth, Company } from '../../services/firebase';
+import { companySettingsService } from '../../services/firestoreSettingsService';
 import Logo from '../../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 
 export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
@@ -37,11 +37,7 @@ export const Financial: React.FC<{ setActiveTab: (tab: string) => void }> = ({ s
 
   const loadCompanies = async () => {
     try {
-      const snapshot = await get(ref(rtdb, 'settings/companies'));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setCompanies(Object.keys(data).map(key => ({ id: key, ...data[key] })));
-      }
+      setCompanies(await companySettingsService.getAll());
     } catch (error) {
       console.error("Erro ao carregar empresas:", error);
     }

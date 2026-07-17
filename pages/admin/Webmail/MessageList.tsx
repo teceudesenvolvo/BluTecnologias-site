@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, MailOpen, Clock } from 'lucide-react';
-import { ref, query, orderByChild, equalTo, onValue } from 'firebase/database';
-import { rtdb, auth } from '../../../services/firebase';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db, auth } from '../../../services/firebase';
 
 interface MessageListProps {
     folder: string;
@@ -17,15 +17,14 @@ export const MessageList: React.FC<MessageListProps> = ({ folder, onSelectEmail 
         if (!auth.currentUser) return;
 
         // Assuming we structure it as users/{uid}/emails
-        const emailsRef = ref(rtdb, `users/${auth.currentUser.uid}/emails`);
-        const q = query(emailsRef, orderByChild('folder'), equalTo(folder));
+        const emailsRef = collection(db, 'users', auth.currentUser.uid, 'emails');
+        const q = query(emailsRef, where('folder', '==', folder));
 
-        const unsubscribe = onValue(q, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                const fetchedEmails = Object.keys(data).map(key => ({
-                    id: key,
-                    ...data[key]
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (!snapshot.empty) {
+                const fetchedEmails = snapshot.docs.map(item => ({
+                    id: item.id,
+                    ...item.data()
                 })).sort((a: any, b: any) => {
                     const timeA = new Date(a.timestamp).getTime();
                     const timeB = new Date(b.timestamp).getTime();
@@ -41,7 +40,7 @@ export const MessageList: React.FC<MessageListProps> = ({ folder, onSelectEmail 
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        return unsubscribe;
     }, [folder]);
 
     const filteredEmails = emails.filter(email =>

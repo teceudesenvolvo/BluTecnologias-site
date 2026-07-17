@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, Loader2, Shield, Building2, Users, FileText, Briefcase, Upload, Trash2, Plus, Search, MapPin, Send, Edit2, X } from 'lucide-react';
-import { auth, rtdb, Company, storageService } from '../../services/firebase';
+import { auth, Company, storageService } from '../../services/firebase';
+import { companySettingsService, userSettingsService } from '../../services/firestoreSettingsService';
 import { updateProfile, updatePassword } from 'firebase/auth';
-import { ref, get, update, push, remove, set } from 'firebase/database';
 
 export const Profile: React.FC = () => {
   const user = auth.currentUser;
@@ -61,10 +61,8 @@ export const Profile: React.FC = () => {
 
   const loadSmtpSettings = async () => {
     try {
-      const snapshot = await get(ref(rtdb, `users/${user?.uid}/smtpSettings`));
-      if (snapshot.exists()) {
-        setSmtpSettings({ ...smtpSettings, ...snapshot.val() });
-      }
+      const settings = await userSettingsService.getSmtp();
+      if (settings) setSmtpSettings(previous => ({ ...previous, ...settings }));
     } catch (error) {
       console.error("Erro ao carregar configurações de e-mail:", error);
     }
@@ -73,17 +71,7 @@ export const Profile: React.FC = () => {
   const loadCompanyData = async () => { // Renamed from loadCompanyData
     setLoading(true);
     try {
-      const snapshot = await get(ref(rtdb, 'settings/companies')); // Changed path to 'companies'
-      if (snapshot.exists()) {
-        const companiesObj = snapshot.val();
-        const loadedCompanies: Company[] = Object.keys(companiesObj).map(key => ({
-          id: key,
-          ...companiesObj[key]
-        }));
-        setCompanies(loadedCompanies);
-      } else {
-        setCompanies([]); // No companies found
-      }
+      setCompanies(await companySettingsService.getAll());
     } catch (error) {
       console.error("Erro ao carregar dados das empresas:", error);
     } finally {
@@ -115,12 +103,11 @@ export const Profile: React.FC = () => {
 
       if (editingCompany) {
         // Update existing company
-        await update(ref(rtdb, `settings/companies/${editingCompany.id}`), companyToSave);
+        await companySettingsService.update(editingCompany.id, companyToSave);
         setMessage({ type: 'success', text: 'Dados da empresa atualizados com sucesso!' });
       } else {
         // Add new company
-        const newCompanyRef = push(ref(rtdb, 'settings/companies'));
-        await set(newCompanyRef, { ...companyToSave, id: newCompanyRef.key });
+        await companySettingsService.create(companyToSave as Omit<Company, 'id'>);
         setMessage({ type: 'success', text: 'Nova empresa adicionada com sucesso!' });
       }
       setIsCompanyModalOpen(false);
@@ -151,7 +138,7 @@ export const Profile: React.FC = () => {
       setSaving(true);
       setMessage(null);
       try {
-        await remove(ref(rtdb, `settings/companies/${companyId}`));
+        await companySettingsService.delete(companyId);
         setMessage({ type: 'success', text: 'Empresa excluída com sucesso!' });
         loadCompanyData();
       } catch (error) {
@@ -309,7 +296,7 @@ export const Profile: React.FC = () => {
         }
 
         // Salvar dados do usuário na coleção 'users'
-        await update(ref(rtdb, `users/${user.uid}`), {
+        await userSettingsService.updateProfile({
           displayName,
           email: user.email,
           updatedAt: new Date().toISOString()
@@ -339,7 +326,7 @@ export const Profile: React.FC = () => {
     setMessage(null);
     try {
       if (user) {
-        await update(ref(rtdb, `users/${user.uid}/smtpSettings`), smtpSettings);
+        await userSettingsService.saveSmtp(smtpSettings);
         setMessage({ type: 'success', text: 'Configurações de e-mail salvas com sucesso!' });
       }
     } catch (error) {
