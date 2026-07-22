@@ -2,7 +2,16 @@
 
 > Documento de handoff para iniciar o backend próprio da Blu.
 >
-> Versão: 1.0 — 17/07/2026
+> Versão: 1.2 — 18/07/2026
+>
+> Atualização 1.1: consolida os módulos financeiros implementados no frontend e
+> nas Cloud Functions: visão executiva, fluxo de caixa, cobranças, notas fiscais,
+> tributos, contas bancárias, conciliação, projetos, centros de custo, orçamentos,
+> DRE gerencial, configurações e relatórios.
+>
+> Atualização 1.2: adiciona o inventário das rotas financeiras já criadas,
+> fallback temporário de leitura pelo Firestore, checklist de implantação das
+> Functions e requisitos operacionais para relatórios e visão executiva.
 
 ## 1. Visão do produto
 
@@ -306,7 +315,302 @@ Coleções atuais e tabelas futuras:
 - `approval_requests`
 - `financial_audit_logs`
 
+Entidades adicionadas ou detalhadas na implementação atual:
+
+- `bank_statement_imports`
+- `bank_statement_items`
+- `reconciliation_links`
+- `reconciliation_history`
+- `fiscal_documents`
+- `collection_events`
+- `project_members`
+- `cost_center_allocations`
+- `budget_versions`
+- `budget_items`
+- `budget_projections`
+- `dre_accounts`
+- `dre_period_closures`
+- `dre_closure_history`
+- `financial_report_configs`
+- `financial_report_exports`
+- `financial_settings`
+- `financial_approval_flows`
+
 Uma baixa nunca deve apagar ou sobrescrever silenciosamente o histórico. Recebimentos, pagamentos, estornos e ajustes são eventos próprios.
+
+### 8.8 Estado atual no Firebase
+
+Enquanto o backend próprio não for iniciado, as regras críticas estão em Cloud Functions e as páginas acessam o Firestore por adapters. As escritas sensíveis são bloqueadas nas regras do cliente.
+
+Rotas financeiras já previstas no frontend:
+
+| Rota | Objetivo |
+|---|---|
+| `/admin/financeiro` | visão executiva e navegação interna do módulo |
+| `/admin/financeiro/visao-geral` | painel financeiro consolidado |
+| `/admin/financeiro/fluxo-de-caixa` | entradas, saídas, previsto e realizado |
+| `/admin/financeiro/cobrancas` | cobranças, recebimentos e inadimplência |
+| `/admin/financeiro/gestao-tributaria` | tributos, retenções, vencimentos e comprovantes |
+| `/admin/financeiro/notas-fiscais` | notas emitidas, recebidas, PDFs, XMLs e vínculos |
+| `/admin/financeiro/contas-bancarias` | contas, saldos, transferências e ajustes |
+| `/admin/financeiro/conciliacao` | importação de extratos e conciliação bancária |
+| `/admin/financeiro/projetos` | projetos financeiros e operacionais |
+| `/admin/financeiro/centros-de-custo` | árvore, rateios e orçado x realizado |
+| `/admin/financeiro/orcamentos` | orçamentos, itens, versões e aprovação |
+| `/admin/financeiro/dre-gerencial` | DRE gerencial, análise e fechamento |
+| `/admin/financeiro/relatorios` | catálogo, filtros, exportações e histórico |
+| `/admin/financeiro/configuracoes` | categorias, DRE, tributos, aprovações e preferências |
+
+| Módulo | Coleções Firestore | Cloud Functions principais |
+|---|---|---|
+| Visão financeira | fontes financeiras consolidadas | `getFinancialOverview` |
+| Fluxo de caixa | `financialTransactions`, `financialSettlements` | funções de lançamentos, baixas, estornos e renegociação |
+| Cobranças | `collections`, `collectionEvents` | `mutateCollection`, `receiveCollection` e comandos relacionados |
+| Notas fiscais | `fiscalDocuments` | funções de criação, atualização, cancelamento e envio |
+| Gestão tributária | `taxRecords` | `mutateTaxRecord`, `commandTaxRecord` |
+| Contas bancárias | `bankAccounts`, `bankAccountSecrets`, `bankTransfers` | funções de conta, transferência e ajuste |
+| Conciliação | `bankStatementImports`, `bankStatementItems`, `reconciliationLinks`, `reconciliationHistory` | `importBankStatement`, `commandReconciliation` |
+| Projetos | `projects`, `projectMembers` | comandos transacionais de projeto |
+| Centros de custo | `costCenters`, `financialAllocations` | comandos de centro e rateio |
+| Orçamentos | `budgets`, `budgetItems`, `budgetProjections` | `commandBudget` |
+| DRE Gerencial | `dreAccounts`, `drePeriodClosures`, `dreClosureHistory` | `commandDrePeriod` |
+| Relatórios | `financialReportConfigs`, `financialReportExports` | `queryFinancialReport`, `commandFinancialReport` |
+| Configurações | `financialCategories`, `financialConfigurationItems`, `financialApprovalFlows`, `dreAccounts` | `mutateFinancialConfiguration` |
+
+Todas essas funções devem validar o usuário autenticado, descobrir a empresa no servidor e nunca aceitar `companyId` do cliente como autoridade.
+
+Functions que precisam existir no Firebase atual até a migração para o backend próprio:
+
+- `getFinancialOverview`;
+- `queryFinancialReport`;
+- `commandFinancialReport`;
+- `importBankStatement`;
+- `commandReconciliation`;
+- `commandBudget`;
+- `commandDrePeriod`;
+- `mutateTaxRecord`;
+- `commandTaxRecord`;
+- `mutateFinancialConfiguration`;
+- funções de contas bancárias, transferências, ajustes e rateios;
+- funções de cobranças, eventos, envio, renegociação, cancelamento e recebimento;
+- funções de notas fiscais, cancelamento, substituição e vínculos.
+
+Enquanto alguma Function ainda não estiver implantada, o frontend pode usar fallback temporário somente para leitura, consultando Firestore por `companyId` do contexto autenticado. Esse fallback não deve executar baixa, conciliação, fechamento, exportação, aprovação ou qualquer operação crítica.
+
+O fallback deve ser removido quando a API própria ou as Functions equivalentes estiverem estáveis em produção. O backend definitivo não deve depender de regras do cliente para proteger dados.
+
+### 8.9 Dinheiro, datas e rastreabilidade
+
+No Firebase atual, valores novos usam inteiros em centavos (`amountCents`, `netAmountCents`, `balanceAmountCents`). No PostgreSQL futuro, usar `NUMERIC(19,4)` ou inteiro em centavos conforme a entidade. Nunca usar `float`.
+
+Datas diferentes não podem ser misturadas:
+
+- `competenceDate`: competência gerencial;
+- `issueDate`: emissão;
+- `dueDate`: vencimento;
+- `settlementDate`: pagamento ou recebimento;
+- `createdAt`: auditoria técnica.
+
+Cada lançamento deve manter `originType` e `originId`. Transferências internas e ajustes de saldo devem usar `dreImpact = false`.
+
+### 8.10 Contas bancárias e conciliação
+
+Dados bancários completos exigem permissão específica e criptografia. A API pública retorna somente valores mascarados.
+
+Importação de extrato:
+
+1. receber OFX ou CSV configurável;
+2. calcular SHA-256 do arquivo;
+3. impedir duplicidade por empresa, conta e hash;
+4. preservar a linha original do extrato;
+5. gerar fingerprint por data, valor, descrição e documento;
+6. criar sugestões por valor, data, descrição e referências;
+7. registrar confiança e campos coincidentes;
+8. conciliar em transação de banco;
+9. manter histórico para desfazer;
+10. exigir justificativa ao ignorar.
+
+A soma dos vínculos deve ser igual ao item bancário, exceto na conciliação parcial. O extrato original é imutável.
+
+### 8.11 Projetos e centros de custo
+
+Projetos consolidam receitas, custos, rateios e margem. Projetos concluídos não aceitam novos lançamentos sem reabertura. Cancelamento exige justificativa.
+
+Centros de custo são hierárquicos. Regras:
+
+- impedir ciclos;
+- consolidar filhos nos pais;
+- não excluir centros com movimentação;
+- rateios devem fechar exatamente 100%;
+- alterações estruturais geram auditoria;
+- orçamento deve ser comparável ao realizado.
+
+### 8.12 Orçamentos e versões
+
+Tipos suportados: empresarial, comercial, licitação, contrato, projeto e centro de custo.
+
+Os itens armazenam quantidade com precisão controlada e valores em centavos. Uma versão aprovada é imutável. Revisões criam nova versão ligada por `root_budget_id` e `previous_version_id`. Ao aprovar uma revisão, a anterior passa para `replaced`.
+
+Quando configurado, um orçamento aprovado gera uma projeção financeira. Orçamento de licitação deve poder originar proposta comercial em uma fase posterior.
+
+### 8.13 DRE Gerencial
+
+A DRE é gerencial e não substitui escrituração contábil oficial. Estrutura padrão:
+
+```text
+Receita Bruta
+(-) Deduções
+(-) Impostos sobre faturamento
+(=) Receita Líquida
+(-) Custos diretos
+(=) Lucro Bruto
+(-) Despesas operacionais
+(=) Resultado Operacional
+(+/-) Resultado financeiro
+(=) Resultado antes dos tributos
+(-) Tributos estimados
+(=) Resultado Líquido
+```
+
+Cada categoria financeira deve apontar para uma conta da DRE. Lançamentos não mapeados ficam fora do resultado e devem aparecer em alerta próprio.
+
+Caixa e competência são consultas separadas. Fechamento gerencial registra usuário e data; reabertura exige justificativa. Alterações em período fechado devem ser rejeitadas por todos os serviços de escrita, não apenas pela tela da DRE.
+
+### 8.14 Visão financeira executiva
+
+O dashboard executivo deve ser calculado no backend em uma consulta agregada por empresa, período e filtros. A resposta deve incluir:
+
+- indicadores realizados e previstos;
+- séries mensais;
+- contas a receber e pagar por vencimento;
+- faturamento por órgão e contrato;
+- despesas por categoria;
+- rentabilidade por projeto;
+- alertas acionáveis;
+- data da última atualização.
+
+Filtros compartilhados: empresa ativa, período, projeto, contrato, órgão, centro de custo e conta bancária. Os cards devem apontar para rotas de detalhamento.
+
+Indicadores mínimos:
+
+- saldo disponível;
+- saldo consolidado;
+- contas a receber;
+- contas a pagar;
+- valores vencidos;
+- receitas do mês ou período;
+- despesas do mês ou período;
+- resultado do período;
+- fluxo projetado;
+- impostos estimados;
+- faturamento;
+- valor recebido;
+- margem;
+- contratos ativos;
+- saldo contratual.
+
+Gráficos mínimos:
+
+- receitas x despesas;
+- evolução do saldo;
+- fluxo realizado x previsto;
+- contas a receber por vencimento;
+- contas a pagar por vencimento;
+- faturamento por órgão;
+- faturamento por contrato;
+- despesas por categoria;
+- resultado mensal;
+- rentabilidade por projeto.
+
+Alertas mínimos:
+
+- cobranças vencidas;
+- contas a pagar vencidas;
+- saldo insuficiente;
+- tributos próximos;
+- notas sem cobrança;
+- lançamentos não conciliados;
+- contratos com valores pendentes;
+- projetos acima do orçamento.
+
+Os atalhos rápidos devem apenas redirecionar para os módulos de origem. A criação efetiva deve continuar no serviço transacional do módulo correspondente.
+
+### 8.15 Relatórios financeiros
+
+O catálogo inicial possui 26 relatórios distribuídos em Financeiro, Cobranças, Fiscal, Bancário, Projetos, Contratos, Orçamentos e Gerencial.
+
+Relatórios mínimos:
+
+- fluxo de caixa;
+- contas a receber;
+- contas a pagar;
+- cobranças;
+- inadimplência;
+- recebimentos;
+- pagamentos;
+- notas fiscais;
+- tributos;
+- retenções;
+- saldo bancário;
+- movimentação bancária;
+- conciliação;
+- receitas por órgão;
+- receitas por contrato;
+- despesas por projeto;
+- despesas por centro de custo;
+- rentabilidade por projeto;
+- rentabilidade por contrato;
+- margem por licitação;
+- orçado x realizado;
+- DRE Gerencial;
+- valores empenhados;
+- valores liquidados;
+- valores recebidos;
+- valores pendentes.
+
+Requisitos:
+
+- paginação por cursor no backend definitivo;
+- filtros salvos e favoritos por usuário/empresa;
+- rastreabilidade até o registro original;
+- regras de cálculo compartilhadas com os módulos de origem;
+- exportações PDF, XLSX e CSV processadas por worker;
+- armazenamento privado do resultado;
+- URL temporária para download;
+- auditoria de exportações sensíveis;
+- compartilhamento somente com membros autorizados da mesma empresa;
+- expiração e retenção configurável dos arquivos;
+- idempotência para evitar exportações duplicadas.
+
+O limite temporário de 2.500 registros usado pelas Cloud Functions atuais não deve ser reproduzido no backend próprio. Grandes relatórios devem usar streaming, cursor e jobs assíncronos.
+
+Exportações devem registrar:
+
+- empresa;
+- usuário;
+- relatório;
+- filtros;
+- formato;
+- sensibilidade;
+- status;
+- caminho privado do arquivo;
+- data de expiração;
+- requestId;
+- IP e userAgent quando disponíveis.
+
+PDF, XLSX e CSV devem ser gerados em worker. A API de exportação retorna um job, não o arquivo final. O download deve usar URL temporária e checar permissão no momento da geração e do download.
+
+### 8.16 Requisitos de interface com impacto no backend
+
+Embora o backend não controle layout, alguns comportamentos de UI geram requisitos de API:
+
+- modais e drawers de operações críticas devem bloquear interação com a tela de fundo;
+- popups de cobrança, proposta, nota fiscal, conciliação, orçamento e DRE devem carregar dados por ID e empresa;
+- abas internas devem buscar dados paginados quando houver volume;
+- ações como aprovar, cancelar, receber, pagar, conciliar, fechar período e exportar devem chamar comandos transacionais;
+- leituras de detalhe devem retornar rastreabilidade para o registro original;
+- estados de loading, vazio, erro e sucesso devem ser suportados por respostas previsíveis da API;
+- mensagens de erro devem ser de domínio, não stack traces ou códigos internos do provedor.
 
 ## 9. Endpoints iniciais
 
@@ -395,7 +699,60 @@ GET    /api/v1/financial/taxes
 POST   /api/v1/financial/taxes
 PATCH  /api/v1/financial/taxes/:id
 POST   /api/v1/financial/taxes/:id/payments
+
+GET    /api/v1/financial/bank-accounts
+POST   /api/v1/financial/bank-accounts
+PATCH  /api/v1/financial/bank-accounts/:id
+POST   /api/v1/financial/bank-accounts/:id/inactivate
+POST   /api/v1/financial/bank-transfers
+POST   /api/v1/financial/bank-accounts/:id/adjustments
+
+POST   /api/v1/financial/bank-statements/imports
+GET    /api/v1/financial/bank-statements/imports/:id
+GET    /api/v1/financial/reconciliation/items
+GET    /api/v1/financial/reconciliation/items/:id/suggestions
+POST   /api/v1/financial/reconciliation/items/:id/links
+POST   /api/v1/financial/reconciliation/items/:id/ignore
+POST   /api/v1/financial/reconciliation/items/:id/undo
+
+GET    /api/v1/financial/projects
+POST   /api/v1/financial/projects
+PATCH  /api/v1/financial/projects/:id
+POST   /api/v1/financial/projects/:id/complete
+POST   /api/v1/financial/projects/:id/cancel
+POST   /api/v1/financial/projects/:id/reopen
+
+GET    /api/v1/financial/cost-centers
+POST   /api/v1/financial/cost-centers
+PATCH  /api/v1/financial/cost-centers/:id
+POST   /api/v1/financial/cost-centers/:id/inactivate
+POST   /api/v1/financial/allocations
+
+GET    /api/v1/financial/budgets
+POST   /api/v1/financial/budgets
+PATCH  /api/v1/financial/budgets/:id
+POST   /api/v1/financial/budgets/:id/versions
+POST   /api/v1/financial/budgets/:id/approve
+POST   /api/v1/financial/budgets/:id/reject
+GET    /api/v1/financial/budgets/:id/compare
+
+GET    /api/v1/financial/dre
+GET    /api/v1/financial/dre/unmapped
+POST   /api/v1/financial/dre/periods/close
+POST   /api/v1/financial/dre/periods/reopen
+
+GET    /api/v1/financial/overview
+GET    /api/v1/financial/reports/catalog
+POST   /api/v1/financial/reports/query
+GET    /api/v1/financial/report-configs
+POST   /api/v1/financial/report-configs
+PATCH  /api/v1/financial/report-configs/:id
+POST   /api/v1/financial/report-exports
+GET    /api/v1/financial/report-exports/:id
+GET    /api/v1/financial/report-exports/:id/download
 ```
+
+Todos os endpoints financeiros de escrita devem validar período fechado, permissão granular, versão otimista e `Idempotency-Key` quando houver efeito monetário ou geração de arquivo.
 
 ## 10. Contas a receber
 
@@ -499,6 +856,10 @@ notification-scheduler
 email-delivery
 ai-analysis
 data-migration
+financial-report-export
+bank-statement-import
+bank-reconciliation-suggestions
+financial-projection-refresh
 ```
 
 Requisitos:
@@ -580,6 +941,29 @@ Fontes atuais relevantes:
 | `crmCards` | `crm_cards` |
 | `legalEntities` | `companies`, `branches` |
 | `financialSettings` | `bank_accounts`, configurações financeiras |
+| `bankAccounts` | `bank_accounts` |
+| `bankTransfers` | `bank_transfers`, `financial_transactions` |
+| `financialSettlements` | `receipts`, `payments` |
+| `collections` | `accounts_receivable`, `collection_actions` |
+| `collectionEvents` | `collection_actions` |
+| `fiscalDocuments` | `invoices`, `tax_withholdings` |
+| `taxRecords` | `tax_obligations`, `tax_payments` |
+| `costCenters` | `cost_centers` |
+| `financialAllocations` | `allocations` |
+| `projects` | `projects` |
+| `projectMembers` | `project_members` |
+| `budgets` | `budgets`, `budget_versions` |
+| `budgetItems` | `budget_entries` |
+| `budgetProjections` | `cash_flow_forecasts` |
+| `bankStatementImports` | `bank_statement_imports` |
+| `bankStatementItems` | `bank_statement_items` |
+| `reconciliationLinks` | `reconciliation_links` |
+| `reconciliationHistory` | `reconciliation_events` |
+| `dreAccounts` | `dre_accounts`, `dre_mappings` |
+| `drePeriodClosures` | `dre_period_closures` |
+| `dreClosureHistory` | `dre_closure_history` |
+| `financialReportConfigs` | `financial_report_configs` |
+| `financialReportExports` | `financial_report_exports` |
 | `tasks` | `tasks` ou atividades CRM |
 | `quotes` | solicitações de cotação |
 | `externalOpportunities` | `external_opportunities` |
@@ -665,7 +1049,22 @@ Nunca versionar valores reais.
 - movimento de cartão CRM;
 - geração de ZIP;
 - retentativa e dead-letter queue;
-- migração com validação de totais.
+- migração com validação de totais;
+- valores monetários em centavos e arredondamento;
+- transferência bancária com dois lançamentos atômicos e sem impacto na DRE;
+- deduplicação de OFX/CSV por hash;
+- conciliação parcial, múltipla, desfazer e ignorar com justificativa;
+- rateio de centro de custo fechando 100%;
+- prevenção de ciclo na hierarquia de centros;
+- projeto concluído bloqueando novos lançamentos;
+- imutabilidade de orçamento aprovado e substituição de versões;
+- DRE por caixa e competência sem mistura;
+- fechamento e reabertura de período gerencial;
+- alerta para categorias sem mapeamento DRE;
+- dashboard financeiro usando um único período de referência;
+- paginação, autorização e auditoria de relatórios;
+- exportação financeira em job idempotente;
+- fallback temporário de leitura desativado por feature flag após implantação.
 
 ## 23. Ordem de implementação
 
@@ -685,6 +1084,7 @@ Nunca versionar valores reais.
 - CRM;
 - dashboard e movimentações financeiras em leitura;
 - adapters REST no frontend sob feature flag.
+- fallback Firestore permitido apenas para leitura e ambiente de transição.
 
 ### Fase 2 — Escrita transacional
 
@@ -709,6 +1109,19 @@ Nunca versionar valores reais.
 - orçamento;
 - tributos e retenções;
 - DRE e relatórios.
+
+Subdivisão recomendada da Fase 4:
+
+1. contas bancárias, transferências e saldos;
+2. projetos, centros de custo e rateios;
+3. importação de extrato e conciliação;
+4. notas fiscais, retenções e gestão tributária;
+5. orçamentos, versões e projeções;
+6. DRE, fechamento gerencial e mapeamentos;
+7. visão executiva agregada;
+8. relatórios, exportações e compartilhamento autorizado.
+
+Ao final da Fase 4, desligar o fallback direto do Firestore para visão financeira e relatórios. O frontend deve consumir somente API própria ou Functions homologadas.
 
 ## 24. Definition of Done
 
@@ -743,4 +1156,3 @@ Entregar uma API executável com:
 10. pipeline CI com lint, testes e build.
 
 Depois desse milestone, iniciar os módulos por adapters, evitando uma migração total em uma única entrega.
-

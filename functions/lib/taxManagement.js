@@ -1,0 +1,38 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const membership = async (uid) => { const s = await admin.firestore().collection('companyUsers').where('userId', '==', uid).limit(1).get(); return s.empty ? { companyId: `company-${uid}` } : { companyId: String(s.docs[0].data().companyId) }; };
+const clean = (v) => Array.isArray(v) ? v.map(clean) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).map(([k, x]) => [k, clean(x)])) : v;
+exports.mutateTaxRecord = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const m = await membership(context.auth.uid), action = String(payload?.action || ''), id = String(payload?.id || ''), input = clean(payload?.value || {}), base = Number(input.calculationBaseCents), rate = Number(input.rateBasisPoints), estimated = Math.round(base * rate / 10000); if (!['create', 'update'].includes(action) || !String(input.taxName || '').trim() || !String(input.competence || '') || !Number.isSafeInteger(base) || !Number.isSafeInteger(rate) || rate < 0)
+    throw new functions.https.HttpsError('invalid-argument', 'Registro tributário inválido.'); const ref = id ? admin.firestore().collection('taxRecords').doc(id) : admin.firestore().collection('taxRecords').doc(); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref), before = snap.exists ? snap.data() : null; if (action === 'update' && (!snap.exists || before?.companyId !== m.companyId))
+    throw new functions.https.HttpsError('not-found', 'Tributo não encontrado.'); if (before?.closedPeriod && !input.reopenAuthorization)
+    throw new functions.https.HttpsError('failed-precondition', 'A competência está fechada e exige autorização para revisão.'); const now = new Date().toISOString(), after = { ...input, reopenAuthorization: null, companyId: m.companyId, estimatedAmountCents: estimated, ruleSnapshot: clean(input.ruleSnapshot || {}), calculationDescription: String(input.calculationDescription || `${base} centavos × ${rate} pontos-base`), createdAt: before?.createdAt || now, createdBy: before?.createdBy || context.auth.uid, updatedAt: now, updatedBy: context.auth.uid, closedPeriod: Boolean(before?.closedPeriod), version: Number(before?.version || 0) + 1 }; tx.set(ref, after, { merge: false }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: m.companyId, action, entityType: 'taxRecord', entityId: ref.id, userId: context.auth.uid, createdAt: now, before, after }); }); return { id: ref.id }; });
+exports.commandTaxRecord = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const m = await membership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), ref = admin.firestore().collection('taxRecords').doc(id); if (!id || !['pay', 'withhold', 'close', 'reopen', 'cancel'].includes(action))
+    throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== m.companyId)
+    throw new functions.https.HttpsError('not-found', 'Tributo não encontrado.'); const before = snap.data(), now = new Date().toISOString(); let after; if (action === 'pay') {
+    const amount = Number(payload?.amountCents);
+    if (!Number.isSafeInteger(amount) || amount <= 0)
+        throw new functions.https.HttpsError('invalid-argument', 'Pagamento inválido.');
+    after = { paidAmountCents: Number(before.paidAmountCents || 0) + amount, paymentDate: String(payload?.date || now.slice(0, 10)), receiptUrl: String(payload?.receiptUrl || before.receiptUrl || ''), status: 'paid' };
+}
+else if (action === 'withhold') {
+    const amount = Number(payload?.amountCents);
+    after = { withheldAmountCents: amount, status: 'withheld', manuallyReviewed: true };
+}
+else if (action === 'close')
+    after = { closedPeriod: true };
+else if (action === 'reopen') {
+    if (!String(payload?.authorization || '').trim())
+        throw new functions.https.HttpsError('invalid-argument', 'Informe a autorização para reabrir.');
+    after = { closedPeriod: false, reopenAuthorization: String(payload.authorization) };
+}
+else {
+    if (!String(payload?.reason || '').trim())
+        throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo.');
+    after = { status: 'cancelled', cancellationReason: String(payload.reason) };
+} tx.update(ref, { ...after, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: m.companyId, action, entityType: 'taxRecord', entityId: id, userId: context.auth.uid, createdAt: now, before, after }); }); return { id }; });
+//# sourceMappingURL=taxManagement.js.map

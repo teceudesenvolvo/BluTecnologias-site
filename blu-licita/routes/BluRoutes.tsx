@@ -36,6 +36,15 @@ import { FinancialSettingsPage } from "../financial/pages/FinancialSettingsPage"
 import { BankAccountsPage } from "../financial/pages/BankAccountsPage";
 import { CostCentersPage } from "../financial/pages/CostCentersPage";
 import { FinancialProjectsPage } from "../financial/pages/FinancialProjectsPage";
+import { CashFlowPage } from "../financial/pages/CashFlowPage";
+import { CollectionsPage } from "../financial/pages/CollectionsPage"; // módulo financeiro unificado
+import { FiscalDocumentsPage } from "../financial/pages/FiscalDocumentsPage"; // gestão fiscal
+import { TaxManagementPage } from "../financial/pages/TaxManagementPage";
+import { BankReconciliationPage } from "../financial/pages/BankReconciliationPage";
+import { BudgetsPage } from "../financial/pages/BudgetsPage";
+import { DreManagementPage } from "../financial/pages/DreManagementPage";
+import { FinancialExecutiveOverviewPage } from "../financial/pages/FinancialExecutiveOverviewPage";
+import { FinancialReportsPage } from "../financial/pages/FinancialReportsPage";
 import { DocumentDrivePage } from "../pages/DocumentDrivePage";
 import { CrmBoardPage } from "../pages/CrmBoardPage";
 import { TeamPage } from "../pages/TeamPage";
@@ -63,7 +72,6 @@ const UnifiedFinancialRoute: React.FC = () => {
     | "reconciliation"
     | "projects"
     | "costCenters"
-    | "budgets"
     | "dre"
     | "reports"
     | "settings";
@@ -78,7 +86,6 @@ const UnifiedFinancialRoute: React.FC = () => {
     ["reconciliation", "Conciliação"],
     ["projects", "Projetos"],
     ["costCenters", "Centro de Custo"],
-    ["budgets", "Orçamentos"],
     ["dre", "DRE Gerencial"],
     ["reports", "Relatórios"],
     ["settings", "Configurações"],
@@ -109,10 +116,6 @@ const UnifiedFinancialRoute: React.FC = () => {
       "Centros de Custo",
       "Estruture áreas da empresa e analise despesas diretas, indiretas e orçamentos.",
     ],
-    budgets: [
-      "Orçamentos",
-      "Planeje receitas e despesas e compare valores orçados com realizados.",
-    ],
     dre: [
       "DRE Gerencial",
       "Analise receita líquida, custos, despesas operacionais e resultado gerencial.",
@@ -130,13 +133,13 @@ const UnifiedFinancialRoute: React.FC = () => {
     <div className="mx-auto grid max-w-[1700px] gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-2 xl:sticky xl:top-24">
         <p className="px-3 pb-2 pt-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Sistema financeiro</p>
-        {operational.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${section===id?'bg-slate-950 text-white':'text-slate-600 hover:bg-slate-50'}`}><span>{label}</span>{!['financialOverview','collections','taxes'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300':'text-slate-400'}`}>Em breve</span>}</button>)}
+        {operational.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${section===id?'bg-slate-950 text-white':'text-slate-600 hover:bg-slate-50'}`}><span>{label}</span>{!['financialOverview','cashFlow','collections','taxes','invoices','banking','reconciliation','projects','costCenters','budgets','dre','reports','settings'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300':'text-slate-400'}`}>Em breve</span>}</button>)}
         <div className="my-3 border-t border-slate-100"/>
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Operação diária</p>
         {core.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${section===id?'bg-blue-50 text-blue-700':'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
       </aside>
       <main className="min-w-0">
-        {section === "financialOverview" ? <FinancialCenterPage initialTab="overview" embedded /> : core.some(([id])=>id===section) ? <FinancialPhaseOnePage view={section as FinancialCoreView} embedded /> : section === "collections" || section === "taxes" ? <FinancialCenterPage key={section} initialTab={section} embedded /> : section === "settings" ? <FinancialSettingsPage /> : section === "banking" ? <BankAccountsPage /> : section === "costCenters" ? <CostCentersPage /> : section === "projects" ? <FinancialProjectsPage /> : <FinancialSectionLanding title={planned[section as keyof typeof planned][0]} description={planned[section as keyof typeof planned][1]} />}
+        {section === "financialOverview" ? <FinancialExecutiveOverviewPage /> : core.some(([id])=>id===section) ? <FinancialPhaseOnePage view={section as FinancialCoreView} embedded /> : section === "collections" ? <CollectionsPage /> : section === "invoices" ? <FiscalDocumentsPage /> : section === "taxes" ? <TaxManagementPage /> : section === "reconciliation" ? <BankReconciliationPage /> : section === "settings" ? <FinancialSettingsPage /> : section === "banking" ? <BankAccountsPage /> : section === "costCenters" ? <CostCentersPage /> : section === "projects" ? <FinancialProjectsPage /> : section === "dre" ? <DreManagementPage /> : section === "reports" ? <FinancialReportsPage /> : section === "cashFlow" ? <CashFlowPage /> : <FinancialSectionLanding title={planned[section as keyof typeof planned][0]} description={planned[section as keyof typeof planned][1]} />}
       </main>
     </div>
   );
@@ -187,7 +190,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="ordens" element={<OrdersPage />} />
         <Route
           path="cobrancas"
-          element={<Navigate to="/admin/financeiro" replace />}
+          element={<Navigate to="/admin/financeiro/cobrancas" replace />}
         />
         <Route path="calendario" element={<CalendarPage />} />
         <Route path="relatorios" element={<ReportsPage />} />
@@ -197,15 +200,24 @@ export const BluRoutes: React.FC = () => (
           element={<Navigate to="/admin/documentos" replace />}
         />
         <Route path="novidades" element={<News />} />
+        <Route path="orcamentos" element={<BudgetsPage />} />
         <Route path="financeiro" element={<UnifiedFinancialRoute />} />
+        <Route path="financeiro/visao-geral" element={<FinancialExecutiveOverviewPage />} />
         <Route path="financeiro/configuracoes" element={<FinancialSettingsPage />} />
         <Route path="financeiro/contas-bancarias" element={<BankAccountsPage />} />
         <Route path="financeiro/centros-de-custo" element={<CostCentersPage />} />
         <Route path="financeiro/projetos" element={<FinancialProjectsPage />} />
+        <Route path="financeiro/fluxo-de-caixa" element={<CashFlowPage />} />
         <Route
           path="financeiro/cobrancas"
-          element={<Navigate to="/admin/financeiro" replace />}
+          element={<CollectionsPage />}
         />
+        <Route path="financeiro/notas-fiscais" element={<FiscalDocumentsPage />} />
+        <Route path="financeiro/gestao-tributaria" element={<TaxManagementPage />} />
+        <Route path="financeiro/conciliacao" element={<BankReconciliationPage />} />
+        <Route path="financeiro/orcamentos" element={<Navigate to="/admin/orcamentos" replace />} />
+        <Route path="financeiro/dre-gerencial" element={<DreManagementPage />} />
+        <Route path="financeiro/relatorios" element={<FinancialReportsPage />} />
         <Route
           path="financeiro/tributos"
           element={<Navigate to="/admin/financeiro" replace />}

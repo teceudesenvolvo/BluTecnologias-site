@@ -1,11 +1,26 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.mutateFinancialConfiguration = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.mutateBankAccount = void 0;
+exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const https = require("https");
+var taxManagement_1 = require("./taxManagement");
+Object.defineProperty(exports, "mutateTaxRecord", { enumerable: true, get: function () { return taxManagement_1.mutateTaxRecord; } });
+Object.defineProperty(exports, "commandTaxRecord", { enumerable: true, get: function () { return taxManagement_1.commandTaxRecord; } });
+var reconciliation_1 = require("./reconciliation");
+Object.defineProperty(exports, "importBankStatement", { enumerable: true, get: function () { return reconciliation_1.importBankStatement; } });
+Object.defineProperty(exports, "commandReconciliation", { enumerable: true, get: function () { return reconciliation_1.commandReconciliation; } });
+var budgets_1 = require("./budgets");
+Object.defineProperty(exports, "commandBudget", { enumerable: true, get: function () { return budgets_1.commandBudget; } });
+var dre_1 = require("./dre");
+Object.defineProperty(exports, "commandDrePeriod", { enumerable: true, get: function () { return dre_1.commandDrePeriod; } });
+var financialOverview_1 = require("./financialOverview");
+Object.defineProperty(exports, "getFinancialOverview", { enumerable: true, get: function () { return financialOverview_1.getFinancialOverview; } });
+var financialReports_1 = require("./financialReports");
+Object.defineProperty(exports, "queryFinancialReport", { enumerable: true, get: function () { return financialReports_1.queryFinancialReport; } });
+Object.defineProperty(exports, "commandFinancialReport", { enumerable: true, get: function () { return financialReports_1.commandFinancialReport; } });
 const financialConfigurationCollections = {
     categories: 'financialCategories', approvals: 'financialApprovalFlows', dre: 'dreAccounts',
     paymentMethods: 'financialConfigurationItems', collectionRules: 'financialConfigurationItems',
@@ -27,7 +42,11 @@ async function requireFinancialPermission(membership, permission) {
         return;
     const configured = await admin.firestore().collection('financialConfigurationItems').where('companyId', '==', membership.companyId).where('section', '==', 'permissions').get();
     const rule = configured.docs.map(item => item.data()).find(item => String(item.data?.role || '').toLocaleLowerCase('pt-BR') === role && item.status === 'active');
-    const defaults = { financeiro: ['viewBankAccounts', 'viewBalances', 'createBankAccount', 'editBankAccount', 'inactivateBankAccount', 'transferBetweenAccounts', 'adjustBalance', 'importStatement', 'exportMovements', 'viewCostCenters', 'createCostCenter', 'editCostCenter', 'inactivateCostCenter', 'reorganizeCostCenters', 'defineCostCenterBudget', 'allocateCostCenters', 'viewFinancialResults'], financial: ['viewBankAccounts', 'viewBalances', 'createBankAccount', 'editBankAccount', 'inactivateBankAccount', 'transferBetweenAccounts', 'adjustBalance', 'importStatement', 'exportMovements', 'viewCostCenters', 'createCostCenter', 'editCostCenter', 'inactivateCostCenter', 'reorganizeCostCenters', 'defineCostCenterBudget', 'allocateCostCenters', 'viewFinancialResults'] };
+    const defaults = { financeiro: ['viewBankAccounts', 'viewBalances', 'createBankAccount', 'editBankAccount', 'inactivateBankAccount', 'transferBetweenAccounts', 'adjustBalance', 'importStatement', 'exportMovements', 'viewCostCenters', 'createCostCenter', 'editCostCenter', 'inactivateCostCenter', 'reorganizeCostCenters', 'defineCostCenterBudget', 'allocateCostCenters', 'viewFinancialResults', 'viewProjects', 'createProject', 'editProject', 'completeProject', 'cancelProject', 'reopenProject', 'linkProjectFinancials', 'viewProjectCosts', 'viewProjectMargin', 'manageProjectTeam', 'viewCashFlow', 'createIncome', 'createExpense', 'settleIncome', 'settleExpense', 'reverseTransaction', 'renegotiateTransaction', 'importTransactions', 'exportTransactions'], financial: ['viewBankAccounts', 'viewBalances', 'createBankAccount', 'editBankAccount', 'inactivateBankAccount', 'transferBetweenAccounts', 'adjustBalance', 'importStatement', 'exportMovements', 'viewCostCenters', 'createCostCenter', 'editCostCenter', 'inactivateCostCenter', 'reorganizeCostCenters', 'defineCostCenterBudget', 'allocateCostCenters', 'viewFinancialResults', 'viewProjects', 'createProject', 'editProject', 'completeProject', 'cancelProject', 'reopenProject', 'linkProjectFinancials', 'viewProjectCosts', 'viewProjectMargin', 'manageProjectTeam', 'viewCashFlow', 'createIncome', 'createExpense', 'settleIncome', 'settleExpense', 'reverseTransaction', 'renegotiateTransaction', 'importTransactions', 'exportTransactions'] };
+    if (['financeiro', 'financial'].includes(role) && ['viewCollections', 'createCollection', 'editCollection', 'receiveCollection', 'sendCollection', 'manageCollectionEvents', 'cancelCollection'].includes(permission))
+        return;
+    if (['financeiro', 'financial'].includes(role) && ['viewFiscalDocuments', 'createFiscalDocument', 'editFiscalDocument', 'cancelFiscalDocument', 'sendFiscalDocument'].includes(permission))
+        return;
     if (rule?.data?.[permission] === true || defaults[role]?.includes(permission))
         return;
     throw new functions.https.HttpsError('permission-denied', 'Seu perfil não possui esta permissão financeira.');
@@ -85,6 +104,28 @@ exports.mutateBankAccount = functions.https.onCall(async (payload, context) => {
     });
     return { id: reference.id };
 });
+exports.mutateCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), action = String(payload?.action || ''), id = payload?.id ? String(payload.id) : '', input = cleanFinancialValue(payload?.value || {}); if (!['create', 'update'].includes(action))
+    throw new functions.https.HttpsError('invalid-argument', 'Ação inválida.'); await requireFinancialPermission(membership, action === 'create' ? 'createCollection' : 'editCollection'); const ref = id ? admin.firestore().collection('collections').doc(id) : admin.firestore().collection('collections').doc(), gross = Number(input.originalAmountCents), discount = Number(input.discountCents || 0), interest = Number(input.interestCents || 0), fine = Number(input.fineCents || 0), net = gross - discount + interest + fine; if (!String(input.description || '').trim() || !String(input.organizationName || '').trim() || !String(input.dueDate || '') || !Number.isSafeInteger(gross) || gross <= 0 || net < 0)
+    throw new functions.https.HttpsError('invalid-argument', 'Descrição, cliente, vencimento e valor são obrigatórios.'); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref), before = snap.exists ? snap.data() : null; if (action === 'update' && (!snap.exists || before?.companyId !== membership.companyId))
+    throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); if (before?.status === 'received')
+    throw new functions.https.HttpsError('failed-precondition', 'Cobranças recebidas não podem ser editadas livremente.'); const now = new Date().toISOString(), received = Number(before?.receivedAmountCents || 0), after = { ...input, companyId: membership.companyId, number: String(input.number || `COB-${Date.now()}`), receivedAmountCents: received, balanceAmountCents: Math.max(0, net - received), originType: String(input.originType || 'manual'), attachmentUrls: Array.isArray(input.attachmentUrls) ? input.attachmentUrls : [], status: String(input.status || 'draft'), createdAt: before?.createdAt || now, createdBy: before?.createdBy || context.auth.uid, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1 }; tx.set(ref, after, { merge: false }); const event = admin.firestore().collection('collectionEvents').doc(); tx.set(event, { companyId: membership.companyId, collectionId: ref.id, type: before ? 'updated' : 'created', description: before ? 'Cobrança atualizada' : 'Cobrança criada', eventDate: now, createdAt: now, createdBy: context.auth.uid }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: ref.id, userId: context.auth.uid, createdAt: now, before, after }); }); return { id: ref.id }; });
+exports.receiveCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'receiveCollection'); const id = String(payload?.id || ''), bankId = String(payload?.bankAccountId || ''), amount = Number(payload?.amountCents), key = String(payload?.idempotencyKey || ''), authorization = String(payload?.authorizationReason || '').trim(); if (!id || id.startsWith('legacy:') || !bankId || !key || !Number.isSafeInteger(amount) || amount <= 0)
+    throw new functions.https.HttpsError('invalid-argument', 'Recebimento inválido.'); const ref = admin.firestore().collection('collections').doc(id), bank = admin.firestore().collection('bankAccounts').doc(bankId), marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_collectionReceipt_${key}`); await admin.firestore().runTransaction(async (tx) => { const [done, snap, bankSnap] = await Promise.all([tx.get(marker), tx.get(ref), tx.get(bank)]); if (done.exists)
+    return; if (!snap.exists || snap.data()?.companyId !== membership.companyId || !bankSnap.exists || bankSnap.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Cobrança ou conta não encontrada.'); const before = snap.data(), balance = Number(before.balanceAmountCents || 0); if (['cancelled', 'renegotiated'].includes(before.status))
+    throw new functions.https.HttpsError('failed-precondition', 'Esta cobrança não aceita recebimentos.'); if (amount > balance && !authorization)
+    throw new functions.https.HttpsError('failed-precondition', 'O recebimento não pode exceder o saldo sem autorização justificada.'); const applied = Math.min(amount, balance), received = Number(before.receivedAmountCents || 0) + applied, remaining = Math.max(0, balance - applied), now = new Date().toISOString(), date = String(payload?.date || now.slice(0, 10)), status = remaining === 0 ? 'received' : 'partiallyReceived'; tx.update(ref, { receivedAmountCents: received, balanceAmountCents: remaining, status, bankAccountId: bankId, bankAccountName: bankSnap.data().name, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); tx.update(bank, { currentBalanceCents: Number(bankSnap.data().currentBalanceCents || 0) + amount, updatedAt: now, updatedBy: context.auth.uid, version: Number(bankSnap.data().version || 0) + 1 }); const movement = admin.firestore().collection('financialTransactions').doc(); tx.set(movement, { companyId: membership.companyId, collectionId: id, kind: 'income', description: `Recebimento: ${before.description}`, grossAmountCents: amount, netAmountCents: amount, settledAmountCents: amount, balanceAmountCents: 0, date, dueDate: date, competence: date.slice(0, 7), bankAccountId: bankId, bankAccountName: bankSnap.data().name, status: 'received', originType: 'collection', originId: id, organizationId: before.organizationId || null, organizationName: before.organizationName, contractId: before.contractId || null, projectId: before.projectId || null, costCenterId: before.costCenterId || null, dreImpact: true, reconciled: false, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid, version: 1 }); tx.set(admin.firestore().collection('collectionEvents').doc(), { companyId: membership.companyId, collectionId: id, type: 'receipt', description: remaining === 0 ? 'Recebimento total registrado' : 'Recebimento parcial registrado', amountCents: amount, eventDate: date, responsibleId: context.auth.uid, createdAt: now, createdBy: context.auth.uid }); tx.set(marker, { companyId: membership.companyId, type: 'collectionReceipt', entityId: movement.id, createdAt: now }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'receive', entityType: 'collection', entityId: id, userId: context.auth.uid, createdAt: now, before: { receivedAmountCents: before.receivedAmountCents, balanceAmountCents: balance }, after: { receivedAmountCents: received, balanceAmountCents: remaining, status, authorization } }); }); return { id }; });
+exports.addCollectionEvent = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'manageCollectionEvents'); const id = String(payload?.id || ''), type = String(payload?.type || ''), description = String(payload?.description || '').trim(), ref = admin.firestore().collection('collections').doc(id), snap = await ref.get(); if (!snap.exists || snap.data()?.companyId !== membership.companyId || !description)
+    throw new functions.https.HttpsError('invalid-argument', 'Evento inválido.'); const now = new Date().toISOString(), event = admin.firestore().collection('collectionEvents').doc(); await event.set({ companyId: membership.companyId, collectionId: id, type, description, eventDate: String(payload?.eventDate || now), responsibleId: String(payload?.responsibleId || context.auth.uid), responsibleName: String(payload?.responsibleName || ''), amountCents: Number(payload?.amountCents || 0), attachmentUrl: String(payload?.attachmentUrl || ''), createdAt: now, createdBy: context.auth.uid }); return { id: event.id }; });
+exports.commandCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim(); if (!id || id.startsWith('legacy:') || !['send', 'renegotiate', 'cancel', 'secondCopy'].includes(action))
+    throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await requireFinancialPermission(membership, action === 'cancel' ? 'cancelCollection' : 'sendCollection'); if (['cancel', 'renegotiate'].includes(action) && !reason)
+    throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo.'); const ref = admin.firestore().collection('collections').doc(id); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); const before = snap.data(), now = new Date().toISOString(); if (before.status === 'received' && action !== 'secondCopy')
+    throw new functions.https.HttpsError('failed-precondition', 'Cobrança recebida não pode ser alterada.'); const status = action === 'send' ? 'sent' : action === 'cancel' ? 'cancelled' : action === 'renegotiate' ? 'renegotiated' : before.status; tx.update(ref, { status, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1, ...(action === 'cancel' ? { cancellationReason: reason } : {}), ...(action === 'renegotiate' ? { renegotiationReason: reason } : {}) }); tx.set(admin.firestore().collection('collectionEvents').doc(), { companyId: membership.companyId, collectionId: id, type: action === 'secondCopy' ? 'sent' : action, description: action === 'secondCopy' ? 'Segunda via gerada' : reason || 'Cobrança enviada', eventDate: now, createdAt: now, createdBy: context.auth.uid }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: id, userId: context.auth.uid, createdAt: now, before, after: { status, reason } }); }); return { id }; });
 exports.transferBetweenBankAccounts = functions.https.onCall(async (payload, context) => { if (!context.auth)
     throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'transferBetweenAccounts'); const sourceId = String(payload?.sourceAccountId || ''), destinationId = String(payload?.destinationAccountId || ''), key = String(payload?.idempotencyKey || ''); const amountCents = Number(payload?.amountCents); if (!sourceId || !destinationId || sourceId === destinationId || !key || !Number.isSafeInteger(amountCents) || amountCents <= 0)
     throw new functions.https.HttpsError('invalid-argument', 'Transferência inválida.'); const source = admin.firestore().collection('bankAccounts').doc(sourceId), destination = admin.firestore().collection('bankAccounts').doc(destinationId), idempotency = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_bankTransfer_${key}`), transfer = admin.firestore().collection('bankTransfers').doc(); await admin.firestore().runTransaction(async (tx) => { const [existing, sourceSnap, destinationSnap] = await Promise.all([tx.get(idempotency), tx.get(source), tx.get(destination)]); if (existing.exists)
@@ -144,6 +185,105 @@ exports.allocateFinancialTransaction = functions.https.onCall(async (payload, co
     throw new functions.https.HttpsError('not-found', 'Lançamento não encontrado.'); const amountCents = Math.abs(Number(movement.data()?.amountCents || Math.round(Number(movement.data()?.amount || 0) * 100))); if (!Number.isSafeInteger(amountCents))
     throw new functions.https.HttpsError('failed-precondition', 'O lançamento não possui valor monetário válido.'); const centerSnaps = await Promise.all(parts.map((x) => tx.get(admin.firestore().collection('costCenters').doc(String(x.costCenterId))))); if (centerSnaps.some(x => !x.exists || x.data()?.companyId !== membership.companyId || x.data()?.status !== 'active' || !x.data()?.allowsEntries))
     throw new functions.https.HttpsError('failed-precondition', 'Um centro selecionado está inativo ou não permite lançamentos.'); existing.docs.forEach(x => tx.delete(x.ref)); let allocated = 0; parts.forEach((part, index) => { const value = index === parts.length - 1 ? amountCents - allocated : Math.floor(amountCents * Number(part.percentageBasisPoints) / 10000); allocated += value; tx.set(admin.firestore().collection('financialAllocations').doc(), { companyId: membership.companyId, transactionId, costCenterId: String(part.costCenterId), percentageBasisPoints: Number(part.percentageBasisPoints), amountCents: value, createdAt: new Date().toISOString(), createdBy: context.auth.uid }); }); tx.update(transactionRef, { costCenterId: null, costCenterName: null, allocated: true, updatedAt: new Date().toISOString(), updatedBy: context.auth.uid }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'allocate', entityType: 'financialTransaction', entityId: transactionId, userId: context.auth.uid, createdAt: new Date().toISOString(), before: { allocations: existing.docs.map(x => x.data()) }, after: { allocations: parts } }); }); return { id: transactionId }; });
+exports.mutateFinancialProject = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
+    const membership = await financialMembership(context.auth.uid), action = String(payload?.action || '');
+    if (!['create', 'update', 'complete', 'cancel', 'reopen'].includes(action))
+        throw new functions.https.HttpsError('invalid-argument', 'Ação inválida.');
+    await requireFinancialPermission(membership, action === 'create' ? 'createProject' : action === 'update' ? 'editProject' : action === 'complete' ? 'completeProject' : action === 'cancel' ? 'cancelProject' : 'reopenProject');
+    const id = payload?.id ? String(payload.id) : undefined, reference = id ? admin.firestore().collection('projects').doc(id) : admin.firestore().collection('projects').doc(), input = cleanFinancialValue(payload?.value || {}), members = Array.isArray(input.memberIds) ? input.memberIds.map(String) : [];
+    if (action === 'cancel' && !String(payload?.reason || '').trim())
+        throw new functions.https.HttpsError('invalid-argument', 'Informe a justificativa do cancelamento.');
+    const existingMembers = id ? await admin.firestore().collection('projectMembers').where('companyId', '==', membership.companyId).where('projectId', '==', id).get() : null;
+    await admin.firestore().runTransaction(async (tx) => { const snapshot = await tx.get(reference), before = snapshot.exists ? snapshot.data() || null : null; if (action !== 'create' && !snapshot.exists)
+        throw new functions.https.HttpsError('not-found', 'Projeto não encontrado.'); if (before && before.companyId !== membership.companyId)
+        throw new functions.https.HttpsError('permission-denied', 'Projeto pertence a outra empresa.'); if (action === 'update' && before?.status === 'completed')
+        throw new functions.https.HttpsError('failed-precondition', 'Reabra o projeto antes de registrar alterações.'); const now = new Date().toISOString(); let after; if (action === 'complete')
+        after = { ...before, status: 'completed', progressPercent: 100, completedAt: now, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1 };
+    else if (action === 'cancel')
+        after = { ...before, status: 'cancelled', cancellationReason: String(payload.reason).trim(), cancelledAt: now, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1 };
+    else if (action === 'reopen')
+        after = { ...before, status: 'active', completedAt: null, cancelledAt: null, cancellationReason: null, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1 };
+    else {
+        if (!String(input.code || '').trim() || !String(input.name || '').trim())
+            throw new functions.https.HttpsError('invalid-argument', 'Código e nome são obrigatórios.');
+        for (const key of ['budgetCents', 'expectedRevenueCents', 'expectedCostCents'])
+            if (!Number.isSafeInteger(Number(input[key] || 0)))
+                throw new functions.https.HttpsError('invalid-argument', 'Valores financeiros devem usar centavos inteiros.');
+        after = { ...input, memberIds: members, expectedMarginCents: Number(input.expectedRevenueCents || 0) - Number(input.expectedCostCents || 0), companyId: membership.companyId, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1, ...(!snapshot.exists ? { createdAt: now, createdBy: context.auth.uid } : {}) };
+    } tx.set(reference, after, { merge: false }); if (action === 'create' || action === 'update') {
+        existingMembers?.docs.forEach(x => tx.delete(x.ref));
+        members.forEach(userId => tx.set(admin.firestore().collection('projectMembers').doc(`${reference.id}_${userId}`), { companyId: membership.companyId, projectId: reference.id, userId, role: 'member', createdAt: now, createdBy: context.auth.uid }));
+    } tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'project', entityId: reference.id, userId: context.auth.uid, createdAt: now, before, after }); });
+    return { id: reference.id };
+});
+const addPeriod = (date, index, recurrence) => { const value = new Date(`${date}T12:00:00Z`); if (recurrence === 'weekly')
+    value.setUTCDate(value.getUTCDate() + index * 7);
+else if (recurrence === 'annual')
+    value.setUTCFullYear(value.getUTCFullYear() + index);
+else
+    value.setUTCMonth(value.getUTCMonth() + index); return value.toISOString().slice(0, 10); };
+const splitCents = (total, count, index) => Math.floor(total / count) + (index < total % count ? 1 : 0);
+exports.createCashFlowTransaction = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), input = cleanFinancialValue(payload || {}), kind = String(input.kind || ''); await requireFinancialPermission(membership, kind === 'income' ? 'createIncome' : 'createExpense'); const gross = Number(input.grossAmountCents), interest = Number(input.interestCents || 0), fine = Number(input.fineCents || 0), discount = Number(input.discountCents || 0), installments = Math.max(1, Math.min(60, Number(input.installments || 1))), recurrenceCount = Math.max(1, Math.min(60, Number(input.recurrenceCount || 1))), count = Math.max(installments, recurrenceCount), key = String(input.idempotencyKey || ''); if (!['income', 'expense'].includes(kind) || !String(input.description || '').trim() || !Number.isSafeInteger(gross) || gross <= 0 || !key)
+    throw new functions.https.HttpsError('invalid-argument', 'Lançamento inválido.'); const marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_cashFlow_${key}`), first = admin.firestore().collection('financialTransactions').doc(), group = count > 1 ? admin.firestore().collection('financialSeries').doc() : null; await admin.firestore().runTransaction(async (tx) => { if ((await tx.get(marker)).exists)
+    return; const now = new Date().toISOString(); for (let i = 0; i < count; i++) {
+    const ref = i === 0 ? first : admin.firestore().collection('financialTransactions').doc(), partGross = splitCents(gross, count, i), partInterest = splitCents(interest, count, i), partFine = splitCents(fine, count, i), partDiscount = splitCents(discount, count, i), net = partGross + partInterest + partFine - partDiscount, due = addPeriod(String(input.dueDate || now.slice(0, 10)), i, String(input.recurrence || 'monthly'));
+    tx.set(ref, { ...input, installments: null, recurrenceCount: null, idempotencyKey: null, companyId: membership.companyId, grossAmountCents: partGross, interestCents: partInterest, fineCents: partFine, discountCents: partDiscount, netAmountCents: net, settledAmountCents: 0, balanceAmountCents: net, dueDate: due, status: ['paid', 'received'].includes(String(input.status)) ? 'pending' : String(input.status || 'pending'), recurrenceGroupId: recurrenceCount > 1 ? group?.id : null, installmentGroupId: installments > 1 ? group?.id : null, installmentNumber: count > 1 ? i + 1 : null, installmentCount: count > 1 ? count : null, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid, version: 1 });
+} if (group)
+    tx.set(group, { companyId: membership.companyId, type: installments > 1 ? 'installment' : 'recurrence', count, createdAt: now, createdBy: context.auth.uid }); tx.set(marker, { companyId: membership.companyId, type: 'cashFlow', entityId: first.id, createdAt: now }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'create', entityType: 'cashFlowTransaction', entityId: first.id, userId: context.auth.uid, createdAt: now, before: null, after: { kind, grossAmountCents: gross, count } }); }); return { id: first.id }; });
+exports.settleCashFlowTransaction = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), amount = Number(payload?.amountCents), bankId = String(payload?.bankAccountId || ''), key = String(payload?.idempotencyKey || ''); if (!id || !bankId || !key || !Number.isSafeInteger(amount) || amount <= 0)
+    throw new functions.https.HttpsError('invalid-argument', 'Baixa inválida.'); const ref = admin.firestore().collection('financialTransactions').doc(id), bank = admin.firestore().collection('bankAccounts').doc(bankId), marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_settlement_${key}`); await admin.firestore().runTransaction(async (tx) => { const [existing, snapshot, bankSnapshot] = await Promise.all([tx.get(marker), tx.get(ref), tx.get(bank)]); if (existing.exists)
+    return; if (!snapshot.exists || snapshot.data()?.companyId !== membership.companyId || !bankSnapshot.exists || bankSnapshot.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Lançamento ou conta não encontrado.'); const before = snapshot.data(), kind = String(before.kind || before.type), permission = kind === 'income' ? 'settleIncome' : 'settleExpense'; await requireFinancialPermission(membership, permission); if (['cancelled', 'renegotiated'].includes(before.status))
+    throw new functions.https.HttpsError('failed-precondition', 'Este lançamento não pode receber baixa.'); const balance = Number(before.balanceAmountCents ?? before.netAmountCents ?? Math.round(Number(before.amount || 0) * 100)); if (amount > balance)
+    throw new functions.https.HttpsError('failed-precondition', 'A baixa não pode superar o saldo.'); const settled = Number(before.settledAmountCents || 0) + amount, remaining = balance - amount, now = new Date().toISOString(), status = remaining === 0 ? (kind === 'income' ? 'received' : 'paid') : (kind === 'income' ? 'partiallyReceived' : 'partiallyPaid'), direction = kind === 'income' ? 1 : -1; tx.update(ref, { settledAmountCents: settled, balanceAmountCents: remaining, settlementDate: String(payload.date || now.slice(0, 10)), bankAccountId: bankId, bankAccountName: bankSnapshot.data().name, status, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); tx.update(bank, { currentBalanceCents: Number(bankSnapshot.data().currentBalanceCents || 0) + direction * amount, updatedAt: now, updatedBy: context.auth.uid, version: Number(bankSnapshot.data().version || 0) + 1 }); const settlement = admin.firestore().collection('financialSettlements').doc(); tx.set(settlement, { companyId: membership.companyId, transactionId: id, bankAccountId: bankId, amountCents: amount, date: String(payload.date || now.slice(0, 10)), type: kind === 'income' ? 'receipt' : 'payment', createdAt: now, createdBy: context.auth.uid }); tx.set(marker, { companyId: membership.companyId, type: 'settlement', entityId: settlement.id, createdAt: now }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'settle', entityType: 'cashFlowTransaction', entityId: id, userId: context.auth.uid, createdAt: now, before: { settledAmountCents: before.settledAmountCents || 0, balanceAmountCents: balance }, after: { settledAmountCents: settled, balanceAmountCents: remaining, status } }); }); return { id }; });
+exports.commandCashFlowTransaction = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim(), key = String(payload?.idempotencyKey || ''); if (!id || !['cancel', 'reverse', 'renegotiate', 'duplicate'].includes(action) || !key)
+    throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await requireFinancialPermission(membership, action === 'reverse' ? 'reverseTransaction' : action === 'renegotiate' ? 'renegotiateTransaction' : action === 'duplicate' ? 'createExpense' : 'reverseTransaction'); const ref = admin.firestore().collection('financialTransactions').doc(id), marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_cashCommand_${key}`); await admin.firestore().runTransaction(async (tx) => { const [done, snapshot] = await Promise.all([tx.get(marker), tx.get(ref)]); if (done.exists)
+    return; if (!snapshot.exists || snapshot.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Lançamento não encontrado.'); const before = snapshot.data(), settled = Number(before.settledAmountCents || 0), now = new Date().toISOString(); if (action === 'cancel' && settled > 0)
+    throw new functions.https.HttpsError('failed-precondition', 'Lançamentos com baixa devem ser estornados.'); if (['cancel', 'reverse', 'renegotiate'].includes(action) && !reason)
+    throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo da operação.'); let createdId; if (action === 'cancel')
+    tx.update(ref, { status: 'cancelled', cancellationReason: reason, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 });
+else if (action === 'reverse') {
+    if (settled <= 0 || !before.bankAccountId)
+        throw new functions.https.HttpsError('failed-precondition', 'Não existe valor efetivado para estornar.');
+    const bank = admin.firestore().collection('bankAccounts').doc(String(before.bankAccountId)), bankSnap = await tx.get(bank);
+    if (!bankSnap.exists)
+        throw new functions.https.HttpsError('not-found', 'Conta da baixa não encontrada.');
+    const reversal = admin.firestore().collection('financialTransactions').doc();
+    createdId = reversal.id;
+    tx.set(reversal, { ...before, description: `Estorno: ${before.description}`, grossAmountCents: -settled, netAmountCents: -settled, settledAmountCents: -settled, balanceAmountCents: 0, status: before.kind === 'income' ? 'received' : 'paid', reversalOfId: id, notes: reason, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid, version: 1 });
+    tx.update(ref, { status: 'cancelled', reversedAt: now, reversalId: reversal.id, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 });
+    const direction = before.kind === 'income' ? -1 : 1;
+    tx.update(bank, { currentBalanceCents: Number(bankSnap.data().currentBalanceCents || 0) + direction * settled, updatedAt: now, updatedBy: context.auth.uid, version: Number(bankSnap.data().version || 0) + 1 });
+}
+else {
+    const copy = admin.firestore().collection('financialTransactions').doc();
+    createdId = copy.id;
+    const due = new Date();
+    due.setDate(due.getDate() + 30);
+    tx.set(copy, { ...before, status: 'pending', settledAmountCents: 0, balanceAmountCents: Number(before.netAmountCents), settlementDate: null, dueDate: due.toISOString().slice(0, 10), renegotiatedFromId: action === 'renegotiate' ? id : null, description: action === 'duplicate' ? `${before.description} (cópia)` : before.description, notes: reason || before.notes, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid, version: 1 });
+    if (action === 'renegotiate')
+        tx.update(ref, { status: 'renegotiated', renegotiatedToId: copy.id, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 });
+} tx.set(marker, { companyId: membership.companyId, type: 'cashCommand', entityId: createdId || id, createdAt: now }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'cashFlowTransaction', entityId: id, userId: context.auth.uid, createdAt: now, before, after: { createdId, reason } }); }); return { id }; });
+exports.importCashFlowTransactions = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'importTransactions'); const rows = Array.isArray(payload?.rows) ? payload.rows.slice(0, 100) : []; if (!rows.length)
+    throw new functions.https.HttpsError('invalid-argument', 'Arquivo sem lançamentos.'); const batch = admin.firestore().batch(), now = new Date().toISOString(); let imported = 0; for (const raw of rows) {
+    const input = cleanFinancialValue(raw), key = String(input.idempotencyKey || '');
+    if (!key || !['income', 'expense'].includes(String(input.kind)) || !Number.isSafeInteger(Number(input.grossAmountCents)) || Number(input.grossAmountCents) <= 0)
+        continue;
+    const marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_cashImport_${key}`);
+    if ((await marker.get()).exists)
+        continue;
+    const ref = admin.firestore().collection('financialTransactions').doc(), net = Number(input.grossAmountCents) + Number(input.interestCents || 0) + Number(input.fineCents || 0) - Number(input.discountCents || 0);
+    batch.set(ref, { ...input, companyId: membership.companyId, netAmountCents: net, settledAmountCents: 0, balanceAmountCents: net, status: String(input.status || 'pending'), createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid, version: 1 });
+    batch.set(marker, { companyId: membership.companyId, type: 'cashImport', entityId: ref.id, createdAt: now });
+    imported++;
+} batch.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'import', entityType: 'cashFlowTransaction', entityId: 'batch', userId: context.auth.uid, createdAt: now, before: null, after: { imported } }); await batch.commit(); return { imported }; });
 function cleanFinancialValue(value) {
     if (value === undefined)
         return null;
@@ -890,4 +1030,123 @@ exports.processFirestoreMailQueue = functions.firestore.document('mail_queue/{pu
         return null;
     }
 });
+exports.mutateFiscalDocument = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError("unauthenticated", "Faça login para continuar.");
+    const membership = await financialMembership(context.auth.uid);
+    const action = String(payload?.action || "");
+    const id = String(payload?.id || "");
+    const input = cleanFinancialValue(payload?.value || {});
+    if (!["create", "update"].includes(action))
+        throw new functions.https.HttpsError("invalid-argument", "Ação inválida.");
+    await requireFinancialPermission(membership, action === "create" ? "createFiscalDocument" : "editFiscalDocument");
+    const gross = Number(input.grossAmountCents);
+    const discount = Number(input.discountCents || 0);
+    const tax = Number(input.taxAmountCents || 0);
+    const withholding = Number(input.withholdingAmountCents || 0);
+    const net = gross - discount - withholding;
+    if (!String(input.number || "").trim() || !String(input.issuerName || "").trim() || !String(input.recipientName || "").trim() || !Number.isSafeInteger(gross) || gross < 0 || net < 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Número, emissor, tomador e valores são obrigatórios.");
+    }
+    const duplicates = await admin.firestore().collection("fiscalDocuments").where("companyId", "==", membership.companyId).where("number", "==", String(input.number)).get();
+    const duplicate = duplicates.docs.find((item) => item.id !== id && ((input.accessKey && item.data().accessKey === input.accessKey) || (item.data().series === input.series && item.data().issuerName === input.issuerName)));
+    if (duplicate)
+        throw new functions.https.HttpsError("already-exists", "Já existe uma nota com a mesma chave ou combinação de número, série e emissor.");
+    const ref = id ? admin.firestore().collection("fiscalDocuments").doc(id) : admin.firestore().collection("fiscalDocuments").doc();
+    const existingTaxes = await admin.firestore()
+        .collection("taxRecords")
+        .where("companyId", "==", membership.companyId)
+        .where("fiscalDocumentId", "==", ref.id)
+        .where("originType", "==", "fiscalDocument")
+        .get();
+    await admin.firestore().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const before = snap.exists ? snap.data() : null;
+        if (action === "update" && (!snap.exists || before?.companyId !== membership.companyId))
+            throw new functions.https.HttpsError("not-found", "Nota fiscal não encontrada.");
+        if (before && ["authorized", "cancelled", "replaced"].includes(before.status))
+            throw new functions.https.HttpsError("failed-precondition", "Esta nota não pode ser editada livremente.");
+        const now = new Date().toISOString();
+        const after = {
+            ...input,
+            companyId: membership.companyId,
+            netAmountCents: net,
+            taxAmountCents: tax,
+            withholdingAmountCents: withholding,
+            receiptUrls: Array.isArray(input.receiptUrls) ? input.receiptUrls : [],
+            createdAt: before?.createdAt || now,
+            createdBy: before?.createdBy || context.auth.uid,
+            updatedAt: now,
+            updatedBy: context.auth.uid,
+            version: Number(before?.version || 0) + 1,
+        };
+        tx.set(ref, after, { merge: false });
+        existingTaxes.docs.forEach((item) => tx.delete(item.ref));
+        const fiscalOrigin = {
+            companyId: membership.companyId,
+            fiscalDocumentId: ref.id,
+            fiscalDocumentNumber: String(after.number || ""),
+            fiscalDocumentKey: String(after.accessKey || ""),
+            contractId: after.contractId || "",
+            contractName: after.contractName || "",
+            projectId: after.projectId || "",
+            projectName: after.projectName || "",
+            organizationId: after.organizationId || "",
+            organizationName: after.organizationName || after.recipientName || "",
+            competence: after.competence || String(after.issueDate || now).slice(0, 7),
+            calculationBaseCents: gross,
+            rateBasisPoints: 0,
+            paidAmountCents: 0,
+            dueDate: after.issueDate || now.slice(0, 10),
+            guideUrl: "",
+            receiptUrl: "",
+            alertDays: 7,
+            ruleName: "Informado na nota fiscal",
+            ruleSnapshot: { source: "fiscalDocument", fiscalDocumentId: ref.id },
+            calculationDescription: "Registro criado automaticamente a partir dos campos tributários da nota fiscal.",
+            originType: "fiscalDocument",
+            originId: ref.id,
+            manuallyReviewed: false,
+            closedPeriod: false,
+            createdAt: now,
+            createdBy: context.auth.uid,
+            updatedAt: now,
+            updatedBy: context.auth.uid,
+            version: 1,
+        };
+        if (tax > 0) {
+            tx.set(admin.firestore().collection("taxRecords").doc(`${ref.id}_estimated_tax`), {
+                ...fiscalOrigin,
+                taxKind: "other",
+                taxName: "Tributos da nota fiscal",
+                estimatedAmountCents: tax,
+                withheldAmountCents: 0,
+                status: "estimated",
+            });
+        }
+        if (withholding > 0) {
+            tx.set(admin.firestore().collection("taxRecords").doc(`${ref.id}_withholding`), {
+                ...fiscalOrigin,
+                taxKind: "other",
+                taxName: "Retenções da nota fiscal",
+                estimatedAmountCents: withholding,
+                withheldAmountCents: withholding,
+                status: "withheld",
+            });
+        }
+        tx.set(admin.firestore().collection("financialAuditLogs").doc(), { companyId: membership.companyId, action, entityType: "fiscalDocument", entityId: ref.id, userId: context.auth.uid, createdAt: now, before, after });
+    });
+    return { id: ref.id };
+});
+exports.commandFiscalDocument = functions.https.onCall(async (payload, context) => { if (!context.auth)
+    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim(), protocol = String(payload?.protocol || '').trim(); if (!id || id.startsWith('legacy:') || !['cancel', 'replace', 'send'].includes(action))
+    throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await requireFinancialPermission(membership, action === 'cancel' ? 'cancelFiscalDocument' : 'sendFiscalDocument'); if (action === 'cancel' && (!reason || !protocol))
+    throw new functions.https.HttpsError('invalid-argument', 'Cancelamento exige justificativa e protocolo.'); if (action === 'replace' && !String(payload?.replacementDocumentId || ''))
+    throw new functions.https.HttpsError('invalid-argument', 'Informe a nota substituta.'); const ref = admin.firestore().collection('fiscalDocuments').doc(id); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Nota fiscal não encontrada.'); const before = snap.data(), now = new Date().toISOString(), after = action === 'cancel' ? { status: 'cancelled', cancellationReason: reason, cancellationProtocol: protocol } : action === 'replace' ? { status: 'replaced', replacementDocumentId: String(payload.replacementDocumentId) } : { status: 'sent', sentAt: now }; tx.update(ref, { ...after, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); if (action === 'replace') {
+    const replacement = admin.firestore().collection('fiscalDocuments').doc(String(payload.replacementDocumentId)), replacementSnap = await tx.get(replacement);
+    if (!replacementSnap.exists || replacementSnap.data()?.companyId !== membership.companyId)
+        throw new functions.https.HttpsError('not-found', 'Nota substituta não encontrada.');
+    tx.update(replacement, { replacedDocumentId: id, updatedAt: now, updatedBy: context.auth.uid });
+} tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'fiscalDocument', entityId: id, userId: context.auth.uid, createdAt: now, before, after }); }); return { id }; });
 //# sourceMappingURL=index.js.map

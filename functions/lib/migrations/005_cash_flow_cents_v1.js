@@ -1,0 +1,22 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.migrateCashFlowCentsV1 = void 0;
+/** Migration 005 — adiciona campos monetários em centavos às movimentações legadas. */
+const admin = require("firebase-admin");
+async function migrateCashFlowCentsV1(companyId, actorId) { const db = admin.firestore(), marker = db.collection('schemaMigrations').doc(`${companyId}_005_cash_flow_cents_v1`); if ((await marker.get()).exists)
+    return { applied: false }; const snapshot = await db.collection('financialTransactions').where('companyId', '==', companyId).get(); let batch = db.batch(), pending = 0, updated = 0; for (const doc of snapshot.docs) {
+    const x = doc.data();
+    if (Number.isSafeInteger(x.grossAmountCents))
+        continue;
+    const gross = Math.round(Number(x.amount || 0) * 100), settled = ['paid', 'received'].includes(x.status) ? gross : 0;
+    batch.update(doc.ref, { kind: x.kind || (x.type === 'income' ? 'income' : 'expense'), grossAmountCents: gross, interestCents: 0, fineCents: 0, discountCents: 0, netAmountCents: gross, settledAmountCents: settled, balanceAmountCents: gross - settled, issueDate: x.issueDate || x.date || '', dueDate: x.dueDate || x.date || '', competence: x.competence || String(x.date || '').slice(0, 7), attachmentUrls: x.attachmentUrls || [], updatedAt: new Date().toISOString(), updatedBy: actorId, version: Number(x.version || 0) + 1, migrationId: '005_cash_flow_cents_v1' });
+    pending++;
+    updated++;
+    if (pending === 400) {
+        await batch.commit();
+        batch = db.batch();
+        pending = 0;
+    }
+} batch.set(marker, { companyId, version: 5, name: 'cash_flow_cents_v1', appliedAt: new Date().toISOString(), appliedBy: actorId, records: updated }); await batch.commit(); return { applied: true, records: updated }; }
+exports.migrateCashFlowCentsV1 = migrateCashFlowCentsV1;
+//# sourceMappingURL=005_cash_flow_cents_v1.js.map
