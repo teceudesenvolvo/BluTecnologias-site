@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../../services/firebase';
 import type { CollectionAuxiliary, CollectionEvent, CollectionInput, FinancialCollection } from '../domain/collectionTypes';
@@ -44,7 +44,23 @@ export class FirebaseCollectionAdapter implements CollectionRepository {
     return { clients, contracts, projects, centers, accounts, paymentMethods: methods.filter(item => item.section === 'paymentMethods') };
   }
   async save(_context: CollectionContext, value: CollectionInput, id?: string) { const result = await httpsCallable(functions, 'mutateCollection')({ action: id ? 'update' : 'create', id, value, idempotencyKey: crypto.randomUUID() }); return String((result.data as any).id); }
-  async receive(_context: CollectionContext, id: string, amountCents: number, date: string, bankAccountId: string, authorizationReason?: string) { await httpsCallable(functions, 'receiveCollection')({ id, amountCents, date, bankAccountId, authorizationReason, idempotencyKey: crypto.randomUUID() }); }
+  async receive(_context: CollectionContext, id: string, amountCents: number, date: string, bankAccountId: string, authorizationReason?: string) {
+    if (id.startsWith('legacy:')) {
+      const [, clientId, billingId] = id.split(':');
+      const reference = doc(db, 'clients', clientId);
+      const snapshot = await getDoc(reference);
+      if (!snapshot.exists()) throw new Error('Cliente da cobrança não encontrado.');
+      const now = new Date().toISOString();
+      const billings = (snapshot.data().cobrancas || []).filter(Boolean).map((billing: any, index: number) =>
+        String(billing.id || index) === billingId
+          ? { ...billing, status: 'received', receivedAt: date || now, receivedAmountCents: amountCents, bankAccountId, authorizationReason, updatedAt: now }
+          : billing,
+      );
+      await updateDoc(reference, { cobrancas: billings, updatedAt: now });
+      return;
+    }
+    await httpsCallable(functions, 'receiveCollection')({ id, amountCents, date, bankAccountId, authorizationReason, idempotencyKey: crypto.randomUUID() });
+  }
   async event(_context: CollectionContext, id: string, type: CollectionEvent['type'], description: string, extra?: Record<string, unknown>) { await httpsCallable(functions, 'addCollectionEvent')({ id, type, description, ...extra }); }
   async command(_context: CollectionContext, id: string, action: 'send' | 'renegotiate' | 'cancel' | 'secondCopy', reason?: string) { await httpsCallable(functions, 'commandCollection')({ id, action, reason, idempotencyKey: crypto.randomUUID() }); }
 }

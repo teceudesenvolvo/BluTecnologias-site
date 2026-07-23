@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "https://blutecnologias-site.web.app",
+      "https://blutecnologias-site.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Content-Disposition", "Authorization", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  }
+]

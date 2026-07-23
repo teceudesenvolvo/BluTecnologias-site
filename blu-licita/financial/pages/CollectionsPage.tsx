@@ -373,7 +373,7 @@ const Table = ({ items, open, receive }: { items: FinancialCollection[]; open: (
             <td className="px-4 py-4">
               <div className="flex gap-2">
                 <button onClick={() => open(item)} className="rounded-lg border px-3 py-2 text-xs font-bold">Detalhar</button>
-                {item.balanceAmountCents > 0 && !item.id.startsWith("legacy:") && <button onClick={() => receive(item)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Receber</button>}
+                {item.balanceAmountCents > 0 && <button onClick={() => receive(item)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Receber</button>}
               </div>
             </td>
           </tr>
@@ -426,16 +426,20 @@ const Detail = ({ item, close, receive }: { item: FinancialCollection; close: ()
       </div>
       <section className="mt-5 rounded-2xl border p-5">
         <Badge status={item.status} />
+        <p className={`mt-4 rounded-xl p-3 text-sm font-bold ${item.status === "received" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+          Situação do recebimento: {item.status === "received" ? "Recebida" : "Não recebida"}
+        </p>
         <p className="mt-4 text-sm text-slate-600">Órgão/cliente: <b>{item.organizationName}</b></p>
         <p className="mt-2 text-sm text-slate-600">Contrato: <b>{item.contractName || "—"}</b></p>
         <p className="mt-2 text-sm text-slate-600">Vencimento: <b>{date(item.dueDate)}</b></p>
+        {item.updatedAt && <p className="mt-2 text-sm text-slate-600">Última atualização: <b>{date(item.updatedAt)}</b></p>}
         <p className="mt-2 text-sm text-slate-600">Setor financeiro/e-mail: <b>{item.financialDepartment || "—"}</b></p>
         {item.notes && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">{item.notes}</p>}
       </section>
     </div>
     <footer className="flex justify-end gap-2 border-t p-5">
       <button onClick={close} className="rounded-xl border px-4 py-2">Fechar</button>
-      {item.balanceAmountCents > 0 && !item.id.startsWith("legacy:") && <button onClick={receive} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white">Marcar recebida</button>}
+      {item.balanceAmountCents > 0 && <button onClick={receive} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white">Marcar recebida</button>}
     </footer>
   </Drawer>
 );

@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUserFolder(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /documents/{userId}/{fileName=**} {
+      allow read, write: if ownsUserFolder(userId);
+    }
+
+    match /certificates/{userId}/{fileName=**} {
+      allow read, write: if ownsUserFolder(userId);
+    }
+
+    match /certificates/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
+    match /financial/{userId}/{fileName=**} {
+      allow read, write: if ownsUserFolder(userId);
+    }
+
+    match /profiles/{userId}/{fileName=**} {
+      allow read, write: if ownsUserFolder(userId);
+    }
+
+    match /news/{fileName=**} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+  }
+}

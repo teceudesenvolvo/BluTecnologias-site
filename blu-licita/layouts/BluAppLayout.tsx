@@ -101,7 +101,7 @@ export const BluAppLayout: React.FC = () => {
                 {todayOpportunities.length>0&&<div><p className="bg-blue-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-blue-700">Oportunidades de hoje</p>{todayOpportunities.map((item)=><button key={item.externalId} onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="block w-full border-b border-slate-100 p-4 text-left hover:bg-slate-50"><p className="text-xs font-bold uppercase text-blue-600">{item.organizationName}</p><p className="mt-1 line-clamp-2 text-sm font-semibold">{item.object}</p><p className="mt-2 text-xs text-slate-400">Publicado hoje · {item.processNumber||item.procurementNumber}</p></button>)}</div>}
                 {todayOpportunities.length===0&&certificateAlerts.length===0&&<p className="p-8 text-center text-sm text-slate-500">Nenhuma notificação nova.</p>}
               </div>
-              <button onClick={()=>{setNotificationOpen(false);navigate('/admin/configuracoes/areas-interesse')}} className="w-full border-t border-slate-100 p-3 text-xs font-semibold text-blue-600">Configurar notificações</button>
+              <button onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="w-full border-t border-slate-100 p-3 text-xs font-semibold text-blue-600">Configurar áreas de interesse</button>
             </div>}
           </div>
         </header>

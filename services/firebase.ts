@@ -39,11 +39,21 @@ const companyCollection = async <T>(name: string): Promise<T[]> => {
 
 const createCompanyDocument = async (name: string, value: Record<string, unknown>) => {
   const owner = currentOwner();
-  await addDoc(collection(db, name), withoutUndefined({ ...value, ...owner }));
+  await addDoc(collection(db, name), withoutUndefined({
+    ...value,
+    ...owner,
+    createdBy: value.createdBy || owner.userId,
+    createdAt: value.createdAt || new Date().toISOString(),
+  }));
 };
 
 const updateCompanyDocument = async (name: string, id: string, value: Record<string, unknown>) => {
-  await updateDoc(doc(db, name, id), withoutUndefined(value));
+  const owner = currentOwner();
+  await updateDoc(doc(db, name, id), withoutUndefined({
+    ...value,
+    updatedBy: value.updatedBy || owner.userId,
+    updatedAt: value.updatedAt || new Date().toISOString(),
+  }));
 };
 
 const deleteCompanyDocument = async (name: string, id: string) => deleteDoc(doc(db, name, id));

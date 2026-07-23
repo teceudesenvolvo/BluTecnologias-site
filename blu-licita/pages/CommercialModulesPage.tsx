@@ -308,11 +308,6 @@ export const SettingsPage = () => (
           "/admin/perfil",
         ],
         [
-          "Áreas de interesse",
-          "Segmentos usados em oportunidades e notificações",
-          "/admin/configuracoes/areas-interesse",
-        ],
-        [
           "Integrações e fontes",
           "PNCP, Compras.gov e portais parceiros",
           "/admin/integracoes",

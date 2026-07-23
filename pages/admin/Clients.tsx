@@ -16,6 +16,7 @@ export const Clients: React.FC = () => {
   const [managingClient, setManagingClient] = useState<ContactLead | null>(null);
   const [manageTab, setManageTab] = useState<'contracts' | 'adjustments' | 'invoices' | 'proposals' | 'reports' | 'billing'>('contracts');
   const [saving, setSaving] = useState(false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
   const [editingClient, setEditingClient] = useState<ContactLead | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [myCompanies, setMyCompanies] = useState<Company[]>([]);
@@ -67,8 +68,8 @@ export const Clients: React.FC = () => {
   // State for sub-items forms
   const [subItemForm, setSubItemForm] = useState<any>({});
 
-  const resetSubItemForm = () => {
-    setSubItemForm({});
+  const resetSubItemForm = (tab: typeof manageTab = manageTab) => {
+    setSubItemForm(tab === 'contracts' ? { startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10) } : {});
   };
 
   useEffect(() => {
@@ -180,6 +181,38 @@ export const Clients: React.FC = () => {
     setSaving(false);
   };
 
+  const fetchClientCnpjData = async () => {
+    const cleanCnpj = formData.cnpj.replace(/\D/g, '');
+    if (cleanCnpj.length !== 14) {
+      alert('Informe um CNPJ válido com 14 dígitos.');
+      return;
+    }
+    setCnpjLoading(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
+      const data = await response.json();
+      if (!response.ok || data.message) throw new Error(data.message || 'CNPJ não encontrado.');
+      const phone = data.ddd_telefone_1 || data.telefone || '';
+      const address = [data.logradouro, data.numero, data.bairro].filter(Boolean).join(', ');
+      setFormData((current) => ({
+        ...current,
+        cnpj: cleanCnpj,
+        razaoSocial: data.razao_social || current.razaoSocial,
+        email: data.email || current.email,
+        phone: phone || current.phone,
+        city: data.municipio || current.city,
+        state: data.uf || current.state,
+        address: address || current.address,
+        cep: data.cep || current.cep,
+        complement: data.complemento || current.complement,
+      }));
+    } catch (error: any) {
+      alert(error?.message || 'Não foi possível buscar os dados do CNPJ.');
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
   const handleDeleteClient = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')) {
       const success = await clientService.delete(id);
@@ -286,7 +319,13 @@ export const Clients: React.FC = () => {
       if (url) finalFileUrl = url;
     }
 
-    const newItem = { ...subItemForm, fileUrl: finalFileUrl, id: Date.now().toString(), userId: auth.currentUser?.uid };
+    const newItem = {
+      ...subItemForm,
+      fileUrl: finalFileUrl,
+      id: Date.now().toString(),
+      userId: auth.currentUser?.uid,
+      ...(type === 'contracts' ? { source: 'manual', importedAt: new Date().toISOString() } : {}),
+    };
     const newList = [...currentList, newItem];
 
     const success = await clientService.update(managingClient.id, { [type]: newList });
@@ -295,7 +334,7 @@ export const Clients: React.FC = () => {
       const updatedClient = { ...managingClient, [type]: newList };
       setManagingClient(updatedClient);
       setContacts(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-      resetSubItemForm();
+      resetSubItemForm(type);
     }
     setSaving(false);
   };
@@ -581,7 +620,7 @@ export const Clients: React.FC = () => {
 
                     {contact.status === 'active' && (
                       <div className="flex gap-2 mt-4">
-                        <button onClick={() => { setManagingClient(contact); setManageTab('contracts'); resetSubItemForm(); }} className="text-blue-600 font-bold text-sm flex items-center gap-2 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors w-fit">
+                        <button onClick={() => { setManagingClient(contact); setManageTab('contracts'); resetSubItemForm('contracts'); }} className="text-blue-600 font-bold text-sm flex items-center gap-2 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors w-fit">
                           <Settings size={16} /> Gerenciar
                         </button>
                         <button onClick={() => openClientModal(contact)} className="text-slate-500 font-bold text-sm flex items-center gap-2 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors w-fit">
@@ -691,8 +730,13 @@ export const Clients: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">CNPJ</label>
-                  <input type="text" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
-                    value={formData.cnpj} onChange={e => setFormData({...formData, cnpj: e.target.value})} />
+                  <div className="flex gap-2">
+                    <input type="text" required className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
+                      value={formData.cnpj} onChange={e => setFormData({...formData, cnpj: e.target.value})} />
+                    <button type="button" onClick={fetchClientCnpjData} disabled={cnpjLoading || formData.cnpj.replace(/\D/g, '').length !== 14} className="shrink-0 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 disabled:opacity-50">
+                      {cnpjLoading ? <Loader2 className="animate-spin" size={16} /> : 'Buscar'}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Inscrição Municipal</label>
@@ -919,7 +963,7 @@ export const Clients: React.FC = () => {
                ].map(tab => (
                  <button
                     key={tab.id}
-                    onClick={() => { setManageTab(tab.id as any); resetSubItemForm(); }}
+                    onClick={() => { setManageTab(tab.id as any); resetSubItemForm(tab.id as any); }}
                     className={`flex items-center gap-2 px-6 py-4 font-medium text-sm whitespace-nowrap transition-colors ${manageTab === tab.id ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                  >
                     <tab.icon size={16} /> {tab.label}

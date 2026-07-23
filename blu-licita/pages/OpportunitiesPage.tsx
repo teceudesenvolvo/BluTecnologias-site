@@ -13,6 +13,7 @@ import {
   MapPin,
   RefreshCw,
   Search,
+  Settings,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import type { TceCeMunicipality } from "../integrations/tce-ce/TceCeConnector";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { opportunityFavoritesService } from "../services/opportunityFavoritesService";
 import { interestSettingsService } from "../services/interestSettingsService";
+import { InterestSettingsPage } from "./InterestSettingsPage";
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 const normalizeText = (value: string) =>
@@ -134,6 +136,7 @@ export const OpportunitiesPage: React.FC = () => {
   const [nextCursor, setNextCursor] = useState<string>();
   const [total, setTotal] = useState<number>();
   const [selected, setSelected] = useState<ExternalOpportunity | null>(null);
+  const [interestOpen, setInterestOpen] = useState(false);
   const [source, setSource] = useState<
     "pncp" | "compras-gov" | "tce-ce" | "portal-compras-publicas"
   >("pncp");
@@ -285,18 +288,27 @@ export const OpportunitiesPage: React.FC = () => {
             Processos publicados por APIs oficiais de compras públicas.
           </p>
         </div>
-        <button
-          onClick={() => load()}
-          disabled={loading || (source === "pncp" || source === "compras-gov" ? !modality : false)}
-          className="flex items-center justify-center gap-2 rounded-xl bg-[#0877ff] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader2 className="animate-spin" size={17} />
-          ) : (
-            <RefreshCw size={17} />
-          )}
-          Atualizar oportunidades
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setInterestOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Settings size={17} />
+            Áreas de interesse
+          </button>
+          <button
+            onClick={() => load()}
+            disabled={loading || (source === "pncp" || source === "compras-gov" ? !modality : false)}
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#0877ff] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={17} />
+            ) : (
+              <RefreshCw size={17} />
+            )}
+            Atualizar oportunidades
+          </button>
+        </div>
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div
@@ -539,6 +551,18 @@ export const OpportunitiesPage: React.FC = () => {
             setSelected(null);
           }}
         />
+      )}
+      {interestOpen && (
+        <div className="fixed inset-0 z-[130] overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-3 flex justify-end">
+              <button onClick={() => { setInterestOpen(false); if (user) interestSettingsService.get(user.companyId).then(setInterestKeywords); }} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow">
+                Fechar
+              </button>
+            </div>
+            <InterestSettingsPage />
+          </div>
+        </div>
       )}
     </div>
   );

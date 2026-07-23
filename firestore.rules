@@ -134,7 +134,9 @@ service cloud.firestore {
     }
     match /{budgetCollection}/{documentId} {
       allow read: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && sameCompany();
-      allow write: if false;
+      allow create: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && sameCompany();
     }
     match /{dreControlCollection}/{documentId} {
       allow read: if dreControlCollection in ['drePeriodClosures','dreClosureHistory'] && sameCompany();

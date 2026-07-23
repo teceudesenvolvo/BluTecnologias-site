@@ -1,5 +1,5 @@
 import React from "react";
-import { BarChart3, CheckCircle2, Copy, Eye, FilePlus2, Loader2, Plus, Search, X } from "lucide-react";
+import { CheckCircle2, Copy, Download, Eye, FilePlus2, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { useBudgets } from "../hooks/useBudgets";
 import type { Budget, BudgetInput, BudgetItemInput, BudgetStatus, BudgetType } from "../domain/budgetTypes";
 
@@ -36,6 +36,7 @@ const emptyItem = (): BudgetItemInput => ({
   unit: "un",
   unitCostCents: 0,
   unitPriceCents: 0,
+  taxPercent: 0,
   taxCents: 0,
   logisticsCents: 0,
   additionalExpensesCents: 0,
@@ -167,6 +168,7 @@ export const BudgetsPage = () => {
                       <IconButton title="Visualizar" action={() => setDetail(budget)}><Eye size={15} /></IconButton>
                       <IconButton title="Duplicar versão" action={() => execute({ action: "duplicate", budgetId: budget.id })}><Copy size={15} /></IconButton>
                       {!["approved", "replaced", "closed"].includes(budget.status) && <IconButton title="Editar" action={() => { setEditing(budget); setFormOpen(true); }}><FilePlus2 size={15} /></IconButton>}
+                      <IconButton title="Excluir" action={() => { if (confirm(`Excluir o orçamento ${budget.code}? Esta ação remove a versão e seus itens.`)) execute({ action: "delete", budgetId: budget.id }); }}><Trash2 size={15} /></IconButton>
                     </div>
                   </td>
                 </tr>
@@ -184,16 +186,33 @@ export const BudgetsPage = () => {
 };
 
 const BudgetForm = ({ budget, data, close, save }: { budget?: Budget; data: any; close: () => void; save: (value: BudgetInput) => Promise<void> }) => {
-  const sourceItems = (data.items || []).filter((item: any) => item.budgetId === budget?.id).sort((a: any, b: any) => a.position - b.position);
+  const sourceItems = (data.items || [])
+    .filter((item: any) => item.budgetId === budget?.id)
+    .sort((a: any, b: any) => a.position - b.position)
+    .map((item: any) => {
+      const subtotal = Math.round(Number(item.unitPriceCents || 0) * (Number(item.quantityMilliUnits || 0) / 1000));
+      return { ...item, taxPercent: Number(item.taxPercent ?? (subtotal > 0 ? (Number(item.taxCents || 0) / subtotal) * 100 : 0)) };
+    });
   const [form, setForm] = React.useState<BudgetInput>(() => (budget ? { ...budget, items: sourceItems.length ? sourceItems : [emptyItem()] } : empty));
   const companies = data.companies || [];
+  const formTotals = React.useMemo(() => ({
+    totalBudgetedCents: form.items.reduce((sum, item) => sum + Number(item.totalCents || 0), 0),
+    totalCostCents: form.items.reduce((sum, item) => {
+      const quantity = Number(item.quantityMilliUnits || 0) / 1000;
+      return sum + Math.round(Number(item.unitCostCents || 0) * quantity) + Number(item.taxCents || 0) + Number(item.logisticsCents || 0) + Number(item.additionalExpensesCents || 0);
+    }, 0),
+    totalTaxesCents: form.items.reduce((sum, item) => sum + Number(item.taxCents || 0), 0),
+    totalMarginCents: form.items.reduce((sum, item) => sum + Number(item.marginCents || 0), 0),
+  }), [form.items]);
 
   const updateItem = (index: number, key: keyof BudgetItemInput, value: any) => {
     const items = form.items.map((item, currentIndex) => {
       if (currentIndex !== index) return item;
       const next = { ...item, [key]: value };
       const quantity = next.quantityMilliUnits / 1000;
-      next.totalCents = Math.round(next.unitPriceCents * quantity);
+      const subtotalCents = Math.round(next.unitPriceCents * quantity);
+      next.taxCents = Math.round((subtotalCents * Number(next.taxPercent || 0)) / 100);
+      next.totalCents = subtotalCents + next.taxCents + next.logisticsCents + next.additionalExpensesCents;
       const cost = Math.round(next.unitCostCents * quantity) + next.taxCents + next.logisticsCents + next.additionalExpensesCents;
       next.marginCents = next.totalCents - cost;
       return next;
@@ -240,7 +259,8 @@ const BudgetForm = ({ budget, data, close, save }: { budget?: Budget; data: any;
                     <Input label="Unidade" value={item.unit} set={(value) => updateItem(index, "unit", value)} />
                     <MoneyInput label="Custo unitário" value={item.unitCostCents} set={(value) => updateItem(index, "unitCostCents", value)} />
                     <MoneyInput label="Preço unitário" value={item.unitPriceCents} set={(value) => updateItem(index, "unitPriceCents", value)} />
-                    <MoneyInput label="Impostos" value={item.taxCents} set={(value) => updateItem(index, "taxCents", value)} />
+                    <PercentInput label="Impostos (%)" value={Number(item.taxPercent || 0)} set={(value) => updateItem(index, "taxPercent", value)} />
+                    <Read label="Valor dos impostos" value={money(item.taxCents)} />
                     <MoneyInput label="Logística" value={item.logisticsCents} set={(value) => updateItem(index, "logisticsCents", value)} />
                     <MoneyInput label="Despesas adicionais" value={item.additionalExpensesCents} set={(value) => updateItem(index, "additionalExpensesCents", value)} />
                     <Read label="Total" value={money(item.totalCents)} />
@@ -248,6 +268,12 @@ const BudgetForm = ({ budget, data, close, save }: { budget?: Budget; data: any;
                     <button type="button" disabled={form.items.length === 1} onClick={() => setForm({ ...form, items: form.items.filter((_, itemIndex) => itemIndex !== index) })} className="self-end rounded-xl border px-3 py-2 text-xs font-bold text-rose-600 disabled:opacity-30">Remover</button>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-4">
+                <Metric label="Total do orçamento" value={money(formTotals.totalBudgetedCents)} />
+                <Metric label="Custos previstos" value={money(formTotals.totalCostCents)} />
+                <Metric label="Impostos calculados" value={money(formTotals.totalTaxesCents)} />
+                <Metric label="Margem prevista" value={money(formTotals.totalMarginCents)} />
               </div>
             </div>
 
@@ -285,13 +311,33 @@ const BudgetDetails = ({ budget, items, realized, companies, close, approve, rej
                 <p className="mt-1 text-xs text-slate-400">Emitente: {(budget as any).issuerCompanyName || company.razaoSocial || company.name || "Empresa não selecionada"}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => generateBudgetPdf(budget, items, company)} className="flex h-fit items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"><BarChart3 size={16} />Gerar PDF</button>
+                <button onClick={() => generateBudgetPdf(budget, items, company)} className="flex h-fit items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"><Download size={16} />Baixar PDF</button>
+              </div>
+            </div>
+          </section>
+          <section className="rounded-2xl border bg-white p-5">
+            <p className="text-xs font-bold uppercase tracking-[.16em] text-blue-600">Prévia da proposta</p>
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">{(budget as any).issuerCompanyName || company.razaoSocial || company.name || "Empresa emitente"}</h3>
+                  <p className="mt-1 text-sm text-slate-500">CNPJ {(budget as any).issuerCompanyDocument || company.cnpj || "não informado"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold uppercase text-slate-400">Proposta comercial</p>
+                  <p className="text-lg font-black">{budget.code}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+                <Read label="Cliente/órgão" value={budget.organizationName || "Não informado"} />
+                <Read label="Validade" value={`${date(budget.periodStart)} a ${date(budget.periodEnd)}`} />
+                <Read label="Total da proposta" value={money(budget.totalBudgetedCents)} />
               </div>
             </div>
           </section>
           <div className="overflow-x-auto rounded-2xl border bg-white">
             <table className="w-full min-w-[800px] text-sm">
-              <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-400"><tr>{["Item", "Qtd.", "Custo un.", "Preço un.", "Impostos/logística", "Total", "Margem"].map((item) => <th key={item} className="px-4 py-3">{item}</th>)}</tr></thead>
+              <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-400"><tr>{["Item", "Qtd.", "Custo un.", "Preço un.", "Impostos", "Logística/despesas", "Total", "Margem"].map((item) => <th key={item} className="px-4 py-3">{item}</th>)}</tr></thead>
               <tbody className="divide-y">
                 {items.map((item) => (
                   <tr key={item.id}>
@@ -299,11 +345,17 @@ const BudgetDetails = ({ budget, items, realized, companies, close, approve, rej
                     <td className="px-4">{item.quantityMilliUnits / 1000} {item.unit}</td>
                     <td className="px-4">{money(item.unitCostCents)}</td>
                     <td className="px-4">{money(item.unitPriceCents)}</td>
-                    <td className="px-4">{money(item.taxCents + item.logisticsCents + item.additionalExpensesCents)}</td>
+                    <td className="px-4">{Number(item.taxPercent || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%<small className="block text-slate-400">{money(item.taxCents)}</small></td>
+                    <td className="px-4">{money(item.logisticsCents + item.additionalExpensesCents)}</td>
                     <td className="px-4 font-bold">{money(item.totalCents)}</td>
                     <td className="px-4">{money(item.marginCents)}</td>
                   </tr>
                 ))}
+                <tr className="bg-slate-50 font-black">
+                  <td colSpan={6} className="px-4 py-4 text-right">Total geral do orçamento</td>
+                  <td className="px-4">{money(budget.totalBudgetedCents)}</td>
+                  <td className="px-4">{money(budget.totalMarginCents)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -321,12 +373,71 @@ const BudgetDetails = ({ budget, items, realized, companies, close, approve, rej
   );
 };
 
+const pdfText = (value: any) => String(value || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[()\\]/g, " ")
+  .slice(0, 110);
+
+const buildPdf = (lines: string[]) => {
+  const content = [
+    "BT",
+    "/F1 11 Tf",
+    "50 790 Td",
+    ...lines.flatMap((line, index) => [
+      index === 0 ? "" : "0 -18 Td",
+      `(${pdfText(line)}) Tj`,
+    ]).filter(Boolean),
+    "ET",
+  ].join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return pdf;
+};
+
 const generateBudgetPdf = (budget: Budget, items: any[], company: any) => {
-  const rows = items.map((item) => `<tr><td><b>${item.productService || ""}</b><br/><small>${item.description || ""}</small></td><td>${item.quantityMilliUnits / 1000} ${item.unit || ""}</td><td>${money(item.unitPriceCents)}</td><td>${money(item.totalCents)}</td></tr>`).join("");
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>${budget.code}</title><style>body{font-family:Inter,Arial,sans-serif;margin:40px;color:#0f172a}.head{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #0ea5e9;padding-bottom:18px}.logo{max-height:72px;max-width:180px}.muted{color:#64748b}.box{border:1px solid #e2e8f0;border-radius:16px;padding:18px;margin-top:24px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#f8fafc;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase}th,td{border-bottom:1px solid #e2e8f0;padding:12px}.total{text-align:right;font-size:22px;font-weight:800;margin-top:24px}.foot{border-top:1px solid #e2e8f0;margin-top:48px;padding-top:16px;color:#64748b;font-size:12px}@media print{button{display:none}}</style></head><body><div class="head"><div>${company.logoUrl ? `<img class="logo" src="${company.logoUrl}"/>` : `<h1>${company.razaoSocial || company.name || "Blu"}</h1>`}<p class="muted">${company.razaoSocial || company.name || ""}<br/>CNPJ ${company.cnpj || "não informado"}</p></div><div><h2>Orçamento ${budget.code}</h2><p class="muted">${date(budget.periodStart)} a ${date(budget.periodEnd)}</p></div></div><div class="box"><h2>${budget.name}</h2><p>${budget.organizationName || ""}</p><p class="muted">${budget.notes || ""}</p></div><table><thead><tr><th>Item</th><th>Qtd.</th><th>Preço un.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><p class="total">Total: ${money(budget.totalBudgetedCents)}</p><div class="foot">${company.footer || company.address || "Documento gerado pela Blu."}</div><script>window.print()</script></body></html>`);
-  win.document.close();
+  const lines = [
+    `${company.razaoSocial || company.name || "Blu"} - CNPJ ${company.cnpj || "nao informado"}`,
+    `Proposta comercial ${budget.code}`,
+    `Cliente/Orgao: ${budget.organizationName || "nao informado"}`,
+    `Periodo/validade: ${date(budget.periodStart)} a ${date(budget.periodEnd)}`,
+    `Orcamento: ${budget.name}`,
+    "",
+    "Itens",
+    ...items.flatMap((item, index) => [
+      `${index + 1}. ${item.productService || "Item"} - ${item.quantityMilliUnits / 1000} ${item.unit || ""}`,
+      `   Preco un.: ${money(item.unitPriceCents)} | Impostos: ${Number(item.taxPercent || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% | Total: ${money(item.totalCents)}`,
+    ]),
+    "",
+    `Total geral: ${money(budget.totalBudgetedCents)}`,
+    `Margem prevista: ${money(budget.totalMarginCents)}`,
+    "",
+    company.footer || company.address || "Documento gerado pela Blu.",
+  ];
+  const blob = new Blob([buildPdf(lines)], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${budget.code || "orcamento"}-proposta.pdf`.replace(/[^\w.-]+/g, "-");
+  anchor.click();
+  URL.revokeObjectURL(url);
 };
 
 const Overlay = ({ children }: { children: React.ReactNode }) => <div className="fixed inset-0 z-[130] flex items-end justify-center bg-slate-950/55 md:items-center md:p-5">{children}</div>;
@@ -337,5 +448,6 @@ const IconButton = ({ title, action, children }: { title: string; action: () => 
 const Input = ({ label, value, set, type = "text" }: { label: string; value: any; set: (value: string) => void; type?: string }) => <label className="text-xs font-bold text-slate-600">{label}<input required type={type} value={value || ""} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal" /></label>;
 const Select = ({ label, value, set, options }: { label: string; value: string; set: (value: string) => void; options: any[] }) => <label className="text-xs font-bold text-slate-600">{label}<select value={value} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-normal">{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>;
 const MoneyInput = ({ label, value, set }: { label: string; value: number; set: (value: number) => void }) => <label className="text-xs font-bold text-slate-600">{label}<input type="number" step="0.01" min="0" value={(value / 100).toFixed(2)} onChange={(event) => set(Math.round(Number(event.target.value) * 100))} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal" /></label>;
+const PercentInput = ({ label, value, set }: { label: string; value: number; set: (value: number) => void }) => <label className="text-xs font-bold text-slate-600">{label}<input type="number" step="0.01" min="0" value={Number(value || 0)} onChange={(event) => set(Number(event.target.value))} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal" /></label>;
 const Decimal = ({ label, value, set }: { label: string; value: number; set: (value: number) => void }) => <label className="text-xs font-bold text-slate-600">{label}<input type="number" step="0.001" min="0.001" value={value} onChange={(event) => set(Number(event.target.value))} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal" /></label>;
 const Read = ({ label, value }: { label: string; value: string }) => <div className="text-xs font-bold text-slate-600">{label}<div className="mt-2 rounded-xl bg-white px-3 py-2.5 text-sm">{value}</div></div>;
