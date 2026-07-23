@@ -20,6 +20,10 @@
         "function": "tceCeProxy"
       },
       {
+        "source": "/api/portal-compras-publicas/**",
+        "function": "portalComprasPublicasProxy"
+      },
+      {
         "source": "/api/billing/checkout",
         "function": "billingCheckout"
       },

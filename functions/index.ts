@@ -239,6 +239,57 @@ export const comprasGovProxy = functions.https.onRequest((req, res) => {
 
 export const tceCeProxy = functions.https.onRequest((req,res)=>{cors({origin:true,methods:['GET']})(req,res,()=>{if(req.method!=='GET'){res.status(405).json({message:'Método não permitido.'});return;}const path=req.path.replace(/^\/api\/tce-ce/,'');const allowedPaths=['/municipios','/processos_administrativos_contratacoes'];if(!allowedPaths.includes(path)){res.status(404).json({message:'Consulta não suportada.'});return;}const allowed=['codigo_municipio','data_inicio','data_fim','$format','$count','$start_index'];const query=new URLSearchParams();allowed.forEach((name)=>{const value=req.query[name];if(typeof value==='string'&&value.length<=32)query.set(name,value)});https.get(`https://api-dados-abertos.tce.ce.gov.br/sim${path}?${query}`,{headers:{Accept:'application/json','User-Agent':'Blu-TCECE-Connector/1.0'}},(upstream)=>{const chunks:Buffer[]=[];upstream.on('data',(chunk)=>chunks.push(Buffer.from(chunk)));upstream.on('end',()=>{res.status(upstream.statusCode||502);res.set('Content-Type',upstream.headers['content-type']||'application/json');res.set('Cache-Control',path==='/municipios'?'public, max-age=86400':'public, max-age=300');res.send(Buffer.concat(chunks));});}).on('error',()=>res.status(502).json({message:'TCE-CE temporariamente indisponível.'}));});});
 
+export const portalComprasPublicasProxy = functions.https.onRequest((req, res) => {
+  cors({ origin: true, methods: ['GET'] })(req, res, () => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ message: 'Método não permitido.' });
+      return;
+    }
+
+    const path = req.path.replace(/^\/api\/portal-compras-publicas/, '');
+    const allowedPaths = ['/publico/listarProcessos', '/publico/listarProcessos/'];
+    if (!allowedPaths.includes(path)) {
+      res.status(404).json({ message: 'Consulta não suportada.' });
+      return;
+    }
+
+    const query = new URLSearchParams();
+    const allowedParameters: Record<string, number> = {
+      publicKey: 160,
+      cdSituacao: 4,
+      dataInicio: 10,
+      dataFim: 10,
+      pagina: 8,
+    };
+    Object.entries(allowedParameters).forEach(([name, maxLength]) => {
+      const value = req.query[name];
+      if (typeof value === 'string' && value.length <= maxLength) query.set(name, value);
+    });
+
+    if (!query.get('publicKey')) {
+      res.status(400).json({ message: 'PublicKey não informada.' });
+      return;
+    }
+
+    const upstreamUrl = `https://apipcp.portaldecompraspublicas.com.br${path}?${query.toString()}`;
+    https
+      .get(upstreamUrl, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-PortalComprasPublicas-Connector/1.0' } }, (upstream) => {
+        const chunks: Buffer[] = [];
+        upstream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        upstream.on('end', () => {
+          res.status(upstream.statusCode || 502);
+          res.set('Content-Type', upstream.headers['content-type'] || 'application/json');
+          res.set('Cache-Control', 'public, max-age=60');
+          res.send(Buffer.concat(chunks));
+        });
+      })
+      .on('error', (error) => {
+        console.error('portalComprasPublicasProxy:', error.message);
+        res.status(502).json({ message: 'O Portal de Compras Públicas está temporariamente indisponível.' });
+      });
+  });
+});
+
 // Helper to parse data URLs (data:<mime>;base64,<data>)
 function parseDataUrl(dataUrl: string) {
   const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl);

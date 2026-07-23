@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
+exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -21,6 +21,14 @@ Object.defineProperty(exports, "getFinancialOverview", { enumerable: true, get: 
 var financialReports_1 = require("./financialReports");
 Object.defineProperty(exports, "queryFinancialReport", { enumerable: true, get: function () { return financialReports_1.queryFinancialReport; } });
 Object.defineProperty(exports, "commandFinancialReport", { enumerable: true, get: function () { return financialReports_1.commandFinancialReport; } });
+var billingFunctions_1 = require("./src/modules/billing/presentation/billingFunctions");
+Object.defineProperty(exports, "billingCheckout", { enumerable: true, get: function () { return billingFunctions_1.billingCheckout; } });
+Object.defineProperty(exports, "billingSummary", { enumerable: true, get: function () { return billingFunctions_1.billingSummary; } });
+Object.defineProperty(exports, "billingPublicPlans", { enumerable: true, get: function () { return billingFunctions_1.billingPublicPlans; } });
+Object.defineProperty(exports, "billingPaymentCheck", { enumerable: true, get: function () { return billingFunctions_1.billingPaymentCheck; } });
+Object.defineProperty(exports, "infinitePayWebhook", { enumerable: true, get: function () { return billingFunctions_1.infinitePayWebhook; } });
+Object.defineProperty(exports, "processBillingWebhookEvent", { enumerable: true, get: function () { return billingFunctions_1.processBillingWebhookEvent; } });
+Object.defineProperty(exports, "dailyBillingMaintenance", { enumerable: true, get: function () { return billingFunctions_1.dailyBillingMaintenance; } });
 const financialConfigurationCollections = {
     categories: 'financialCategories', approvals: 'financialApprovalFlows', dre: 'dreAccounts',
     paymentMethods: 'financialConfigurationItems', collectionRules: 'financialConfigurationItems',
@@ -462,6 +470,53 @@ exports.tceCeProxy = functions.https.onRequest((req, res) => { cors({ origin: tr
     return;
 } const allowed = ['codigo_municipio', 'data_inicio', 'data_fim', '$format', '$count', '$start_index']; const query = new URLSearchParams(); allowed.forEach((name) => { const value = req.query[name]; if (typeof value === 'string' && value.length <= 32)
     query.set(name, value); }); https.get(`https://api-dados-abertos.tce.ce.gov.br/sim${path}?${query}`, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-TCECE-Connector/1.0' } }, (upstream) => { const chunks = []; upstream.on('data', (chunk) => chunks.push(Buffer.from(chunk))); upstream.on('end', () => { res.status(upstream.statusCode || 502); res.set('Content-Type', upstream.headers['content-type'] || 'application/json'); res.set('Cache-Control', path === '/municipios' ? 'public, max-age=86400' : 'public, max-age=300'); res.send(Buffer.concat(chunks)); }); }).on('error', () => res.status(502).json({ message: 'TCE-CE temporariamente indisponível.' })); }); });
+exports.portalComprasPublicasProxy = functions.https.onRequest((req, res) => {
+    cors({ origin: true, methods: ['GET'] })(req, res, () => {
+        if (req.method !== 'GET') {
+            res.status(405).json({ message: 'Método não permitido.' });
+            return;
+        }
+        const path = req.path.replace(/^\/api\/portal-compras-publicas/, '');
+        const allowedPaths = ['/publico/listarProcessos', '/publico/listarProcessos/'];
+        if (!allowedPaths.includes(path)) {
+            res.status(404).json({ message: 'Consulta não suportada.' });
+            return;
+        }
+        const query = new URLSearchParams();
+        const allowedParameters = {
+            publicKey: 160,
+            cdSituacao: 4,
+            dataInicio: 10,
+            dataFim: 10,
+            pagina: 8,
+        };
+        Object.entries(allowedParameters).forEach(([name, maxLength]) => {
+            const value = req.query[name];
+            if (typeof value === 'string' && value.length <= maxLength)
+                query.set(name, value);
+        });
+        if (!query.get('publicKey')) {
+            res.status(400).json({ message: 'PublicKey não informada.' });
+            return;
+        }
+        const upstreamUrl = `https://apipcp.portaldecompraspublicas.com.br${path}?${query.toString()}`;
+        https
+            .get(upstreamUrl, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-PortalComprasPublicas-Connector/1.0' } }, (upstream) => {
+            const chunks = [];
+            upstream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+            upstream.on('end', () => {
+                res.status(upstream.statusCode || 502);
+                res.set('Content-Type', upstream.headers['content-type'] || 'application/json');
+                res.set('Cache-Control', 'public, max-age=60');
+                res.send(Buffer.concat(chunks));
+            });
+        })
+            .on('error', (error) => {
+            console.error('portalComprasPublicasProxy:', error.message);
+            res.status(502).json({ message: 'O Portal de Compras Públicas está temporariamente indisponível.' });
+        });
+    });
+});
 // Helper to parse data URLs (data:<mime>;base64,<data>)
 function parseDataUrl(dataUrl) {
     const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl);
