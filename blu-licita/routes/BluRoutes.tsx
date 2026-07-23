@@ -57,6 +57,7 @@ import { SubscriptionPage } from "../billing/pages/SubscriptionPage";
 import { CheckoutReturnPage } from "../billing/pages/CheckoutReturnPage";
 import { BluHqPage } from "../pages/BluHqPage";
 import { SupportPage } from "../pages/SupportPage";
+import { MigrationPage } from "../pages/MigrationPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
@@ -242,6 +243,7 @@ export const BluRoutes: React.FC = () => (
         />
         <Route path="novidades" element={<PlatformAdminOnly><News /></PlatformAdminOnly>} />
         <Route path="hq" element={<PlatformAdminOnly><BluHqPage /></PlatformAdminOnly>} />
+        <Route path="migracao" element={<PlatformAdminOnly><MigrationPage /></PlatformAdminOnly>} />
         <Route path="orcamentos" element={<BudgetsPage />} />
         <Route path="financeiro" element={<UnifiedFinancialRoute />} />
         <Route path="financeiro/visao-geral" element={<FinancialExecutiveOverviewPage />} />

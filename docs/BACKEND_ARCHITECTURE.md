@@ -2,7 +2,7 @@
 
 > Documento de handoff para iniciar o backend próprio da Blu.
 >
-> Versão: 1.2 — 18/07/2026
+> Versão: 1.3 — 23/07/2026
 >
 > Atualização 1.1: consolida os módulos financeiros implementados no frontend e
 > nas Cloud Functions: visão executiva, fluxo de caixa, cobranças, notas fiscais,
@@ -12,6 +12,11 @@
 > Atualização 1.2: adiciona o inventário das rotas financeiras já criadas,
 > fallback temporário de leitura pelo Firestore, checklist de implantação das
 > Functions e requisitos operacionais para relatórios e visão executiva.
+>
+> Atualização 1.3: adiciona a camada SaaS/Billing com InfinitePay, planos,
+> assinaturas, limites de uso, Blu HQ, suporte, equipe, produtos/serviços,
+> calendário, controle de acesso por tipo de usuário e inventário das rotas e
+> Functions HTTP/callable já existentes no projeto.
 
 ## 1. Visão do produto
 
@@ -377,6 +382,64 @@ Rotas financeiras já previstas no frontend:
 | Relatórios | `financialReportConfigs`, `financialReportExports` | `queryFinancialReport`, `commandFinancialReport` |
 | Configurações | `financialCategories`, `financialConfigurationItems`, `financialApprovalFlows`, `dreAccounts` | `mutateFinancialConfiguration` |
 
+Observação de navegação: a página de orçamentos saiu do submenu financeiro e
+passou a existir como módulo principal em `/admin/orcamentos`. A rota
+`/admin/financeiro/orcamentos` deve permanecer apenas como redirecionamento de
+compatibilidade.
+
+Rotas administrativas e SaaS já presentes ou previstas no frontend atual:
+
+| Rota | Objetivo |
+|---|---|
+| `/admin/dashboard` | visão executiva do ERP comercial |
+| `/admin/planos` | comparação de planos e início de upgrade |
+| `/admin/assinatura` | assinatura, status, ciclo, uso e cobranças |
+| `/admin/assinatura/checkout` | abertura do checkout do gateway |
+| `/admin/assinatura/retorno` | confirmação segura pós-checkout |
+| `/admin/assinatura/cobrancas` | histórico de cobranças da assinatura |
+| `/admin/assinatura/pagamentos` | histórico de pagamentos/recibos |
+| `/admin/assinatura/uso` | consumo dos limites contratados |
+| `/admin/hq` | painel interno Blu HQ para operação da plataforma |
+| `/admin/suporte` | chat, SAC e abertura/acompanhamento de chamados |
+| `/admin/equipe` | membros, convites e limites de usuários |
+| `/admin/produtos` | catálogo comercial de produtos e serviços |
+| `/admin/calendario` | agenda integrada aos módulos de negócio |
+| `/admin/configuracoes/niveis-acesso` | perfis, permissões e páginas permitidas |
+| `/admin/configuracoes/planos` | administração de planos quando permitido |
+| `/cadastro-membro` | aceite de convite e cadastro de membro |
+| `/onboarding` | primeiro acesso, empresa e teste gratuito |
+
+Cloud Functions e rewrites HTTP atualmente mapeados no Firebase Hosting:
+
+| Rota pública | Function |
+|---|---|
+| `/api/pncp/**` | `pncpProxy` |
+| `/api/compras-gov/**` | `comprasGovProxy` |
+| `/api/tce-ce/**` | `tceCeProxy` |
+| `/api/portal-compras-publicas/**` | `portalComprasPublicasProxy` |
+| `/api/billing/checkout` | `billingCheckout` |
+| `/api/billing/summary` | `billingSummary` |
+| `/api/billing/plans` | `billingPublicPlans` |
+| `/api/billing/payment-check` | `billingPaymentCheck` |
+| `/api/webhooks/infinitepay` | `infinitePayWebhook` |
+
+Functions callable/HTTP de domínio já exportadas ou previstas no Firebase atual:
+
+- integrações públicas: `pncpProxy`, `comprasGovProxy`, `tceCeProxy`, `portalComprasPublicasProxy`;
+- financeiro executivo e relatórios: `getFinancialOverview`, `queryFinancialReport`, `commandFinancialReport`;
+- fluxo de caixa: `createCashFlowTransaction`, `settleCashFlowTransaction`, `commandCashFlowTransaction`, `importCashFlowTransactions`;
+- cobranças: `mutateCollection`, `receiveCollection`, `addCollectionEvent`, `commandCollection`;
+- notas fiscais: `mutateFiscalDocument`, `commandFiscalDocument`;
+- gestão tributária: `mutateTaxRecord`, `commandTaxRecord`;
+- contas bancárias: `mutateBankAccount`, `transferBetweenBankAccounts`, `adjustBankAccountBalance`;
+- conciliação: `importBankStatement`, `commandReconciliation`;
+- centros de custo e projetos: `mutateCostCenter`, `allocateFinancialTransaction`, `mutateFinancialProject`;
+- orçamentos: `commandBudget`;
+- DRE: `commandDrePeriod`;
+- configurações financeiras: `mutateFinancialConfiguration`;
+- e-mail/fila: `sendBillingEmail`, `sendBillingEmailHttp`, `handleInboundEmail`, `processFirestoreMailQueue`;
+- billing: `billingCheckout`, `billingSummary`, `billingPublicPlans`, `billingPaymentCheck`, `infinitePayWebhook`, `processBillingWebhookEvent`, `dailyBillingMaintenance`.
+
 Todas essas funções devem validar o usuário autenticado, descobrir a empresa no servidor e nunca aceitar `companyId` do cliente como autoridade.
 
 Functions que precisam existir no Firebase atual até a migração para o backend próprio:
@@ -612,6 +675,262 @@ Embora o backend não controle layout, alguns comportamentos de UI geram requisi
 - estados de loading, vazio, erro e sucesso devem ser suportados por respostas previsíveis da API;
 - mensagens de erro devem ser de domínio, não stack traces ou códigos internos do provedor.
 
+### 8.17 SaaS, planos, limites e billing
+
+A Blu é a fonte oficial de cliente, plano, assinatura, vigência, limites,
+cobranças, status de acesso, inadimplência e reativação. O gateway de pagamento
+não deve ser tratado como fonte de verdade da assinatura.
+
+Coleções Firestore atuais ou necessárias na etapa Firebase:
+
+| Coleção | Responsabilidade |
+|---|---|
+| `billingProviders` | provedores disponíveis, ambiente, handle e capacidades |
+| `plans` | planos, preços, limites, trial e exibição pública |
+| `subscriptions` | assinatura da empresa, ciclo atual, trial, tolerância e status |
+| `billingOrders` | cobranças geradas para checkout, renovação, upgrade e reativação |
+| `payments` | pagamentos confirmados e recibos |
+| `billingWebhookEvents` | eventos brutos/normalizados recebidos dos gateways |
+| `billingAuditLogs` | auditoria das alterações críticas de billing |
+| `subscriptionUsage` | uso agregado da assinatura para aplicar limites |
+
+Status de assinatura:
+
+```text
+TRIALING
+PAYMENT_PENDING
+ACTIVE
+PAST_DUE
+GRACE_PERIOD
+SUSPENDED
+CANCELED
+EXPIRED
+```
+
+Tipos de cobrança:
+
+```text
+FIRST_SUBSCRIPTION
+RENEWAL
+UPGRADE
+DOWNGRADE
+REACTIVATION
+EXTRA_CAPACITY
+IMPLEMENTATION
+MANUAL_CHARGE
+```
+
+Planos iniciais:
+
+| Plano | Empresas | Contratos ativos | Usuários | Armazenamento | Contas bancárias | Observação |
+|---|---:|---:|---:|---:|---:|---|
+| Essencial | 1 | 10 | 1 | 1 GB | 1 | entrada no mercado público |
+| Profissional | 3 | 30 | 5 | 5 GB | 10 | crescimento operacional |
+| Performance | 5 | 90 | 10 | 10 GB | ilimitado | alto volume de contratos |
+| Enterprise | ilimitado/configurável | ilimitado/configurável | ilimitado/configurável | personalizado | ilimitado | contratação assistida |
+
+Limites adicionais previstos nos planos:
+
+- oportunidades favoritas;
+- documentos cadastrados;
+- eventos de histórico;
+- certificados digitais;
+- modelos de documentos personalizados;
+- créditos de IA;
+- pesquisas salvas;
+- automações ativas;
+- alertas customizados;
+- requisições de API;
+- webhooks.
+
+Todos os planos acessam as funcionalidades da plataforma. A diferença comercial
+é capacidade operacional, armazenamento, quantidade de usuários, empresas e
+volumes. O serviço central `PlanEntitlementService` deve validar:
+
+- `canAddCompany`;
+- `canAddUser`;
+- `canActivateContract`;
+- `canUploadDocument`;
+- `getRemainingStorage`;
+- `getUsageSummary`;
+- `validatePlanChange`;
+- `enforceEntitlements`.
+
+A validação de limite pode existir no frontend para experiência, mas deve ser
+obrigatória no backend/Cloud Functions para segurança.
+
+#### InfinitePay
+
+O provider atual preparado é `InfinitePayBillingProvider`, usado sempre por uma
+interface `BillingProvider`. Nenhum domínio deve chamar diretamente a API da
+InfinitePay.
+
+Capacidades oficialmente previstas nesta fase:
+
+- criar checkout por `POST https://api.checkout.infinitepay.io/links`;
+- consultar pagamento por `POST https://api.checkout.infinitepay.io/payment_check`;
+- receber webhook público em `/api/webhooks/infinitepay`;
+- confirmar Pix/cartão somente após webhook e/ou verificação server-side.
+
+Não implementar como se existissem APIs oficiais de assinatura recorrente,
+cliente salvo, cartão tokenizado, estorno, cancelamento ou reembolso enquanto
+isso não estiver documentado pelo provedor. A recorrência mensal é gerenciada
+pela Blu: gerar cobrança, criar checkout, notificar, aguardar confirmação e
+renovar a assinatura após pagamento confirmado.
+
+Regras obrigatórias:
+
+- preços vêm sempre de `plans`, nunca do frontend;
+- `order_nsu` é único, imutável e não contém dados pessoais;
+- webhook é idempotente por `provider + transaction_nsu` ou, na ausência, por combinação controlada de `provider + order_nsu + invoice_slug`;
+- pagamentos só ativam/renovam assinatura se valor, pedido, provider e empresa forem compatíveis;
+- o redirecionamento do navegador nunca confirma pagamento sozinho;
+- segredos ficam em variáveis de ambiente ou Secret Manager;
+- a Blu nunca recebe, processa ou armazena dados de cartão.
+
+Variáveis específicas:
+
+```env
+INFINITEPAY_HANDLE=
+INFINITEPAY_API_BASE_URL=https://api.checkout.infinitepay.io
+APP_PUBLIC_URL=
+INFINITEPAY_WEBHOOK_URL=
+INFINITEPAY_REDIRECT_URL=
+```
+
+#### Trial, inadimplência e bloqueio
+
+O teste gratuito padrão é de 7 dias. Ao criar conta, a assinatura inicia como
+`TRIALING` com limites do plano escolhido. Alertas devem ser enviados:
+
+- 3 dias antes do fim;
+- 1 dia antes do fim;
+- no dia do fim;
+- após a expiração.
+
+Após vencimento sem pagamento:
+
+1. dia 0: `PAST_DUE`;
+2. durante a tolerância: `GRACE_PERIOD`, com aviso persistente;
+3. após a tolerância configurável: `SUSPENDED`, preservando dados e permitindo acesso às telas de cobrança/reativação.
+
+O prazo operacional solicitado para bloqueio é até 7 dias de atraso, mas o valor
+final deve ser configurável no Blu HQ.
+
+#### Blu HQ
+
+Rotas internas planejadas:
+
+- `/admin/hq`;
+- `/hq/planos`;
+- `/hq/assinaturas`;
+- `/hq/cobrancas`;
+- `/hq/pagamentos`;
+- `/hq/integracoes/infinitepay`;
+- `/hq/webhooks`;
+- `/hq/auditoria`.
+
+Papéis de plataforma:
+
+```text
+SUPER_ADMIN
+BILLING_ADMIN
+COMPANY_OWNER
+COMPANY_ADMIN
+MEMBER
+```
+
+Somente `SUPER_ADMIN` e `BILLING_ADMIN` podem alterar planos, preços, provider,
+reativar assinatura manualmente, reprocessar webhook e visualizar payloads
+técnicos.
+
+### 8.18 Suporte, equipe, acesso, produtos/serviços e calendário
+
+Esses módulos não são apenas telas. Eles geram contratos de backend que precisam
+ser preservados na migração.
+
+#### Suporte e chamados
+
+Coleções atuais ou previstas:
+
+- `supportTickets`;
+- `supportMessages`;
+- `supportAttachments`;
+- `supportAuditLogs`.
+
+Requisitos:
+
+- chat de suporte/SAC por empresa e usuário;
+- abertura de chamado com categoria, prioridade, status e responsável;
+- timeline de mensagens, anexos e alterações;
+- notificações internas e por e-mail;
+- visão Blu HQ para atendimento da base de clientes.
+
+#### Equipe e convites
+
+Coleções atuais ou previstas:
+
+- `teamMembers`;
+- `teamInvitations`;
+- `mail_queue`;
+- `accessProfiles`;
+- `accessProfilePermissions`;
+- `pageAccessRules`.
+
+Requisitos:
+
+- criar convite por e-mail sem criar diretamente usuário final;
+- página `/cadastro-membro` para aceite do convite;
+- aplicar limite de usuários do plano antes de enviar convite;
+- permitir tipos/perfis configuráveis de usuário;
+- controlar acesso página a página e ação a ação;
+- validar permissão no backend, não apenas esconder item de menu.
+
+#### Produtos e serviços
+
+O catálogo é comercial, voltado à venda e composição de propostas/orçamentos,
+não um módulo de logística ou estoque.
+
+Coleções atuais ou previstas:
+
+- `products`;
+- `services`;
+- `productCategories`;
+- `serviceCategories`;
+- `productTaxProfiles`;
+- `serviceTaxProfiles`.
+
+Requisitos:
+
+- produto ou serviço pode ser usado como item de orçamento/proposta;
+- cadastro deve conter preço, custo, unidade, descrição comercial e status;
+- incluir metadados tributários configuráveis por produto/serviço;
+- impostos não devem aparecer obrigatoriamente na proposta em PDF;
+- item de orçamento deve preservar snapshot do nome, descrição, unidade, preço e regras tributárias aplicadas no momento da proposta.
+
+#### Calendário
+
+Coleções atuais ou previstas:
+
+- `calendarEvents`;
+- `calendarEventLinks`;
+- `calendarPreferences`.
+
+Eventos devem poder nascer de:
+
+- oportunidades e datas de abertura/disputa;
+- contratos e vencimentos;
+- ordens de serviço/fornecimento;
+- cobranças e contas a pagar;
+- notas fiscais;
+- tributos;
+- certidões/documentos;
+- cartões do CRM;
+- chamados de suporte.
+
+O backend deve expor calendário agregado por empresa, período e origem, sem
+obrigar o frontend a consultar todos os módulos separadamente.
+
 ## 9. Endpoints iniciais
 
 ### Sessão e contexto
@@ -753,6 +1072,104 @@ GET    /api/v1/financial/report-exports/:id/download
 ```
 
 Todos os endpoints financeiros de escrita devem validar período fechado, permissão granular, versão otimista e `Idempotency-Key` quando houver efeito monetário ou geração de arquivo.
+
+### Assinatura, planos e billing
+
+```text
+GET    /api/v1/plans
+GET    /api/v1/subscription
+GET    /api/v1/subscription/usage
+POST   /api/v1/billing/checkout
+POST   /api/v1/billing/payment-check
+GET    /api/v1/billing/orders
+GET    /api/v1/billing/orders/:id
+GET    /api/v1/billing/payments
+GET    /api/v1/billing/payments/:id
+POST   /api/v1/billing/orders/:id/retry-checkout
+POST   /api/v1/billing/change-plan
+POST   /api/v1/billing/cancel-subscription
+POST   /api/v1/webhooks/infinitepay
+```
+
+Endpoints públicos legados/atuais no Firebase Hosting podem usar `/api/billing/*`
+durante a transição, mas o backend próprio deve padronizar em `/api/v1`.
+
+### Blu HQ
+
+```text
+GET    /api/v1/hq/plans
+POST   /api/v1/hq/plans
+PATCH  /api/v1/hq/plans/:id
+GET    /api/v1/hq/subscriptions
+GET    /api/v1/hq/subscriptions/:id
+POST   /api/v1/hq/subscriptions/:id/suspend
+POST   /api/v1/hq/subscriptions/:id/reactivate
+POST   /api/v1/hq/subscriptions/:id/change-plan
+GET    /api/v1/hq/billing-orders
+GET    /api/v1/hq/payments
+GET    /api/v1/hq/webhooks
+POST   /api/v1/hq/webhooks/:id/reprocess
+GET    /api/v1/hq/audit-logs
+```
+
+### Suporte
+
+```text
+GET    /api/v1/support/tickets
+POST   /api/v1/support/tickets
+GET    /api/v1/support/tickets/:id
+PATCH  /api/v1/support/tickets/:id
+POST   /api/v1/support/tickets/:id/messages
+POST   /api/v1/support/tickets/:id/attachments
+POST   /api/v1/support/tickets/:id/close
+POST   /api/v1/support/tickets/:id/reopen
+```
+
+### Equipe e acesso
+
+```text
+GET    /api/v1/team/members
+POST   /api/v1/team/invitations
+GET    /api/v1/team/invitations/:token
+POST   /api/v1/team/invitations/:token/accept
+PATCH  /api/v1/team/members/:id
+POST   /api/v1/team/members/:id/deactivate
+GET    /api/v1/access/profiles
+POST   /api/v1/access/profiles
+PATCH  /api/v1/access/profiles/:id
+GET    /api/v1/access/page-rules
+PUT    /api/v1/access/page-rules
+```
+
+### Produtos e serviços
+
+```text
+GET    /api/v1/products
+POST   /api/v1/products
+GET    /api/v1/products/:id
+PATCH  /api/v1/products/:id
+POST   /api/v1/products/:id/inactivate
+GET    /api/v1/services
+POST   /api/v1/services
+GET    /api/v1/services/:id
+PATCH  /api/v1/services/:id
+POST   /api/v1/services/:id/inactivate
+GET    /api/v1/catalog/tax-profiles
+POST   /api/v1/catalog/tax-profiles
+PATCH  /api/v1/catalog/tax-profiles/:id
+```
+
+### Calendário
+
+```text
+GET    /api/v1/calendar/events
+POST   /api/v1/calendar/events
+GET    /api/v1/calendar/events/:id
+PATCH  /api/v1/calendar/events/:id
+POST   /api/v1/calendar/events/:id/cancel
+GET    /api/v1/calendar/agenda
+GET    /api/v1/calendar/sources
+```
 
 ## 10. Contas a receber
 
@@ -967,6 +1384,29 @@ Fontes atuais relevantes:
 | `tasks` | `tasks` ou atividades CRM |
 | `quotes` | solicitações de cotação |
 | `externalOpportunities` | `external_opportunities` |
+| `billingProviders` | `billing_providers` |
+| `plans` | `plans` |
+| `subscriptions` | `subscriptions` |
+| `billingOrders` | `billing_orders` |
+| `payments` | `payments` |
+| `billingWebhookEvents` | `billing_webhook_events` |
+| `billingAuditLogs` | `billing_audit_logs` |
+| `subscriptionUsage` | `subscription_usage` |
+| `teamMembers` | `company_users`, `team_members` |
+| `teamInvitations` | `team_invitations` |
+| `accessProfiles` | `roles`, `access_profiles` |
+| `accessProfilePermissions` | `role_permissions`, `access_profile_permissions` |
+| `pageAccessRules` | `page_access_rules` |
+| `supportTickets` | `support_tickets` |
+| `supportMessages` | `support_messages` |
+| `products` | `products` |
+| `services` | `services` |
+| `productCategories` | `product_categories` |
+| `serviceCategories` | `service_categories` |
+| `productTaxProfiles` | `product_tax_profiles` |
+| `serviceTaxProfiles` | `service_tax_profiles` |
+| `calendarEvents` | `calendar_events` |
+| `calendarEventLinks` | `calendar_event_links` |
 
 Estratégia:
 
@@ -1029,6 +1469,10 @@ STORAGE_BUCKET=
 STORAGE_ACCESS_KEY_ID=
 STORAGE_SECRET_ACCESS_KEY=
 PUBLIC_APP_URL=
+INFINITEPAY_HANDLE=
+INFINITEPAY_API_BASE_URL=
+INFINITEPAY_WEBHOOK_URL=
+INFINITEPAY_REDIRECT_URL=
 OTEL_EXPORTER_OTLP_ENDPOINT=
 SENTRY_DSN=
 ```
@@ -1065,6 +1509,18 @@ Nunca versionar valores reais.
 - paginação, autorização e auditoria de relatórios;
 - exportação financeira em job idempotente;
 - fallback temporário de leitura desativado por feature flag após implantação.
+- criação de checkout sem aceitar preço enviado pelo frontend;
+- webhook InfinitePay duplicado não processar pagamento duas vezes;
+- confirmação de pagamento por `payment_check` antes de ativar assinatura quando necessário;
+- transições de assinatura: trial, ativa, atraso, tolerância, suspensão, cancelamento e reativação;
+- limites de plano aplicados em empresas, usuários, contratos, documentos, armazenamento, certificados e contas bancárias;
+- upgrade aplicado somente após pagamento confirmado;
+- downgrade impedido quando o uso atual excede o limite do plano destino;
+- convite de membro respeitando limite do plano;
+- permissões por tipo de usuário e página validadas no backend;
+- ticket de suporte isolado por empresa;
+- item de orçamento preservando snapshot de produto/serviço e regra tributária;
+- calendário consolidado retornando eventos de múltiplas origens sem vazamento entre empresas.
 
 ## 23. Ordem de implementação
 
@@ -1094,15 +1550,27 @@ Nunca versionar valores reais.
 - auditoria financeira;
 - aprovações básicas.
 
-### Fase 3 — Integrações e jobs
+### Fase 3 — SaaS, assinatura e limites
+
+- planos e preços administráveis;
+- assinaturas, trial e uso;
+- InfinitePay via `BillingProvider`;
+- checkout, webhook, `payment_check` e idempotência;
+- tolerância, suspensão e reativação;
+- Blu HQ inicial para planos, assinaturas, cobranças, pagamentos, webhooks e auditoria;
+- `PlanEntitlementService` aplicado em membros, empresas, contratos, documentos, financeiro e orçamentos.
+
+### Fase 4 — Integrações e jobs
 
 - PNCP, Compras.gov.br e TCE-CE;
+- Portal de Compras Públicas;
 - notificações;
 - ZIP assíncrono;
 - processamento de documentos;
 - e-mail por fila.
+- jobs de trial, renovação, cobrança em atraso, tolerância e suspensão.
 
-### Fase 4 — Financeiro avançado
+### Fase 5 — Financeiro avançado
 
 - bancos e conciliação;
 - projetos e centros de custo;
@@ -1110,7 +1578,7 @@ Nunca versionar valores reais.
 - tributos e retenções;
 - DRE e relatórios.
 
-Subdivisão recomendada da Fase 4:
+Subdivisão recomendada da Fase 5:
 
 1. contas bancárias, transferências e saldos;
 2. projetos, centros de custo e rateios;
@@ -1121,7 +1589,15 @@ Subdivisão recomendada da Fase 4:
 7. visão executiva agregada;
 8. relatórios, exportações e compartilhamento autorizado.
 
-Ao final da Fase 4, desligar o fallback direto do Firestore para visão financeira e relatórios. O frontend deve consumir somente API própria ou Functions homologadas.
+Ao final da Fase 5, desligar o fallback direto do Firestore para visão financeira e relatórios. O frontend deve consumir somente API própria ou Functions homologadas.
+
+### Fase 6 — Operação comercial e atendimento
+
+- equipe, convites e níveis de acesso;
+- suporte, SAC e chamados;
+- catálogo de produtos e serviços com perfis tributários;
+- calendário consolidado;
+- relatórios de operação da plataforma no Blu HQ.
 
 ## 24. Definition of Done
 

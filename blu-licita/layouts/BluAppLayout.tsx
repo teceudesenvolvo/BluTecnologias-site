@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, CreditCard, FileText, Headphones, HelpCircle, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, CreditCard, Database, FileText, Headphones, HelpCircle, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
 import { auth, certificateService, onAuthStateChanged, type Certificate } from '../../services/firebase';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
@@ -35,6 +35,7 @@ const nav = [
 const platformAdminNav = [
   { label: 'Novidades', to: '/admin/novidades', icon: Megaphone },
   { label: 'Blu HQ', to: '/admin/hq', icon: ShieldCheck },
+  { label: 'Migração', to: '/admin/migracao', icon: Database },
 ];
 
 const quickFeatures = [
@@ -52,6 +53,7 @@ const quickFeatures = [
   { label: 'Abrir chamado', to: '/admin/suporte', description: 'Chat com suporte, SAC e acompanhamento de chamados', keywords: 'suporte chamado chat sac atendimento ajuda problema ticket' },
   { label: 'Níveis de acesso', to: '/admin/configuracoes/niveis-acesso', description: 'Configurar permissões por tipo de usuário', keywords: 'permissão permissao acesso perfil usuário usuario tipo equipe admin' },
   { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança infinitepay upgrade uso limite' },
+  { label: 'Migração de dados', to: '/admin/migracao', description: 'Migrar dados do Firebase para o backend Blu', keywords: 'migração migracao firebase backend banco dados render postgres' },
 ];
 
 const certificateReference = (item: Certificate) => {
