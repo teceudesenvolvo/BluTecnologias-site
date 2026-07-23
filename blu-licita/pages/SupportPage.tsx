@@ -36,16 +36,26 @@ export const SupportPage: React.FC = () => {
   const [reply, setReply] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
   const selectedTicket = tickets.find((item) => item.id === selectedId) || tickets[0];
   const ticketMessages = selectedTicket ? messages.filter((item) => item.ticketId === selectedTicket.id) : [];
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const data = await supportService.list();
-    setTickets(data.tickets);
-    setMessages(data.messages);
-    setSelectedId((current) => current || data.tickets[0]?.id || '');
-    setLoading(false);
+    try {
+      const data = await supportService.list();
+      setTickets(data.tickets);
+      setMessages(data.messages);
+      setSelectedId((current) => current || data.tickets[0]?.id || '');
+      setError('');
+    } catch (reason: any) {
+      console.error('Erro ao carregar suporte:', reason);
+      setTickets([]);
+      setMessages([]);
+      setError(reason?.code === 'permission-denied' ? 'Sem permissão para carregar chamados. Publique as regras atualizadas do Firestore.' : reason?.message || 'Não foi possível carregar os chamados.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
@@ -54,31 +64,46 @@ export const SupportPage: React.FC = () => {
     event.preventDefault();
     if (!form.subject.trim() || !form.description.trim()) return;
     setSaving(true);
-    const id = await supportService.createTicket({ ...form, requesterName: form.requesterName || user?.name || '', requesterEmail: form.requesterEmail || user?.email || '' });
-    setForm({ ...emptyTicket, requesterName: user?.name || '', requesterEmail: user?.email || '' });
-    setModalOpen(false);
-    await load();
-    setSelectedId(id);
-    setSaving(false);
+    try {
+      const id = await supportService.createTicket({ ...form, requesterName: form.requesterName || user?.name || '', requesterEmail: form.requesterEmail || user?.email || '' });
+      setForm({ ...emptyTicket, requesterName: user?.name || '', requesterEmail: user?.email || '' });
+      setModalOpen(false);
+      await load();
+      setSelectedId(id);
+    } catch (reason: any) {
+      alert(reason?.message || 'Não foi possível abrir o chamado.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const sendReply = async () => {
     if (!selectedTicket || !reply.trim()) return;
     setSaving(true);
-    await supportService.sendMessage(selectedTicket, reply.trim());
-    setReply('');
-    await load();
-    setSelectedId(selectedTicket.id);
-    setSaving(false);
+    try {
+      await supportService.sendMessage(selectedTicket, reply.trim());
+      setReply('');
+      await load();
+      setSelectedId(selectedTicket.id);
+    } catch (reason: any) {
+      alert(reason?.message || 'Não foi possível enviar a mensagem.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateStatus = async (status: SupportTicketStatus) => {
     if (!selectedTicket) return;
     setSaving(true);
-    await supportService.updateStatus(selectedTicket, status);
-    await load();
-    setSelectedId(selectedTicket.id);
-    setSaving(false);
+    try {
+      await supportService.updateStatus(selectedTicket, status);
+      await load();
+      setSelectedId(selectedTicket.id);
+    } catch (reason: any) {
+      alert(reason?.message || 'Não foi possível atualizar o chamado.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div className="grid min-h-[520px] place-items-center"><Loader2 className="animate-spin text-blue-600" /></div>;
@@ -100,6 +125,8 @@ export const SupportPage: React.FC = () => {
         <Metric icon={<CheckCircle2 />} label="Resolvidos" value={String(tickets.filter((item) => item.status === 'resolved').length)} />
         <Metric icon={<ShieldCheck />} label="SAC" value="Ativo" detail="Canais oficiais centralizados" />
       </section>
+
+      {error && <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700 dark:border-rose-300/20 dark:bg-rose-500/10 dark:text-rose-100">{error}</section>}
 
       <section className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
         <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/8">

@@ -43,6 +43,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       subscriptionId,
       accessStatus: 'TRIALING',
       onboardingGoals: input.goals || [],
+      createdBy: credential.user.uid,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };

@@ -6,6 +6,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isPlatformAdmin() {
+      return isSignedIn() && request.auth.token.email == 'admin@blutecnologias.com.br';
+    }
+
     function companyUser(companyId) {
       return isSignedIn() && (
         companyId == request.auth.uid ||
@@ -23,7 +27,8 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read, update: if companyUser(companyId);
+      allow read: if isPlatformAdmin() || companyUser(companyId);
+      allow update: if companyUser(companyId) || isPlatformAdmin();
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
 
       match /opportunityFavorites/{favoriteId} {
@@ -35,13 +40,74 @@ service cloud.firestore {
     }
 
     match /companyUsers/{membershipId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isPlatformAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.invitationId is string
         && exists(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId))
         && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
         && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.companyId == request.resource.data.companyId;
+    }
+
+    match /plans/{planId} {
+      allow read: if (resource.data.active == true && resource.data.public == true) || isSignedIn();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.customerCompanyId);
+      allow create: if isPlatformAdmin() || (
+        request.resource.data.customerCompanyId is string
+        && companyUser(request.resource.data.customerCompanyId)
+      );
+      allow update: if isPlatformAdmin() || (
+        companyUser(resource.data.customerCompanyId)
+        && request.resource.data.customerCompanyId == resource.data.customerCompanyId
+      );
+      allow delete: if false;
+    }
+
+    match /subscriptionUsage/{usageId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId) || companyUser(resource.data.customerCompanyId);
+      allow write: if false;
+    }
+
+    match /billingOrders/{orderId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /billingProviders/{providerId} {
+      allow read: if isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /billingWebhookEvents/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /billingAuditLogs/{logId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isPlatformAdmin() || (sameCompany() && request.resource.data.companyId == resource.data.companyId);
+      allow delete: if false;
+    }
+
+    match /supportMessages/{messageId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow create: if createsForOwnCompany() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /teamInvitations/{invitationId} {
@@ -67,17 +133,17 @@ service cloud.firestore {
     // Configurações financeiras: leitura segregada por empresa. Toda escrita
     // passa pela Cloud Function, que valida papel, tenant e registra auditoria.
     match /{financialCollection}/{documentId} {
-      allow read: if financialCollection in ['financialCategories', 'financialConfigurationItems', 'financialApprovalFlows', 'dreAccounts'] && sameCompany();
+      allow read: if financialCollection in ['financialCategories', 'financialConfigurationItems', 'financialApprovalFlows', 'dreAccounts'] && (isPlatformAdmin() || sameCompany());
       allow write: if false;
     }
 
     match /financialAuditLogs/{logId} {
-      allow read: if sameCompany();
+      allow read: if isPlatformAdmin() || sameCompany();
       allow write: if false;
     }
 
     match /bankAccounts/{accountId} {
-      allow read: if sameCompany();
+      allow read: if isPlatformAdmin() || sameCompany();
       allow write: if false;
     }
     match /bankAccountSecrets/{accountId} {
@@ -192,9 +258,9 @@ service cloud.firestore {
     }
 
     match /{collection}/{documentId} {
-      allow read, delete: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && sameCompany();
-      allow create: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if !(collection in ['integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+      allow read, delete: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && (isPlatformAdmin() || sameCompany());
+      allow create: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && (isPlatformAdmin() || sameCompany()) && request.resource.data.companyId == resource.data.companyId;
     }
 
     // Permitir aos usuários ler e escrever em sua própria coleção de e-mails
