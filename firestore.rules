@@ -8,6 +8,7 @@ service cloud.firestore {
 
     function companyUser(companyId) {
       return isSignedIn() && (
+        companyId == request.auth.uid ||
         companyId == 'company-' + request.auth.uid ||
         exists(/databases/$(database)/documents/companyUsers/$(companyId + '_' + request.auth.uid))
       );
@@ -85,6 +86,22 @@ service cloud.firestore {
     match /bankTransfers/{transferId} {
       allow read: if sameCompany();
       allow write: if false;
+    }
+    match /legalEntities/{entityId} {
+      function ownLegacyEntity() {
+        return isSignedIn() && (
+          resource.data.createdBy == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          resource.data.updatedBy == request.auth.uid
+        );
+      }
+
+      allow read, delete: if sameCompany() || ownLegacyEntity();
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if (
+        (sameCompany() && request.resource.data.companyId == resource.data.companyId) ||
+        (ownLegacyEntity() && createsForOwnCompany())
+      );
     }
     match /idempotencyKeys/{keyId} {
       allow read, write: if false;

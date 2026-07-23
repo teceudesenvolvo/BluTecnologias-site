@@ -1,6 +1,7 @@
 import React from 'react';
 import { Building2, CalendarClock, FileSignature, Loader2, Plus, Search, X } from 'lucide-react';
 import { auth, clientService, contactService, type ClientContract, type ContactLead } from '../../services/firebase';
+import { PlanLimitWarning, usePlanLimits } from '../../blu-licita/hooks/usePlanLimits';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -48,6 +49,7 @@ export const ContractsPage: React.FC = () => {
   const [contractStep, setContractStep] = React.useState<1 | 2 | 3>(1);
   const [search, setSearch] = React.useState('');
   const [form, setForm] = React.useState(emptyForm);
+  const plan = usePlanLimits();
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -83,7 +85,8 @@ export const ContractsPage: React.FC = () => {
     !search || `${item.title} ${item.clientName} ${item.clientCnpj || ''} ${item.processNumber || ''}`.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const active = contracts.filter((item) => !item.status || !['closed', 'cancelled', 'completed'].includes(String(item.status)));
+  const active = contracts.filter((item) => !item.status || !['closed', 'cancelled', 'completed', 'encerrado', 'cancelado', 'concluido', 'concluído'].includes(String(item.status).toLowerCase()));
+  const canCreateContract = plan.allowed('activeContracts', active.length);
   const endingThisMonth = active.filter((item) => item.endDate?.slice(0, 7) === today().slice(0, 7));
   const totalValue = active.reduce((sum, item) => sum + Number(item.value || 0), 0);
   const step1Valid = form.clientMode === 'existing' ? Boolean(form.clientId) : Boolean(form.cnpj && form.razaoSocial && form.email);
@@ -126,6 +129,10 @@ export const ContractsPage: React.FC = () => {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!canCreateContract) {
+      alert(plan.message('contratos ativos', 'activeContracts'));
+      return;
+    }
     setSaving(true);
     try {
       let targetClient = clients.find((client) => client.id === form.clientId);
@@ -196,10 +203,12 @@ export const ContractsPage: React.FC = () => {
           <h1 className="mt-2 text-3xl font-bold text-slate-950">Contratos</h1>
           <p className="mt-1 text-sm text-slate-500">Contratos salvos em Clientes, centralizados para acompanhamento comercial e financeiro.</p>
         </div>
-        <button onClick={() => { setContractStep(1); setFormOpen(true); }} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">
+        <button onClick={() => { if (!canCreateContract) { alert(plan.message('contratos ativos', 'activeContracts')); return; } setContractStep(1); setFormOpen(true); }} disabled={!canCreateContract} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
           <Plus size={17} /> Novo contrato
         </button>
       </header>
+      <p className="text-xs font-semibold text-slate-400">Uso do plano: {active.length}/{plan.label('activeContracts')} contrato(s) ativo(s)</p>
+      {!canCreateContract && <PlanLimitWarning>{plan.message('contratos ativos', 'activeContracts')} Contratos existentes continuam disponíveis para consulta.</PlanLimitWarning>}
 
       <section className="grid gap-3 md:grid-cols-4">
         <Metric label="Contratos ativos" value={String(active.length)} />

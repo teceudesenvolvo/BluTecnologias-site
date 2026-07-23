@@ -8,6 +8,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../../../services/firebase";
+import { companySettingsService } from "../../../services/firestoreSettingsService";
 import type { BudgetInput } from "../domain/budgetTypes";
 
 const list = async (name: string, companyId: string) => {
@@ -28,17 +29,28 @@ const normalizeItem = (item: any, position: number, budgetId: string, companyId:
   const totalCents = subtotalCents + taxCents + logisticsCents + additionalExpensesCents;
   const costCents = Math.round(Number(item.unitCostCents || 0) * quantity) + taxCents + logisticsCents + additionalExpensesCents;
 
-  return {
-    productService: item.productService || "",
-    description: item.description || "",
-    quantityMilliUnits: Number(item.quantityMilliUnits || 0),
-    unit: item.unit || "un",
-    unitCostCents: Number(item.unitCostCents || 0),
-    unitPriceCents: Number(item.unitPriceCents || 0),
-    taxPercent,
-    taxCents,
-    logisticsCents,
-    additionalExpensesCents,
+    return {
+      itemType: item.itemType || "product",
+      catalogItemId: item.catalogItemId || "",
+      productService: item.productService || "",
+      description: item.description || "",
+      quantityMilliUnits: Number(item.quantityMilliUnits || 0),
+      unit: item.unit || "un",
+      unitCostCents: Number(item.unitCostCents || 0),
+      unitPriceCents: Number(item.unitPriceCents || 0),
+      taxPercent,
+      taxCents,
+      taxRegime: item.taxRegime || "",
+      taxCode: item.taxCode || "",
+      serviceCode: item.serviceCode || "",
+      ncm: item.ncm || "",
+      cfop: item.cfop || "",
+      issPercent: Number(item.issPercent || 0),
+      icmsPercent: Number(item.icmsPercent || 0),
+      pisPercent: Number(item.pisPercent || 0),
+      cofinsPercent: Number(item.cofinsPercent || 0),
+      logisticsCents,
+      additionalExpensesCents,
     totalCents,
     marginCents: totalCents - costCents,
     position,
@@ -60,10 +72,13 @@ const totals = (items: any[]) => {
 
 export class FirebaseBudgetAdapter {
   async load(companyId: string) {
-    const [budgets, items, projects, costCenters, transactions, clients, members, companies] = await Promise.all(
-      ["budgets", "budgetItems", "projects", "costCenters", "financialTransactions", "clients", "teamMembers", "legalEntities"].map((name) => list(name, companyId)),
+    const [budgets, items, projects, costCenters, transactions, clients, members, products, serviceOrders, companies] = await Promise.all(
+      [
+        ...["budgets", "budgetItems", "projects", "costCenters", "financialTransactions", "clients", "teamMembers", "products", "serviceOrders"].map((name) => list(name, companyId)),
+        companySettingsService.getAll().catch(() => []),
+      ],
     );
-    return { budgets, items, projects, costCenters, transactions, clients, members, companies };
+    return { budgets, items, projects, costCenters, transactions, clients, members, products, serviceOrders, companies };
   }
 
   async command(value: any) {

@@ -4,6 +4,7 @@ import { documentDriveService, downloadDocumentsZip, type DriveDocument } from "
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { auth, certificateService, storageService, type Company } from "../../services/firebase";
 import { companySettingsService } from "../../services/firestoreSettingsService";
+import { PlanLimitWarning, usePlanLimits } from "../hooks/usePlanLimits";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const date = (value?: string) => (value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—");
@@ -75,6 +76,7 @@ export const DocumentDrivePage: React.FC = () => {
     from: "",
     to: "",
   });
+  const plan = usePlanLimits();
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -116,6 +118,10 @@ export const DocumentDrivePage: React.FC = () => {
   const allVisibleSelected = filtered.length > 0 && filtered.every((item) => selected.includes(item.id));
 
   const openNewDocumentForm = () => {
+    if (!plan.allowed("documents", documents.length)) {
+      alert(plan.message("documentos cadastrados", "documents"));
+      return;
+    }
     setEditingDocument(null);
     setFormOpen(true);
   };
@@ -126,6 +132,10 @@ export const DocumentDrivePage: React.FC = () => {
   };
 
   const saveDocument = async (form: DocumentFormValues, editingId?: string) => {
+    if (!editingId && !plan.allowed("documents", documents.length)) {
+      alert(plan.message("documentos cadastrados", "documents"));
+      return;
+    }
     if (!form.file && !form.fileUrl) {
       alert("Selecione um arquivo PDF para enviar.");
       return;
@@ -219,12 +229,18 @@ export const DocumentDrivePage: React.FC = () => {
               {zipping ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
               {zipping ? "Gerando ZIP..." : `Baixar ZIP (${selectedDocuments.length})`}
             </button>
-            <button onClick={openNewDocumentForm} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">
+            <button onClick={openNewDocumentForm} disabled={!plan.allowed("documents", documents.length)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
               {uploading ? <Loader2 className="animate-spin" size={17} /> : <Upload size={17} />}
               Novo documento
             </button>
           </div>
         </div>
+        <p className="mt-3 text-xs font-semibold text-slate-400">Uso do plano: {documents.length}/{plan.label("documents")} documento(s)</p>
+        {!plan.allowed("documents", documents.length) && (
+          <div className="mt-3">
+            <PlanLimitWarning>{plan.message("documentos cadastrados", "documents")} Você ainda pode editar e baixar os documentos existentes.</PlanLimitWarning>
+          </div>
+        )}
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <label className="relative xl:col-span-2">

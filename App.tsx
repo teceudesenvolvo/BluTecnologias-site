@@ -18,6 +18,8 @@ import { Contact } from './pages/Contact';
 import { ProductDetails } from './pages/softwares/ProductDetails';
 import { BlogPost } from './pages/BlogPost';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { PlansPage } from './blu-licita/billing/pages/PlansPage';
+import { OnboardingPage } from './blu-licita/pages/OnboardingPage';
 
 // Com Login
 import { BluRoutes } from './blu-licita/routes/BluRoutes';
@@ -26,11 +28,12 @@ import { BluRoutes } from './blu-licita/routes/BluRoutes';
 const AppContent: React.FC = () => {
   const location = useLocation();
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
-  const hideFooter = location.pathname === '/login' || isSystem;
-  const hideNavbar = location.pathname === '/login' || isSystem;
+  const isLanding = location.pathname === '/';
+  const hideFooter = location.pathname === '/login' || isSystem || isLanding;
+  const hideNavbar = location.pathname === '/login' || isSystem || isLanding;
 
   return (
-      <div className="font-sans text-slate-900 bg-slate-100 min-h-screen flex flex-col">
+      <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>
         {!hideNavbar && <Navbar />}
         <main className="flex-grow">
           <Routes>
@@ -39,6 +42,8 @@ const AppContent: React.FC = () => {
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/planos" element={<PlansPage />} />
+            <Route path="/cadastro" element={<OnboardingPage />} />
             <Route path="/contact" element={<Contact />} />
            {/* Produtos */}
             <Route path="/products" element={<Products />} />

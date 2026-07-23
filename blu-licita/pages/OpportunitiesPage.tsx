@@ -26,6 +26,7 @@ import { useBluAuth } from "../contexts/BluAuthContext";
 import { opportunityFavoritesService } from "../services/opportunityFavoritesService";
 import { interestSettingsService } from "../services/interestSettingsService";
 import { InterestSettingsPage } from "./InterestSettingsPage";
+import { usePlanLimits } from "../hooks/usePlanLimits";
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 const normalizeText = (value: string) =>
@@ -117,6 +118,7 @@ const processStatusMeta:Record<ProcessStatus,{label:string;color:string}>={publi
 export const OpportunitiesPage: React.FC = () => {
   const { user } = useBluAuth();
   const [interestKeywords, setInterestKeywords] = useState<string[]>([]);
+  const [interestStates, setInterestStates] = useState<string[]>([]);
   const [statusFilter,setStatusFilter]=useState<"all"|ProcessStatus>("all");
   const today = useMemo(() => new Date(), []);
   const [startDate, setStartDate] = useState(() => {
@@ -246,9 +248,14 @@ export const OpportunitiesPage: React.FC = () => {
   }, [modality, source, municipality]);
   useEffect(() => {
     if (user)
-      interestSettingsService.get(user.companyId).then(setInterestKeywords);
+      Promise.all([interestSettingsService.get(user.companyId), interestSettingsService.getStates(user.companyId)]).then(([keywords, states]) => {
+        setInterestKeywords(keywords);
+        setInterestStates(states);
+      });
   }, [user]);
   const visible = items.filter((item) => {
+    const raw = item.raw as Record<string, any>;
+    const itemUf = String(raw.uf || raw.UF || raw.unidadeOrgao?.ufSigla || raw.unidadeOrgao?.uf || raw.estado || "").toUpperCase();
     const searchable = normalizeText(
       `${item.object} ${item.organizationName} ${item.processNumber || ""}`,
     );
@@ -259,8 +266,12 @@ export const OpportunitiesPage: React.FC = () => {
       normalizedQuery.length > 0 ||
       interestKeywords.length === 0 ||
       interestSettingsService.matches(item.object, interestKeywords);
+    const matchesInterestState =
+      interestStates.length === 0 ||
+      !itemUf ||
+      interestStates.includes(itemUf);
     const matchesStatus=statusFilter==="all"||processStatus(item)===statusFilter;
-    return matchesSearch && matchesInterest && matchesStatus;
+    return matchesSearch && matchesInterest && matchesInterestState && matchesStatus;
   });
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
@@ -556,7 +567,7 @@ export const OpportunitiesPage: React.FC = () => {
         <div className="fixed inset-0 z-[130] overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
           <div className="mx-auto max-w-6xl">
             <div className="mb-3 flex justify-end">
-              <button onClick={() => { setInterestOpen(false); if (user) interestSettingsService.get(user.companyId).then(setInterestKeywords); }} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow">
+              <button onClick={() => { setInterestOpen(false); if (user) Promise.all([interestSettingsService.get(user.companyId), interestSettingsService.getStates(user.companyId)]).then(([keywords, states]) => { setInterestKeywords(keywords); setInterestStates(states); }); }} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow">
                 Fechar
               </button>
             </div>
@@ -576,7 +587,9 @@ const OpportunityRow = ({
   open: () => void;
 }) => {
   const { user } = useBluAuth();
+  const plan = usePlanLimits();
   const [favorite, setFavorite] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
   const raw = item.raw as {
     modalidadeNome?: string;
     unidadeOrgao?: { municipioNome?: string; ufSigla?: string };
@@ -594,9 +607,10 @@ const OpportunityRow = ({
     if (user)
       opportunityFavoritesService
         .list(user.companyId)
-        .then((saved) =>
-          setFavorite(saved.has(`${item.source}:${item.externalId}`)),
-        )
+        .then((saved) => {
+          setFavoritesCount(saved.size);
+          setFavorite(saved.has(`${item.source}:${item.externalId}`));
+        })
         .catch(() => {});
   }, [user, item.source, item.externalId]);
   const stop = (event: React.MouseEvent) => event.stopPropagation();
@@ -605,7 +619,14 @@ const OpportunityRow = ({
     if (!user) return;
     if (favorite)
       await opportunityFavoritesService.remove(user.companyId, item);
-    else await opportunityFavoritesService.save(user.companyId, user.id, item);
+    else {
+      if (!plan.allowed("favoriteOpportunities", favoritesCount)) {
+        alert(plan.message("oportunidades salvas para análise", "favoriteOpportunities"));
+        return;
+      }
+      await opportunityFavoritesService.save(user.companyId, user.id, item);
+    }
+    setFavoritesCount((current) => favorite ? Math.max(0, current - 1) : current + 1);
     setFavorite(!favorite);
   };
   const show = (tab: "overview" | "documents", event: React.MouseEvent) => {

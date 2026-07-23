@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, Loader2, Shield, Building2, Users, FileText, Briefcase, Upload, Trash2, Plus, Search, MapPin, Send, Edit2, X } from 'lucide-react';
-import { auth, Company, storageService } from '../../services/firebase';
+import { auth, Company, onAuthStateChanged, storageService } from '../../services/firebase';
 import { companySettingsService, userSettingsService } from '../../services/firestoreSettingsService';
-import { updateProfile, updatePassword } from 'firebase/auth';
+import { updateProfile, updatePassword, type User as FirebaseUser } from 'firebase/auth';
+import { PlanLimitWarning, usePlanLimits } from '../../blu-licita/hooks/usePlanLimits';
 
 export const Profile: React.FC = () => {
-  const user = auth.currentUser;
+  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [activeTab, setActiveTab] = useState<'company' | 'partners' | 'representatives' | 'activities' | 'financials' | 'access' | 'email'>('company');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -28,6 +29,7 @@ export const Profile: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]); // Array to hold multiple companies
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null); // Company being edited
+  const plan = usePlanLimits();
   const [currentCompanyFormData, setCurrentCompanyFormData] = useState<Partial<Company>>({ // Data for the modal form
     cnpj: '',
     razaoSocial: '',
@@ -55,9 +57,19 @@ export const Profile: React.FC = () => {
   
 
   useEffect(() => {
-    loadCompanyData();
-    if (user) loadSmtpSettings();
-  }, [user]);
+    const unsubscribe = onAuthStateChanged(auth, currentUser => {
+      setUser(currentUser);
+      if (currentUser) {
+        setDisplayName(currentUser.displayName || '');
+        loadCompanyData();
+        loadSmtpSettings();
+      } else {
+        setCompanies([]);
+        setLoading(false);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const loadSmtpSettings = async () => {
     try {
@@ -89,9 +101,11 @@ export const Profile: React.FC = () => {
 
       // Se for uma imagem nova em base64 (preview), faz o upload real para o Storage
       if (finalLogoUrl && finalLogoUrl.startsWith('data:')) {
-        const path = `logos/${Date.now()}_logo.jpg`;
+        if (!user?.uid) throw new Error('Usuário não autenticado.');
+        const path = `profiles/${user.uid}/logos/${Date.now()}_logo.jpg`;
         const url = await storageService.uploadBase64(finalLogoUrl, path, 'image/jpeg');
-        if (url) finalLogoUrl = url;
+        if (!url) throw new Error('Não foi possível enviar a logomarca. Verifique as regras do Firebase Storage.');
+        finalLogoUrl = url;
       }
 
       const companyToSave = {
@@ -119,9 +133,14 @@ export const Profile: React.FC = () => {
         bairro: '', municipio: '', uf: '', socios: [], representantes: [], atividades: [], demonstrativos: []
       });
       loadCompanyData(); // Reload all companies
-    } catch (error) {
-      console.error(error);
-      setMessage({ type: 'error', text: 'Erro ao salvar dados da empresa.' });
+    } catch (error: any) {
+      if (error?.code !== 'permission-denied') console.error(error);
+      setMessage({
+        type: 'error',
+        text: error?.code === 'permission-denied'
+          ? 'Sem permissão para salvar esta empresa. Publique as regras atualizadas do Firebase ou verifique o vínculo da empresa com o usuário.'
+          : 'Erro ao salvar dados da empresa.'
+      });
     } finally {
       setSaving(false);
     }
@@ -141,9 +160,14 @@ export const Profile: React.FC = () => {
         await companySettingsService.delete(companyId);
         setMessage({ type: 'success', text: 'Empresa excluída com sucesso!' });
         loadCompanyData();
-      } catch (error) {
-        console.error(error);
-        setMessage({ type: 'error', text: 'Erro ao excluir empresa.' });
+      } catch (error: any) {
+        if (error?.code !== 'permission-denied') console.error(error);
+        setMessage({
+          type: 'error',
+          text: error?.code === 'permission-denied'
+            ? 'Sem permissão para excluir esta empresa. Publique as regras atualizadas do Firebase ou verifique o vínculo da empresa com o usuário.'
+            : 'Erro ao excluir empresa.'
+        });
       } finally {
         setSaving(false);
       }
@@ -151,6 +175,10 @@ export const Profile: React.FC = () => {
   };
 
   const handleAddNewCompany = () => {
+    if (!plan.allowed('companies', companies.length)) {
+      setMessage({ type: 'error', text: plan.message('empresas/CNPJs', 'companies') });
+      return;
+    }
     setEditingCompany(null);
     setCurrentCompanyFormData({ // Reset form for new entry
       cnpj: '', razaoSocial: '', nomeFantasia: '', porte: '', naturezaJuridica: '',
@@ -302,6 +330,14 @@ export const Profile: React.FC = () => {
           updatedAt: new Date().toISOString()
         });
 
+        try {
+          const cached = JSON.parse(localStorage.getItem('blu-licita:user') || 'null');
+          if (cached) localStorage.setItem('blu-licita:user', JSON.stringify({ ...cached, name: displayName }));
+          window.dispatchEvent(new Event('blu:profile-updated'));
+        } catch {
+          window.dispatchEvent(new Event('blu:profile-updated'));
+        }
+
         setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
         setNewPassword('');
         setConfirmPassword('');
@@ -389,10 +425,14 @@ export const Profile: React.FC = () => {
           <div className="space-y-6 animate-fade-in-up">
             <div className="flex justify-between items-center">
             <h4 className="font-bold text-slate-700">Minhas Empresas</h4>
-            <button onClick={handleAddNewCompany} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5">
+            <button onClick={handleAddNewCompany} disabled={!plan.allowed('companies', companies.length)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
               <Plus size={18} /> Adicionar Empresa
             </button>
           </div>
+          <p className="text-xs font-semibold text-slate-400">Uso do plano: {companies.length}/{plan.label('companies')} empresa(s)</p>
+          {!plan.allowed('companies', companies.length) && (
+            <PlanLimitWarning>{plan.message('empresas/CNPJs', 'companies')} Você ainda pode editar empresas já cadastradas.</PlanLimitWarning>
+          )}
 
           {companies.length === 0 && !loading ? (
             <div className="text-center py-20 text-slate-400">Nenhuma empresa cadastrada.</div>

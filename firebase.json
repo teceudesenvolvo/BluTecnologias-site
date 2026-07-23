@@ -20,6 +20,26 @@
         "function": "tceCeProxy"
       },
       {
+        "source": "/api/billing/checkout",
+        "function": "billingCheckout"
+      },
+      {
+        "source": "/api/billing/summary",
+        "function": "billingSummary"
+      },
+      {
+        "source": "/api/billing/plans",
+        "function": "billingPublicPlans"
+      },
+      {
+        "source": "/api/billing/payment-check",
+        "function": "billingPaymentCheck"
+      },
+      {
+        "source": "/api/webhooks/infinitepay",
+        "function": "infinitePayWebhook"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

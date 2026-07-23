@@ -9,6 +9,15 @@ export { commandBudget } from './budgets';
 export { commandDrePeriod } from './dre';
 export { getFinancialOverview } from './financialOverview';
 export { queryFinancialReport, commandFinancialReport } from './financialReports';
+export {
+  billingCheckout,
+  billingSummary,
+  billingPublicPlans,
+  billingPaymentCheck,
+  infinitePayWebhook,
+  processBillingWebhookEvent,
+  dailyBillingMaintenance,
+} from './src/modules/billing/presentation/billingFunctions';
 
 const financialConfigurationCollections: Record<string, string> = {
   categories: 'financialCategories', approvals: 'financialApprovalFlows', dre: 'dreAccounts',

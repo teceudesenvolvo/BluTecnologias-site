@@ -308,6 +308,16 @@ export const SettingsPage = () => (
           "/admin/perfil",
         ],
         [
+          "Níveis de acesso",
+          "Tipos de usuário e páginas permitidas",
+          "/admin/configuracoes/niveis-acesso",
+        ],
+        [
+          "Planos e limites",
+          "Empresas, usuários, contratos, documentos, armazenamento e API",
+          "/admin/configuracoes/planos",
+        ],
+        [
           "Integrações e fontes",
           "PNCP, Compras.gov e portais parceiros",
           "/admin/integracoes",

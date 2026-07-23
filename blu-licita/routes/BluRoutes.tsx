@@ -24,11 +24,12 @@ import { IntegrationsPage } from "../pages/IntegrationsPage";
 import { OpportunitiesPage } from "../pages/OpportunitiesPage";
 import { InterestSettingsPage } from "../pages/InterestSettingsPage";
 import {
-  CalendarPage,
-  OrdersPage,
-  ReportsPage,
   SettingsPage,
 } from "../pages/CommercialModulesPage";
+import { CalendarPage } from "../pages/CalendarPage";
+import { OrdersPage } from "../pages/OrdersPage";
+import { ReportsPage } from "../pages/ReportsPage";
+import { ProductsPage } from "../pages/ProductsPage";
 import { SavedBiddingsPage } from "../pages/SavedBiddingsPage";
 import { FinancialCenterPage } from "../pages/FinancialCenterPage";
 import { FinancialPhaseOnePage, type FinancialCoreView } from "../financial/pages/FinancialPhaseOnePage";
@@ -49,6 +50,13 @@ import { DocumentDrivePage } from "../pages/DocumentDrivePage";
 import { CrmBoardPage } from "../pages/CrmBoardPage";
 import { TeamPage } from "../pages/TeamPage";
 import { MemberSignupPage } from "../pages/MemberSignupPage";
+import { AccessSettingsPage } from "../pages/AccessSettingsPage";
+import { PlansSettingsPage } from "../pages/PlansSettingsPage";
+import { PlansPage } from "../billing/pages/PlansPage";
+import { SubscriptionPage } from "../billing/pages/SubscriptionPage";
+import { CheckoutReturnPage } from "../billing/pages/CheckoutReturnPage";
+import { BluHqPage } from "../pages/BluHqPage";
+import { SupportPage } from "../pages/SupportPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
@@ -58,6 +66,12 @@ const ProtectedLayout: React.FC = () => {
   ) : (
     <Navigate to="/admin/login" replace state={{ from: location.pathname }} />
   );
+};
+
+const PlatformAdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useBluAuth();
+  const isBluPlatformAdmin = String(user?.email || "").toLowerCase() === "admin@blutecnologias.com.br";
+  return isBluPlatformAdmin ? <>{children}</> : <Navigate to="/admin/dashboard" replace />;
 };
 
 const UnifiedFinancialRoute: React.FC = () => {
@@ -91,6 +105,10 @@ const UnifiedFinancialRoute: React.FC = () => {
     ["settings", "Configurações"],
   ];
   const core:Array<[FinancialCoreView,string]>=[["overview","Visão Geral"],["receivables","Contas a Receber"],["payables","Contas a Pagar"],["movements","Movimentações"]];
+  const allFinancialSections: Array<[FinancialSection | FinancialCoreView, string, string]> = [
+    ...operational.map(([id, label]) => [id, label, "Sistema financeiro"] as [FinancialSection, string, string]),
+    ...core.map(([id, label]) => [id, label, "Operação diária"] as [FinancialCoreView, string, string]),
+  ];
   const planned = {
     cashFlow: [
       "Fluxo de Caixa",
@@ -131,12 +149,26 @@ const UnifiedFinancialRoute: React.FC = () => {
   } as const;
   return (
     <div className="mx-auto grid max-w-[1700px] gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-2 xl:sticky xl:top-24">
-        <p className="px-3 pb-2 pt-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Sistema financeiro</p>
-        {operational.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${section===id?'bg-slate-950 text-white':'text-slate-600 hover:bg-slate-50'}`}><span>{label}</span>{!['financialOverview','cashFlow','collections','taxes','invoices','banking','reconciliation','projects','costCenters','budgets','dre','reports','settings'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300':'text-slate-400'}`}>Em breve</span>}</button>)}
-        <div className="my-3 border-t border-slate-100"/>
-        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Operação diária</p>
-        {core.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${section===id?'bg-blue-50 text-blue-700':'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
+      <section className="rounded-2xl border border-white/65 bg-white/72 p-4 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:hidden dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
+        <label className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">
+          Seção financeira
+          <select
+            value={section}
+            onChange={(event) => setSection(event.target.value as FinancialSection)}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/8 dark:text-white"
+          >
+            {allFinancialSections.map(([id, label, group]) => (
+              <option key={id} value={id}>{group} · {label}</option>
+            ))}
+          </select>
+        </label>
+      </section>
+      <aside className="hidden h-fit rounded-2xl border border-white/65 bg-white/72 p-2 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:sticky xl:top-24 xl:block dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
+        <p className="px-3 pb-2 pt-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">Sistema financeiro</p>
+        {operational.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-slate-950 text-white dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}><span>{label}</span>{!['financialOverview','cashFlow','collections','taxes','invoices','banking','reconciliation','projects','costCenters','budgets','dre','reports','settings'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300 dark:text-blue-200':'text-slate-400 dark:text-slate-500'}`}>Em breve</span>}</button>)}
+        <div className="my-3 border-t border-slate-100 dark:border-white/10"/>
+        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">Operação diária</p>
+        {core.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-blue-50 text-blue-700 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}>{label}</button>)}
       </aside>
       <main className="min-w-0">
         {section === "financialOverview" ? <FinancialExecutiveOverviewPage /> : core.some(([id])=>id===section) ? <FinancialPhaseOnePage view={section as FinancialCoreView} embedded /> : section === "collections" ? <CollectionsPage /> : section === "invoices" ? <FiscalDocumentsPage /> : section === "taxes" ? <TaxManagementPage /> : section === "reconciliation" ? <BankReconciliationPage /> : section === "settings" ? <FinancialSettingsPage /> : section === "banking" ? <BankAccountsPage /> : section === "costCenters" ? <CostCentersPage /> : section === "projects" ? <FinancialProjectsPage /> : section === "dre" ? <DreManagementPage /> : section === "reports" ? <FinancialReportsPage /> : section === "cashFlow" ? <CashFlowPage /> : <FinancialSectionLanding title={planned[section as keyof typeof planned][0]} description={planned[section as keyof typeof planned][1]} />}
@@ -159,7 +191,7 @@ const FinancialSectionLanding: React.FC<{
         {description}
       </p>
     </header>
-    <section className="rounded-2xl border border-slate-200 bg-white p-8">
+    <section className="rounded-2xl border border-white/65 bg-white/72 p-8 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
       <div className="mx-auto max-w-xl py-12 text-center">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-2xl font-bold text-blue-600">
           b
@@ -183,11 +215,20 @@ export const BluRoutes: React.FC = () => (
       <Route path="cadastro-membro" element={<MemberSignupPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="planos" element={<PlansPage />} />
+        <Route path="assinatura" element={<SubscriptionPage />} />
+        <Route path="assinatura/checkout" element={<PlansPage />} />
+        <Route path="assinatura/retorno" element={<CheckoutReturnPage />} />
+        <Route path="assinatura/cobrancas" element={<SubscriptionPage />} />
+        <Route path="assinatura/pagamentos" element={<SubscriptionPage />} />
+        <Route path="assinatura/uso" element={<SubscriptionPage />} />
+        <Route path="suporte" element={<SupportPage />} />
         <Route path="oportunidades" element={<OpportunitiesPage />} />
         <Route path="crm" element={<CrmBoardPage />} />
         <Route path="equipe" element={<TeamPage />} />
         <Route path="licitacoes" element={<SavedBiddingsPage />} />
         <Route path="ordens" element={<OrdersPage />} />
+        <Route path="produtos" element={<ProductsPage />} />
         <Route
           path="cobrancas"
           element={<Navigate to="/admin/financeiro/cobrancas" replace />}
@@ -199,7 +240,8 @@ export const BluRoutes: React.FC = () => (
           path="certidoes"
           element={<Navigate to="/admin/documentos" replace />}
         />
-        <Route path="novidades" element={<News />} />
+        <Route path="novidades" element={<PlatformAdminOnly><News /></PlatformAdminOnly>} />
+        <Route path="hq" element={<PlatformAdminOnly><BluHqPage /></PlatformAdminOnly>} />
         <Route path="orcamentos" element={<BudgetsPage />} />
         <Route path="financeiro" element={<UnifiedFinancialRoute />} />
         <Route path="financeiro/visao-geral" element={<FinancialExecutiveOverviewPage />} />
@@ -243,6 +285,14 @@ export const BluRoutes: React.FC = () => (
         <Route
           path="configuracoes/areas-interesse"
           element={<InterestSettingsPage />}
+        />
+        <Route
+          path="configuracoes/niveis-acesso"
+          element={<AccessSettingsPage />}
+        />
+        <Route
+          path="configuracoes/planos"
+          element={<PlansSettingsPage />}
         />
         <Route path="pipeline" element={<ModulePlaceholderPage />} />
       </Route>

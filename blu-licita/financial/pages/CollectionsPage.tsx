@@ -449,6 +449,13 @@ const Receive = ({ item, accounts, saving, close, save }: { item: FinancialColle
   const [paymentDate, setPaymentDate] = React.useState(today());
   const [bank, setBank] = React.useState("");
   const [reason, setReason] = React.useState("");
+  const activeAccounts = accounts
+    .filter((account) => account.status !== "inactive" && account.status !== "blocked")
+    .map((account) => {
+      const name = account.name || account.institution || account.bankName || "Conta bancária";
+      const details = [account.agency && `Ag ${account.agency}`, account.accountNumber && `CC ${account.accountNumber}`].filter(Boolean).join(" · ");
+      return [account.id || name, details && !String(name).includes(details) ? `${name} · ${details}` : name];
+    });
   return (
     <Drawer title="Registrar recebimento" close={close}>
       <form onSubmit={(event) => { event.preventDefault(); save(amount, paymentDate, bank, reason); }} className="flex flex-1 flex-col">
@@ -456,7 +463,8 @@ const Receive = ({ item, accounts, saving, close, save }: { item: FinancialColle
           <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-700">Saldo pendente: <b>{money(item.balanceAmountCents)}</b>.</p>
           <Input label="Valor recebido (centavos)" type="number" value={amount} set={(value) => setAmount(Number(value))} />
           <Input label="Data do recebimento" type="date" value={paymentDate} set={setPaymentDate} />
-          <Select label="Conta bancária" value={bank} set={setBank} options={[["", "Selecione"], ...accounts.filter((item) => item.status === "active").map((item) => [item.id, item.name])]} />
+          <Select label="Conta bancária" value={bank} set={setBank} options={[["", activeAccounts.length ? "Selecione" : "Nenhuma conta cadastrada"], ...activeAccounts]} />
+          {!activeAccounts.length && <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-700">Cadastre uma conta bancária em Financeiro › Contas Bancárias ou Dados financeiros para registrar o recebimento.</p>}
           {amount > item.balanceAmountCents && <Input label="Autorização para exceder saldo" value={reason} set={setReason} />}
         </div>
         <footer className="flex justify-end gap-2 border-t p-5">

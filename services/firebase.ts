@@ -26,7 +26,11 @@ export const db = getFirestore(app);
 const currentOwner = () => {
   const user = auth.currentUser;
   if (!user) throw new Error('Usuário não autenticado.');
-  return { userId: user.uid, companyId: `company-${user.uid}` };
+  let companyId = `company-${user.uid}`;
+  try {
+    companyId = JSON.parse(localStorage.getItem('blu-licita:user') || 'null')?.companyId || companyId;
+  } catch {}
+  return { userId: user.uid, companyId };
 };
 
 const withoutUndefined = <T>(value: T): T => JSON.parse(JSON.stringify(value));
