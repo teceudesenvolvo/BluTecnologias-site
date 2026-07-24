@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/pncp/consulta/:path*",
+      "destination": "https://pncp.gov.br/api/consulta/:path*"
+    },
+    {
+      "source": "/api/pncp/domain/:path*",
+      "destination": "https://pncp.gov.br/api/pncp/:path*"
+    },
+    {
+      "source": "/api/tce-ce/:path*",
+      "destination": "https://api-dados-abertos.tce.ce.gov.br/sim/:path*"
+    },
+    {
+      "source": "/api/compras-gov/:path*",
+      "destination": "https://compras.dados.gov.br/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}
