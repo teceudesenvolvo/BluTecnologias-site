@@ -21,6 +21,7 @@ import { manualImportProvider } from "../integrations/manual-import/manualImport
 import { syncJobsMock } from "../integrations/mocks/syncJobs";
 import type { IntegrationProvider } from "../integrations/core/IntegrationProvider";
 
+
 const availability: Record<
   IntegrationProvider["availability"],
   { label: string; tone: string }

@@ -28,7 +28,7 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read: if isPlatformAdmin() || companyUser(companyId);
-      allow update: if companyUser(companyId) || isPlatformAdmin();
+      allow update: if companyUser(companyId);
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
 
       match /opportunityFavorites/{favoriteId} {
@@ -51,19 +51,12 @@ service cloud.firestore {
 
     match /plans/{planId} {
       allow read: if (resource.data.active == true && resource.data.public == true) || isSignedIn();
-      allow write: if isPlatformAdmin();
+      allow write: if false;
     }
 
     match /subscriptions/{subscriptionId} {
       allow read: if isPlatformAdmin() || companyUser(resource.data.customerCompanyId);
-      allow create: if isPlatformAdmin() || (
-        request.resource.data.customerCompanyId is string
-        && companyUser(request.resource.data.customerCompanyId)
-      );
-      allow update: if isPlatformAdmin() || (
-        companyUser(resource.data.customerCompanyId)
-        && request.resource.data.customerCompanyId == resource.data.customerCompanyId
-      );
+      allow create, update: if isPlatformAdmin();
       allow delete: if false;
     }
 
@@ -84,7 +77,7 @@ service cloud.firestore {
 
     match /billingProviders/{providerId} {
       allow read: if isPlatformAdmin();
-      allow write: if isPlatformAdmin();
+      allow write: if false;
     }
 
     match /billingWebhookEvents/{eventId} {
@@ -258,9 +251,10 @@ service cloud.firestore {
     }
 
     match /{collection}/{documentId} {
-      allow read, delete: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && (isPlatformAdmin() || sameCompany());
+      allow read: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && (isPlatformAdmin() || sameCompany());
+      allow delete: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && sameCompany();
       allow create: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && (isPlatformAdmin() || sameCompany()) && request.resource.data.companyId == resource.data.companyId;
+      allow update: if !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports']) && sameCompany() && request.resource.data.companyId == resource.data.companyId;
     }
 
     // Permitir aos usuários ler e escrever em sua própria coleção de e-mails
