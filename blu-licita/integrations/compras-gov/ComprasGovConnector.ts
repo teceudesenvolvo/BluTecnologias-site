@@ -33,7 +33,13 @@ type ComprasGovPage = {
   paginasRestantes?: number;
 };
 
-const BASE_URL = "/api/compras-gov";
+/**
+ * Rota relativa.
+ *
+ * No localhost, o Vite encaminha a requisição.
+ * Na produção, o vercel.json encaminha a requisição.
+ */
+const BASE = "/api/compras-gov";
 
 const ENDPOINT =
   "/modulo-contratacoes/1_consultarContratacoes_PNCP_14133";
@@ -46,7 +52,7 @@ const requestWithTimeout = async (
 ): Promise<Response> => {
   const controller = new AbortController();
 
-  const timeoutId = window.setTimeout(() => {
+  const timeout = window.setTimeout(() => {
     controller.abort();
   }, REQUEST_TIMEOUT_MS);
 
@@ -60,7 +66,7 @@ const requestWithTimeout = async (
       },
     });
   } finally {
-    window.clearTimeout(timeoutId);
+    window.clearTimeout(timeout);
   }
 };
 
@@ -78,10 +84,10 @@ const readErrorDetails = async (
 };
 
 const buildUrl = (params: URLSearchParams): string =>
-  `${BASE_URL}${ENDPOINT}?${params.toString()}`;
+  `${BASE}${ENDPOINT}?${params.toString()}`;
 
-const normalizePageSize = (value?: number): number =>
-  Math.max(10, Math.min(value || 40, 500));
+const normalizePageSize = (pageSize?: number): number =>
+  Math.max(10, Math.min(pageSize || 40, 500));
 
 export class ComprasGovConnector
   implements ProcurementConnector
@@ -100,7 +106,7 @@ export class ComprasGovConnector
 
       warnings: [
         "A API de Dados Abertos não exige credenciais.",
-        "As consultas são realizadas por uma rota intermediária para evitar bloqueios de CORS.",
+        "A consulta é encaminhada por um proxy para evitar bloqueios de CORS.",
       ],
     };
   }
@@ -138,8 +144,7 @@ export class ComprasGovConnector
 
       return {
         success: true,
-        message:
-          "API pública do Compras.gov.br disponível.",
+        message: "API pública do Compras.gov.br disponível.",
         checkedAt: new Date().toISOString(),
         latencyMs: Date.now() - started,
       };
@@ -151,8 +156,7 @@ export class ComprasGovConnector
 
       return {
         success: false,
-        message:
-          "API do Compras.gov.br não respondeu.",
+        message: "API do Compras.gov.br não respondeu.",
         checkedAt: new Date().toISOString(),
         latencyMs: Date.now() - started,
       };
@@ -236,7 +240,7 @@ export class ComprasGovConnector
       ) {
         throw new IntegrationError(
           "INVALID_RESPONSE",
-          "O Compras.gov.br retornou uma lista inválida.",
+          "O Compras.gov.br retornou uma resposta inválida.",
           "compras-gov",
           "listOpportunities",
           true,
@@ -296,7 +300,6 @@ export class ComprasGovConnector
   ): ExternalOpportunity {
     return {
       externalId: item.numeroControlePNCP,
-
       source: "compras-gov",
 
       organizationName:
@@ -317,9 +320,7 @@ export class ComprasGovConnector
         "Objeto não informado",
 
       estimatedValue:
-        typeof item.valorTotalEstimado === "number"
-          ? item.valorTotalEstimado
-          : undefined,
+        item.valorTotalEstimado,
 
       publicationDate:
         item.dataPublicacaoPncp,
@@ -362,67 +363,42 @@ export class ComprasGovConnector
 
     return {
       id: `compras-gov:${external.externalId}`,
-
       source: "compras-gov",
-
-      sourceId:
-        external.externalId,
+      sourceId: external.externalId,
 
       organization: {
-        cnpj:
-          external.organizationCnpj,
-
-        name:
-          external.organizationName,
+        cnpj: external.organizationCnpj,
+        name: external.organizationName,
 
         city:
-          typeof raw.unidadeOrgaoMunicipioNome ===
-          "string"
+          typeof raw.unidadeOrgaoMunicipioNome === "string"
             ? raw.unidadeOrgaoMunicipioNome
             : "",
 
         state:
-          typeof raw.unidadeOrgaoUfSigla ===
-          "string"
+          typeof raw.unidadeOrgaoUfSigla === "string"
             ? raw.unidadeOrgaoUfSigla
             : "",
       },
 
-      processNumber:
-        external.processNumber,
-
-      procurementNumber:
-        external.procurementNumber,
+      processNumber: external.processNumber,
+      procurementNumber: external.procurementNumber,
 
       modality:
         typeof raw.modalidadeNome === "string"
           ? raw.modalidadeNome
           : "",
 
-      object:
-        external.object,
-
-      estimatedValue:
-        external.estimatedValue,
-
+      object: external.object,
+      estimatedValue: external.estimatedValue,
       currency: "BRL",
-
-      publicationDate:
-        external.publicationDate,
-
-      openingDate:
-        external.openingDate,
-
+      publicationDate: external.publicationDate,
+      openingDate: external.openingDate,
       status: "UNKNOWN",
-
       items: [],
-
       documents: [],
-
       rawData: raw,
-
       importedAt: now,
-
       updatedAt: now,
     };
   }

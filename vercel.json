@@ -1,23 +1,32 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/api/pncp/consulta/:path*",
-      "destination": "https://pncp.gov.br/api/consulta/:path*"
+      "source": "/api/compras-gov/:path*",
+      "destination": "https://dadosabertos.compras.gov.br/:path*"
     },
     {
       "source": "/api/pncp/domain/:path*",
       "destination": "https://pncp.gov.br/api/pncp/:path*"
     },
     {
+      "source": "/api/pncp/file/:path*",
+      "destination": "https://pncp.gov.br/pncp-api/:path*"
+    },
+    {
+      "source": "/api/pncp/:path*",
+      "destination": "https://pncp.gov.br/api/:path*"
+    },
+    {
       "source": "/api/tce-ce/:path*",
       "destination": "https://api-dados-abertos.tce.ce.gov.br/sim/:path*"
     },
     {
-      "source": "/api/compras-gov/:path*",
-      "destination": "https://compras.dados.gov.br/:path*"
+      "source": "/api/portal-compras-publicas/:path*",
+      "destination": "https://apipcp.portaldecompraspublicas.com.br/:path*"
     },
     {
-      "source": "/:path*",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
