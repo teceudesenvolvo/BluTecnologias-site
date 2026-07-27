@@ -86,7 +86,10 @@ exports.billingPublicPlans = functions.https.onRequest((req, res) => {
         if (req.method !== 'GET')
             return json(res, 405, { message: 'Método não permitido.' });
         const snapshot = await db().collection('plans').where('active', '==', true).where('public', '==', true).get();
-        return json(res, 200, { plans: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)) });
+        const plans = snapshot.docs.length
+            ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
+            : billingTypes_1.DEFAULT_BILLING_PLANS;
+        return json(res, 200, { plans });
     });
 });
 exports.billingPaymentCheck = functions.https.onRequest((req, res) => {

@@ -1,6 +1,30 @@
 import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
 import { auth, db } from "../../../services/firebase";
 
+const TEST_PLAN: BillingPlanView = {
+  id: "test-1-real",
+  name: "Plano Teste Blu",
+  slug: "test-1-real",
+  description: "Plano de validação para testar a jornada de compra com cobrança simbólica de R$ 1,00.",
+  priceInCents: 100,
+  billingInterval: "month",
+  trialDays: 7,
+  limits: {
+    companies: 1,
+    activeContracts: 1,
+    storageBytes: 1024 * 1024 * 1024,
+    users: 1,
+    aiCredits: 0,
+    savedSearches: 0,
+    activeAutomations: 0,
+    customAlerts: 0,
+    apiRequests: 0,
+    certificates: 0,
+    bankAccounts: 1,
+  },
+  displayOrder: 0,
+};
+
 // provider-agnostic billing client (Asaas / future gateways)
 const apiBaseUrl = () => (import.meta.env.VITE_BLU_API_BASE_URL as string | undefined || "").replace(/\/$/, "");
 
@@ -37,11 +61,10 @@ const byDateDesc = (a: any, b: any) => String(b.createdAt || b.paidAt || "").loc
 
 const firestorePublicPlans = async (): Promise<{ plans: BillingPlanView[] }> => {
   const snapshot = await getDocs(query(collection(db, "plans"), where("active", "==", true), where("public", "==", true)));
-  return {
-    plans: snapshot.docs
-      .map((item) => ({ id: item.id, ...item.data() } as BillingPlanView))
-      .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)),
-  };
+  const plans = snapshot.docs
+    .map((item) => ({ id: item.id, ...item.data() } as BillingPlanView))
+    .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+  return { plans: plans.length ? plans : [TEST_PLAN] };
 };
 
 const firestoreSummary = async (): Promise<BillingSummary> => {

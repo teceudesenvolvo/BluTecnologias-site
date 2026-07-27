@@ -35,6 +35,200 @@ const currentOwner = () => {
 
 const withoutUndefined = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
+const normalizeDigits = (value: unknown) => String(value || '').replace(/\D/g, '');
+const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+export type DuplicateScope = 'global' | 'company';
+
+export type DuplicateMatch = {
+  field: string;
+  collection: string;
+  id: string;
+  value: string;
+  label: string;
+};
+
+export class DuplicateValidationError extends Error {
+  matches: DuplicateMatch[];
+
+  constructor(matches: DuplicateMatch[]) {
+    const labels = matches.map((match) => match.label).filter(Boolean).slice(0, 3);
+    const suffix = labels.length ? `: ${labels.join(', ')}${matches.length > 3 ? '...' : ''}` : '.';
+    super(`Registro já cadastrado${suffix}`);
+    this.name = 'DuplicateValidationError';
+    this.matches = matches;
+  }
+}
+
+type DuplicateRule = {
+  fields: string[];
+  label: string;
+  collections: string[];
+  scope: DuplicateScope;
+};
+
+const duplicateRules: Record<string, DuplicateRule> = {
+  companies: {
+    fields: ['cnpj', 'document', 'email', 'telefoneCelular', 'telefoneFixo', 'razaoSocial', 'nomeFantasia'],
+    label: 'empresa',
+    collections: ['companies', 'platformCustomers', 'clients', 'partners', 'partnerApplications'],
+    scope: 'global',
+  },
+  legalEntities: {
+    fields: ['cnpj', 'document', 'email', 'telefoneCelular', 'telefoneFixo', 'razaoSocial', 'nomeFantasia'],
+    label: 'empresa',
+    collections: ['companies', 'platformCustomers', 'clients', 'partners', 'partnerApplications'],
+    scope: 'company',
+  },
+  clients: {
+    fields: ['cnpj', 'document', 'email', 'phone', 'razaoSocial', 'name'],
+    label: 'cliente',
+    collections: ['clients', 'prospects', 'companies', 'platformCustomers', 'partners', 'partnerApplications'],
+    scope: 'company',
+  },
+  prospects: {
+    fields: ['cnpj', 'document', 'email', 'phone', 'razaoSocial', 'name'],
+    label: 'prospect',
+    collections: ['clients', 'prospects', 'companies', 'platformCustomers', 'partners', 'partnerApplications'],
+    scope: 'company',
+  },
+  teamMembers: {
+    fields: ['email', 'phone'],
+    label: 'membro da equipe',
+    collections: ['teamMembers', 'companyUsers'],
+    scope: 'company',
+  },
+  companyUsers: {
+    fields: ['email', 'phone'],
+    label: 'usuário',
+    collections: ['teamMembers', 'companyUsers'],
+    scope: 'company',
+  },
+  partners: {
+    fields: ['document', 'cnpj', 'cpf', 'email', 'phone', 'companyName', 'legalName', 'tradeName'],
+    label: 'parceiro',
+    collections: ['partners', 'partnerApplications'],
+    scope: 'global',
+  },
+  partnerApplications: {
+    fields: ['document', 'cnpj', 'cpf', 'email', 'phone', 'companyName', 'legalName', 'tradeName'],
+    label: 'cadastro de parceiro',
+    collections: ['partners', 'partnerApplications'],
+    scope: 'global',
+  },
+  platformCustomers: {
+    fields: ['document', 'cnpj', 'email', 'phone', 'companyName', 'legalName', 'tradeName'],
+    label: 'cliente da plataforma',
+    collections: ['platformCustomers', 'companies', 'partners', 'partnerApplications'],
+    scope: 'global',
+  },
+};
+
+const duplicateValueMatchers: Array<{ field: string; normalize: (value: unknown) => string }> = [
+  { field: 'cnpj', normalize: normalizeDigits },
+  { field: 'document', normalize: normalizeDigits },
+  { field: 'cpf', normalize: normalizeDigits },
+  { field: 'email', normalize: normalizeText },
+  { field: 'phone', normalize: normalizeDigits },
+  { field: 'telefoneFixo', normalize: normalizeDigits },
+  { field: 'telefoneCelular', normalize: normalizeDigits },
+  { field: 'razaoSocial', normalize: normalizeText },
+  { field: 'nomeFantasia', normalize: normalizeText },
+  { field: 'companyName', normalize: normalizeText },
+  { field: 'legalName', normalize: normalizeText },
+  { field: 'tradeName', normalize: normalizeText },
+  { field: 'name', normalize: normalizeText },
+];
+
+const duplicateLabels: Record<string, string> = {
+  cnpj: 'CNPJ',
+  document: 'Documento',
+  cpf: 'CPF',
+  email: 'E-mail',
+  phone: 'Telefone',
+  telefoneFixo: 'Telefone',
+  telefoneCelular: 'Telefone',
+  razaoSocial: 'Razão social',
+  nomeFantasia: 'Nome fantasia',
+  companyName: 'Empresa',
+  legalName: 'Razão social',
+  tradeName: 'Nome fantasia',
+  name: 'Nome',
+};
+
+const companyLikeCollections = new Set(['companies', 'platformCustomers', 'clients', 'prospects', 'partners', 'partnerApplications']);
+const personCollections = new Set(['teamMembers', 'companyUsers']);
+
+const duplicateQueryScope = async (collectionName: string, scope: DuplicateScope, companyId?: string) => {
+  if (scope === 'company' && companyId && !['partnerApplications', 'partners', 'platformCustomers'].includes(collectionName)) {
+    return getDocs(query(collection(db, collectionName), where('companyId', '==', companyId)));
+  }
+  return getDocs(collection(db, collectionName));
+};
+
+export const assertNoDuplicateRecord = async (collectionName: string, value: Record<string, unknown>, options: { excludeId?: string; companyId?: string; scope?: DuplicateScope } = {}) => {
+  const rule = duplicateRules[collectionName];
+  if (!rule) return [];
+
+  const scope = options.scope || rule.scope;
+  const hits: DuplicateMatch[] = [];
+  const candidateCollections = rule.collections;
+  const normalizedInput = duplicateValueMatchers.reduce((acc, matcher) => {
+    const raw = value[matcher.field];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return acc;
+    acc[matcher.field] = matcher.normalize(raw);
+    return acc;
+  }, {} as Record<string, string>);
+
+  if (!Object.keys(normalizedInput).length) return [];
+
+  for (const candidateCollection of candidateCollections) {
+    try {
+      const snapshot = await duplicateQueryScope(candidateCollection, scope, options.companyId);
+      for (const item of snapshot.docs) {
+        if (options.excludeId && item.id === options.excludeId) continue;
+        const data = item.data() as Record<string, unknown>;
+        if (scope === 'company' && options.companyId && !personCollections.has(candidateCollection) && !companyLikeCollections.has(candidateCollection)) {
+          const itemCompanyId = String(data.companyId || '');
+          if (itemCompanyId && itemCompanyId !== options.companyId) continue;
+        }
+        for (const [field, normalized] of Object.entries(normalizedInput)) {
+          const matcher = duplicateValueMatchers.find((entry) => entry.field === field);
+          if (!matcher) continue;
+          const possibleValues = duplicateValueMatchers
+            .filter((entry) => entry.field === field || (field === 'document' && ['cnpj', 'cpf'].includes(entry.field)) || (field === 'cnpj' && entry.field === 'document') || (field === 'cpf' && entry.field === 'document'))
+            .map((entry) => entry.normalize(data[entry.field]));
+          const found = possibleValues.find((candidate) => candidate && candidate === normalized);
+          if (found) {
+            hits.push({
+              field,
+              collection: candidateCollection,
+              id: item.id,
+              value: String(data[matcher.field] || data[field] || ''),
+              label: `${duplicateLabels[field] || field} já cadastrado em ${candidateCollection}`,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Duplicate validation skipped for ${candidateCollection}`, error);
+    }
+  }
+
+  const unique = new Map<string, DuplicateMatch>();
+  for (const hit of hits) {
+    const key = `${hit.collection}:${hit.field}:${hit.value}`;
+    if (!unique.has(key)) unique.set(key, hit);
+  }
+  return [...unique.values()];
+};
+
+export const ensureNoDuplicateRecord = async (collectionName: string, value: Record<string, unknown>, options: { excludeId?: string; companyId?: string; scope?: DuplicateScope } = {}) => {
+  const matches = await assertNoDuplicateRecord(collectionName, value, options);
+  if (matches.length) throw new DuplicateValidationError(matches);
+  return matches;
+};
+
 const companyCollection = async <T>(name: string): Promise<T[]> => {
   const { companyId } = currentOwner();
   const snapshot = await getDocs(query(collection(db, name), where('companyId', '==', companyId)));
@@ -43,6 +237,7 @@ const companyCollection = async <T>(name: string): Promise<T[]> => {
 
 const createCompanyDocument = async (name: string, value: Record<string, unknown>) => {
   const owner = currentOwner();
+  await ensureNoDuplicateRecord(name, value, { companyId: owner.companyId });
   await addDoc(collection(db, name), withoutUndefined({
     ...value,
     ...owner,
@@ -53,6 +248,7 @@ const createCompanyDocument = async (name: string, value: Record<string, unknown
 
 const updateCompanyDocument = async (name: string, id: string, value: Record<string, unknown>) => {
   const owner = currentOwner();
+  await ensureNoDuplicateRecord(name, value, { companyId: owner.companyId, excludeId: id });
   await updateDoc(doc(db, name, id), withoutUndefined({
     ...value,
     updatedBy: value.updatedBy || owner.userId,
@@ -406,6 +602,7 @@ export const prospectService = {
       await createCompanyDocument('prospects', prospect as Record<string, unknown>);
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao criar prospect:', error);
       return false;
     }
@@ -416,6 +613,7 @@ export const prospectService = {
       await updateCompanyDocument('prospects', id, prospect as Record<string, unknown>);
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao atualizar prospect:', error);
       return false;
     }
@@ -526,6 +724,7 @@ export const contactService = {
       await createCompanyDocument('clients', leadData);
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao salvar contato:', error);
       return false;
     }
@@ -635,6 +834,7 @@ export const clientService = {
       await createCompanyDocument('clients', clientData);
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao criar cliente:', error);
       return false;
     }
@@ -645,6 +845,7 @@ export const clientService = {
       await updateCompanyDocument('clients', id, { status });
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao atualizar status do cliente:', error);
       return false;
     }
@@ -655,6 +856,7 @@ export const clientService = {
       await updateCompanyDocument('clients', id, data as Record<string, unknown>);
       return true;
     } catch (error) {
+      if (error instanceof DuplicateValidationError) throw error;
       console.error('Erro ao atualizar dados do cliente:', error);
       return false;
     }

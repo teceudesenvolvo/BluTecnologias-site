@@ -5,6 +5,7 @@ import {
   BillingPlan,
   billingErrors,
   BillingProvider,
+  DEFAULT_BILLING_PLANS,
   NormalizedWebhookEvent,
   PaymentCheckResult,
   SubscriptionStatus,
@@ -42,7 +43,11 @@ export class BillingService {
 
   async getPlan(planId: string): Promise<BillingPlan> {
     const snapshot = await this.db.collection('plans').doc(planId).get();
-    if (!snapshot.exists) throw billingErrors.planNotFound();
+    const fallbackPlan = DEFAULT_BILLING_PLANS.find((plan) => plan.id === planId || plan.slug === planId) || null;
+    if (!snapshot.exists) {
+      if (fallbackPlan) return fallbackPlan;
+      throw billingErrors.planNotFound();
+    }
     const plan = { id: snapshot.id, ...snapshot.data() } as BillingPlan;
     if (!plan.active) throw billingErrors.planInactive();
     if (!Number.isSafeInteger(Number(plan.priceInCents)) || Number(plan.priceInCents) <= 0) throw billingErrors.planInactive();

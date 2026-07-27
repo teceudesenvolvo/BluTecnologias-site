@@ -58,6 +58,8 @@ import { CheckoutReturnPage } from "../billing/pages/CheckoutReturnPage";
 import { BluHqPage } from "../pages/BluHqPage";
 import { SupportPage } from "../pages/SupportPage";
 import { MigrationPage } from "../pages/MigrationPage";
+import { PartnerSignupPage } from "../pages/PartnerSignupPage";
+import { PartnerPortalPage } from "../pages/PartnerPortalPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
@@ -240,6 +242,7 @@ export const BluRoutes: React.FC = () => (
     <Routes>
       <Route path="login" element={<BluLoginPage />} />
       <Route path="onboarding" element={<OnboardingPage />} />
+      <Route path="parceiros/cadastro" element={<PartnerSignupPage />} />
       <Route path="cadastro-membro" element={<MemberSignupPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="dashboard" element={<DashboardPage />} />
@@ -251,6 +254,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="assinatura/pagamentos" element={<SubscriptionPage />} />
         <Route path="assinatura/uso" element={<SubscriptionPage />} />
         <Route path="suporte" element={<SupportPage />} />
+        <Route path="parceiros" element={<PartnerPortalPage />} />
         <Route path="oportunidades" element={<OpportunitiesPage />} />
         <Route path="crm" element={<CrmBoardPage />} />
         <Route path="equipe" element={<TeamPage />} />

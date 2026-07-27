@@ -99,6 +99,26 @@ export type HqPlatformCustomer = {
   updatedAt?: string;
 };
 
+export type HqPartner = {
+  id: string;
+  type?: string;
+  referralCode?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+  legalName?: string;
+  tradeName?: string;
+  bankName?: string;
+  agency?: string;
+  accountNumber?: string;
+  pixKey?: string;
+  pixType?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type HqCustomerRow = {
   id: string;
   company: string;
@@ -158,6 +178,7 @@ export type HqIncompleteCustomer = {
 export type HqOverview = {
   tenants: HqCustomerRow[];
   incompleteCustomers: HqIncompleteCustomer[];
+  partners: HqPartner[];
   members: Array<{ id: string; companyId: string; name: string; email: string; company: string; role: string; status: string }>;
   prospects: Array<{ id: string; name: string; source: string; stage: string; value: string }>;
   supportQueue: Array<{ id: string; company: string; subject: string; status: string }>;
@@ -172,6 +193,7 @@ export type HqOverview = {
     downgrades: number;
     leads: number;
     incompleteCustomers: number;
+    partners: number;
   };
 };
 
@@ -212,7 +234,7 @@ export const hqService = {
     if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
-    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers] = await Promise.all([
+    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners] = await Promise.all([
       asList<HqCompany>('companies'),
       asList<HqSubscription>('subscriptions'),
       asList<HqPlan>('plans'),
@@ -223,6 +245,7 @@ export const hqService = {
       asList<HqProspect>('clients').catch(() => []),
       asList<any>('companyUsers').catch(() => []),
       asList<HqPlatformCustomer>('platformCustomers').catch(() => []),
+      asList<HqPartner>('partners').catch(() => []),
     ]);
 
     const plansById = new Map(plans.map((plan) => [plan.id, plan]));
@@ -345,6 +368,27 @@ export const hqService = {
         value: item.solution || 'Plano a definir',
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+    const partnerList = partners
+      .map((item) => ({
+        id: item.id,
+        type: item.type || 'revendedor',
+        referralCode: item.referralCode || '',
+        name: item.name || item.tradeName || item.companyName || 'Parceiro sem nome',
+        email: item.email || '',
+        phone: item.phone || '',
+        companyName: item.companyName || item.tradeName || item.legalName || '',
+        legalName: item.legalName || '',
+        tradeName: item.tradeName || '',
+        bankName: item.bankName || '',
+        agency: item.agency || '',
+        accountNumber: item.accountNumber || '',
+        pixKey: item.pixKey || '',
+        pixType: item.pixType || '',
+        status: item.status || 'pending',
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const companyName = new Map(tenants.map((tenant) => [tenant.id, tenant.company]));
     const supportQueue = tickets
@@ -364,6 +408,7 @@ export const hqService = {
       tenants,
       members,
       prospects: realProspects,
+      partners: partnerList,
       supportQueue,
       metrics: {
         customers: tenants.length,
@@ -376,6 +421,7 @@ export const hqService = {
         downgrades,
         leads,
         incompleteCustomers: incompleteCustomers.length,
+        partners: partnerList.length,
       },
     };
   },

@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, db } from '../../services/firebase';
+import { auth, db, ensureNoDuplicateRecord } from '../../services/firebase';
 
 export type TeamMember = { id: string; name: string; email: string; phone?: string; role: string; department?: string; status: 'active' | 'invited' };
 const owner = () => { const user = auth.currentUser; if (!user) throw new Error('Usuário não autenticado.'); let companyId = `company-${user.uid}`; try { companyId = JSON.parse(localStorage.getItem('blu-licita:user') || 'null')?.companyId || companyId; } catch {} return { companyId, createdBy: user.uid }; };
@@ -22,6 +22,11 @@ export const teamService = {
     return [...unique.values()];
   },
   async invite(value: Omit<TeamMember, 'id' | 'status'>) {
+    await ensureNoDuplicateRecord('teamMembers', {
+      email: value.email,
+      phone: value.phone || '',
+      name: value.name,
+    }, { scope: 'company' });
     const now = new Date().toISOString();
     const invitation = await addDoc(collection(db, 'teamInvitations'), { ...value, ...owner(), status: 'pending', createdAt: now, expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
     await setDoc(doc(db, 'teamMembers', memberDocId(owner().companyId, value.email)), { ...value, ...owner(), invitationId: invitation.id, status: 'invited', createdAt: now, updatedAt: now }, { merge: true });

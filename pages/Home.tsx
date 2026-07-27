@@ -172,6 +172,29 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
+        <section className="relative z-10 mx-auto max-w-7xl px-5 py-24">
+          <div className={`${liquidPanel} grid gap-8 p-6 md:p-10 lg:grid-cols-[1fr_auto] lg:items-center`}>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[.22em] text-blue-600 dark:text-blue-200">Programa de parceria</p>
+              <h2 className="mt-4 text-4xl font-black tracking-[-0.05em] text-slate-950 md:text-6xl dark:text-white">
+                Ganhe indicando a Blu para novos clientes.
+              </h2>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Crie seu cadastro como parceiro, compartilhe um link exclusivo e acompanhe suas indicações
+                com um fluxo comercial organizado.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+              <Link to="/parceria" className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white/70 px-6 text-sm font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:bg-white/8 dark:text-slate-200">
+                Conhecer o programa
+              </Link>
+              <Link to="/admin/parceiros/cadastro" className="inline-flex h-12 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-black text-white shadow-2xl shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-500">
+                Virar parceiro
+              </Link>
+            </div>
+          </div>
+        </section>
+
         <section id="ia" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
           <div className={`${liquidPanel} grid gap-8 p-6 md:p-10 lg:grid-cols-[0.85fr_1.15fr]`}>
             <div className="relative z-10">
@@ -252,6 +275,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
       <div className="hidden items-center gap-7 text-sm font-bold text-slate-600 md:flex dark:text-slate-300">
         <button onClick={() => scrollToSection('problema')} className="hover:text-blue-600">Produto</button>
         <button onClick={() => scrollToSection('ia')} className="hover:text-blue-600">IA</button>
+        <Link to="/parceria" className="hover:text-blue-600">Parceria</Link>
         <Link to="/blog" className="hover:text-blue-600">Conteúdos</Link>
       </div>
       <div className="hidden items-center gap-2 md:flex">
@@ -270,6 +294,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
         <div className="grid gap-2 text-sm font-bold">
           <Link to="/admin/onboarding" className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-white">Experimentar gratuitamente</Link>
           <Link to="/admin/login" className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-blue-700 dark:border-blue-300/20 dark:bg-blue-500/10 dark:text-blue-200">Entrar no sistema</Link>
+          <Link to="/parceria" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Programa de parceria</Link>
           <Link to="/contact" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Agendar demonstração</Link>
         </div>
       </div>

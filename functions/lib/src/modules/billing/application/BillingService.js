@@ -29,8 +29,12 @@ class BillingService {
     }
     async getPlan(planId) {
         const snapshot = await this.db.collection('plans').doc(planId).get();
-        if (!snapshot.exists)
+        const fallbackPlan = billingTypes_1.DEFAULT_BILLING_PLANS.find((plan) => plan.id === planId || plan.slug === planId) || null;
+        if (!snapshot.exists) {
+            if (fallbackPlan)
+                return fallbackPlan;
             throw billingTypes_1.billingErrors.planNotFound();
+        }
         const plan = { id: snapshot.id, ...snapshot.data() };
         if (!plan.active)
             throw billingTypes_1.billingErrors.planInactive();

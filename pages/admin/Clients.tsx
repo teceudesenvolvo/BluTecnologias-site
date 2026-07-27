@@ -228,38 +228,42 @@ export const Clients: React.FC = () => {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    
-    const payload = { ...formData, status: 'active', userId: auth.currentUser?.uid };
-    let success = false;
-    if (editingClient) {
-      success = await clientService.update(editingClient.id, payload);
-    } else {
-      success = await clientService.create(payload);
-    }
+    try {
+      const payload = { ...formData, status: 'active', userId: auth.currentUser?.uid };
+      let success = false;
+      if (editingClient) {
+        success = await clientService.update(editingClient.id, payload);
+      } else {
+        success = await clientService.create(payload);
+      }
 
-    if (success) {
-      setIsModalOpen(false);
-      setFormData({
-        name: '',
-        razaoSocial: '',
-        cnpj: '',
-        inscricaoMunicipal: '',
-        role: '',
-        email: '',
-        phone: '',
-        city: '',
-        state: '',
-        address: '',
-        cep: '',
-        complement: '',
-        financialContact: '',
-        solution: '',
-        message: ''
-      });
-      setEditingClient(null);
-      loadContacts();
+      if (success) {
+        setIsModalOpen(false);
+        setFormData({
+          name: '',
+          razaoSocial: '',
+          cnpj: '',
+          inscricaoMunicipal: '',
+          role: '',
+          email: '',
+          phone: '',
+          city: '',
+          state: '',
+          address: '',
+          cep: '',
+          complement: '',
+          financialContact: '',
+          solution: '',
+          message: ''
+        });
+        setEditingClient(null);
+        loadContacts();
+      }
+    } catch (error: any) {
+      alert(error?.message || 'Já existe um cadastro com os mesmos dados.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const applyCnpjDataToClientForm = async () => {
@@ -317,32 +321,36 @@ export const Clients: React.FC = () => {
   const handleProspectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
-    const uploadedFiles = [];
-    for (const file of prospectFormData.files) {
-      if (file.base64.startsWith('data:')) {
-        const path = `prospects/${Date.now()}_${file.name}`;
-        const url = await storageService.uploadBase64(file.base64, path);
-        if (url) uploadedFiles.push({ name: file.name, base64: url });
-      } else {
-        uploadedFiles.push(file);
+    try {
+      const uploadedFiles = [];
+      for (const file of prospectFormData.files) {
+        if (file.base64.startsWith('data:')) {
+          const path = `prospects/${Date.now()}_${file.name}`;
+          const url = await storageService.uploadBase64(file.base64, path);
+          if (url) uploadedFiles.push({ name: file.name, base64: url });
+        } else {
+          uploadedFiles.push(file);
+        }
       }
-    }
 
-    const payload = { ...prospectFormData, files: uploadedFiles, userId: auth.currentUser?.uid };
-    let success = false;
-    if (editingProspect) {
-      success = await prospectService.update(editingProspect.id, payload);
-    } else {
-      success = await prospectService.create(payload);
-    }
+      const payload = { ...prospectFormData, files: uploadedFiles, userId: auth.currentUser?.uid };
+      let success = false;
+      if (editingProspect) {
+        success = await prospectService.update(editingProspect.id, payload);
+      } else {
+        success = await prospectService.create(payload);
+      }
 
-    if (success) {
-      setIsProspectModalOpen(false);
-      setEditingProspect(null);
-      loadProspects();
+      if (success) {
+        setIsProspectModalOpen(false);
+        setEditingProspect(null);
+        loadProspects();
+      }
+    } catch (error: any) {
+      alert(error?.message || 'Já existe uma prospecção com os mesmos dados.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleProspectFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

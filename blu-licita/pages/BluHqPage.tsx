@@ -22,6 +22,7 @@ export const BluHqPage: React.FC = () => {
   const [search, setSearch] = React.useState('');
   const [selectedTenantId, setSelectedTenantId] = React.useState('');
   const [prospectsOpen, setProspectsOpen] = React.useState(false);
+  const [partnersOpen, setPartnersOpen] = React.useState(false);
   const [bluTeamMembers, setBluTeamMembers] = React.useState<PlatformTeamMember[]>([]);
   const [bluTeamOpen, setBluTeamOpen] = React.useState(false);
   const [bluTeamSaving, setBluTeamSaving] = React.useState(false);
@@ -205,6 +206,7 @@ export const BluHqPage: React.FC = () => {
             <Metric icon={<Megaphone />} label="Leads do site" value={String(data?.metrics.leads || 0)} detail="Contatos vindos do Fale Conosco" />
             <Metric icon={<RefreshCw />} label="Testes grátis" value={String(data?.metrics.trialCompanies || 0)} detail="Empresas em período gratuito" />
             <Metric icon={<Users />} label="Cadastros incompletos" value={String(data?.metrics.incompleteCustomers || 0)} detail="Empresas ou vínculos que ainda pedem revisão" tone="amber" />
+            <Metric icon={<Users />} label="Parceiros" value={String(data?.metrics.partners || 0)} detail="Revendedores e parceiros cadastrados" />
             <Metric icon={<ArrowUpRight />} label="Movimentos de plano" value={`${String(data?.metrics.upgrades || 0)} / ${String(data?.metrics.downgrades || 0)}`} detail="Upgrades / downgrades registrados" />
           </section>
 
@@ -311,6 +313,28 @@ export const BluHqPage: React.FC = () => {
                     </article>
                   ))}
                   {!prospects.length && <EmptyState title="Nenhum prospect real" description="Leads do site (Fale Conosco), clientes em teste e prospects comerciais aparecerão nesta fila." compact />}
+                </div>
+              </section>
+              <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-black">Parceiros da Blu</h2>
+                  <button onClick={() => setPartnersOpen(true)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-100 dark:hover:bg-white/[0.08]">Abrir em popup</button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {(data?.partners || []).slice(0, 3).map((item) => (
+                    <article key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/6">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-black">{item.name}</h3>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{item.companyName || item.legalName || '—'}</p>
+                        </div>
+                        <ArrowUpRight size={16} className="text-blue-600" />
+                      </div>
+                      <p className="mt-4 text-sm font-semibold">{item.referralCode || 'Sem código'}</p>
+                      <p className="mt-1 text-xs text-blue-600">{item.type || 'revendedor'}</p>
+                    </article>
+                  ))}
+                  {!data?.partners?.length && <EmptyState title="Nenhum parceiro real" description="Os parceiros cadastrados pelo novo portal aparecerão aqui." compact />}
                 </div>
               </section>
               <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900 shadow-sm dark:border-blue-300/20 dark:bg-blue-500/10 dark:text-blue-100">
@@ -561,6 +585,30 @@ export const BluHqPage: React.FC = () => {
                 <p className="mt-1 text-xs text-blue-600">{item.value}</p>
               </article>
             )) : <EmptyState title="Nenhum prospect encontrado" description="Use a busca para encontrar leads e prospects reais." compact />}
+          </div>
+        </Modal>
+      )}
+
+      {partnersOpen && (
+        <Modal title="Parceiros da Blu" close={() => setPartnersOpen(false)}>
+          <div className="space-y-3">
+            {(data?.partners || []).length ? (data?.partners || []).map((item) => (
+              <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-black">{item.name}</h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{item.companyName || item.legalName || '—'}</p>
+                  </div>
+                  <ArrowUpRight size={16} className="text-blue-600" />
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 dark:text-slate-300 md:grid-cols-2">
+                  <p>Telefone: {item.phone || '—'}</p>
+                  <p>E-mail: {item.email || '—'}</p>
+                  <p>Banco: {item.bankName || '—'}</p>
+                  <p>Pix: {[item.pixType, item.pixKey].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
+              </article>
+            )) : <EmptyState title="Nenhum parceiro encontrado" description="Os parceiros cadastrados aparecerão aqui." compact />}
           </div>
         </Modal>
       )}

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Building2, Check, CheckCircle2, Loader2, PartyPopper, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
 import { subscriptionPlans, type PlanKey } from '../services/subscriptionPlanService';
@@ -16,6 +16,7 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', required = 
 );
 
 export const OnboardingPage: React.FC = () => {
+  const [params] = useSearchParams();
   const [step, setStep] = useState(1);
   const [plan, setPlan] = useState<PlanKey>('professional');
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
@@ -25,6 +26,7 @@ export const OnboardingPage: React.FC = () => {
   const [companyForm, setCompanyForm] = useState({ legalName: '', tradeName: '', document: '', segment: '', city: '', state: '' });
   const { createTrialAccount } = useBluAuth();
   const navigate = useNavigate();
+  const partnerCode = params.get('ref') || '';
   const selectablePlans = useMemo(() => subscriptionPlans.filter((item) => item.key !== 'enterprise'), []);
   const currentPlan = useMemo(() => selectablePlans.find((item) => item.key === plan) || selectablePlans[1], [plan, selectablePlans]);
   const progress = step * 25;
@@ -47,7 +49,7 @@ export const OnboardingPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals });
+      await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals, partnerCode });
       navigate('/admin/dashboard');
     } catch (reason: any) {
       setError(reason?.message || 'Não foi possível criar sua conta. Verifique os dados e tente novamente.');

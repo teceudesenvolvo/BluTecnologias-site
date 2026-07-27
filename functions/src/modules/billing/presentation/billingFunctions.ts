@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as cors from 'cors';
 import * as crypto from 'crypto';
-import { BillingOrderType, billingErrors, BillingDomainError } from '../domain/billingTypes';
+import { BillingOrderType, billingErrors, BillingDomainError, DEFAULT_BILLING_PLANS } from '../domain/billingTypes';
 import { InfinitePayBillingProvider } from '../infrastructure/InfinitePayBillingProvider';
 import { BillingService } from '../application/BillingService';
 
@@ -80,7 +80,10 @@ export const billingPublicPlans = functions.https.onRequest((req, res) => {
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'GET') return json(res, 405, { message: 'Método não permitido.' });
     const snapshot = await db().collection('plans').where('active', '==', true).where('public', '==', true).get();
-    return json(res, 200, { plans: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)) });
+    const plans = snapshot.docs.length
+      ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
+      : DEFAULT_BILLING_PLANS;
+    return json(res, 200, { plans });
   });
 });
 

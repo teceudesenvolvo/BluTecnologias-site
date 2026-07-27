@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import type { BluUser } from '../types';
 import { authService } from '../services/authService';
-import type { TrialSignupInput } from '../repositories/AuthRepository';
+import type { PartnerSignupInput, TrialSignupInput } from '../repositories/AuthRepository';
 
 interface AuthContextValue {
   user: BluUser | null;
   signIn(email: string, password: string): Promise<void>;
   signInDemo(): Promise<void>;
   createTrialAccount(input: TrialSignupInput): Promise<void>;
+  createPartnerAccount(input: PartnerSignupInput): Promise<void>;
   signOut(): Promise<void>;
 }
 
@@ -31,6 +32,7 @@ export const BluAuthProvider: React.FC<React.PropsWithChildren> = ({ children })
     signIn: async (email, password) => persist(await authService.signIn(email, password)),
     signInDemo: async () => persist(await authService.signInDemo()),
     createTrialAccount: async (input) => persist(await authService.createTrialAccount(input)),
+    createPartnerAccount: async (input) => persist(await authService.createPartnerAccount(input)),
     signOut: async () => { await authService.signOut(); persist(null); },
   }), [user]);
 

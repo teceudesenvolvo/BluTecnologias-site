@@ -20,6 +20,7 @@ import { BlogPost } from './pages/BlogPost';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { PlansPage } from './blu-licita/billing/pages/PlansPage';
 import { OnboardingPage } from './blu-licita/pages/OnboardingPage';
+import { PartnerProgramPage } from './pages/PartnerProgramPage';
 
 // Com Login
 import { BluRoutes } from './blu-licita/routes/BluRoutes';
@@ -43,6 +44,7 @@ const AppContent: React.FC = () => {
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />
             <Route path="/planos" element={<PlansPage />} />
+            <Route path="/parceria" element={<PartnerProgramPage />} />
             <Route path="/cadastro" element={<OnboardingPage />} />
             <Route path="/contact" element={<Contact />} />
            {/* Produtos */}

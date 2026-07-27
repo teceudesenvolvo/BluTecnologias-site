@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
-import { auth, db, type Company, type FinancialSettings } from './firebase';
+import { auth, db, ensureNoDuplicateRecord, type Company, type FinancialSettings } from './firebase';
 
 const owner = () => {
   const user = auth.currentUser;
@@ -33,6 +33,29 @@ const makeId = () => {
   }
 };
 
+const normalizeDigits = (value: unknown) => String(value || '').replace(/\D/g, '');
+const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const assertUniqueCompanies = async (companies: Company[], excludeId?: string) => {
+  const seen = new Map<string, string>();
+  for (const company of companies) {
+    const checks = [
+      { key: 'cnpj', value: normalizeDigits(company.cnpj) },
+      { key: 'email', value: normalizeText(company.email) },
+      { key: 'phone', value: normalizeDigits(company.telefoneCelular || company.telefoneFixo) },
+      { key: 'name', value: normalizeText(company.razaoSocial || company.nomeFantasia) },
+    ].filter((item) => item.value);
+    for (const item of checks) {
+      const uniqueKey = `${item.key}:${item.value}`;
+      const existing = seen.get(uniqueKey);
+      if (existing && existing !== company.id && existing !== excludeId) {
+        throw new Error(`Já existe uma empresa cadastrada com o mesmo ${item.key === 'phone' ? 'telefone' : item.key === 'email' ? 'e-mail' : item.key === 'cnpj' ? 'CNPJ' : 'nome'}.`);
+      }
+      seen.set(uniqueKey, company.id);
+    }
+  }
+};
+
 export const companySettingsService = {
   async getSettingsCompanies(): Promise<Company[]> {
     const { user, companyId, ownCompanyId } = owner();
@@ -53,6 +76,7 @@ export const companySettingsService = {
   },
   async saveSettingsCompanies(companies: Company[]) {
     const { user, companyId, ownCompanyId } = owner();
+    await assertUniqueCompanies(companies);
     const ids = candidateCompanyIds(user.uid, companyId)
       .concat(ownCompanyId)
       .filter((value, index, list) => list.indexOf(value) === index);
@@ -102,6 +126,14 @@ export const companySettingsService = {
       createdBy: user.uid,
       createdAt: new Date().toISOString(),
     } as Company);
+    await ensureNoDuplicateRecord('companies', {
+      cnpj: newCompany.cnpj,
+      email: newCompany.email,
+      phone: newCompany.telefoneCelular || newCompany.telefoneFixo,
+      companyName: newCompany.razaoSocial || newCompany.nomeFantasia,
+      legalName: newCompany.razaoSocial,
+      tradeName: newCompany.nomeFantasia,
+    }, { scope: 'company', companyId });
     await this.saveSettingsCompanies([...companies, newCompany]);
     return { id: newCompany.id };
   },
@@ -117,6 +149,14 @@ export const companySettingsService = {
       updatedBy: user.uid,
       updatedAt: new Date().toISOString(),
     } as Company);
+    await ensureNoDuplicateRecord('companies', {
+      cnpj: updated.cnpj,
+      email: updated.email,
+      phone: updated.telefoneCelular || updated.telefoneFixo,
+      companyName: updated.razaoSocial || updated.nomeFantasia,
+      legalName: updated.razaoSocial,
+      tradeName: updated.nomeFantasia,
+    }, { scope: 'company', companyId: updated.companyId || companyId, excludeId: id });
     await this.saveSettingsCompanies(current
       ? companies.map(company => company.id === id ? updated : company)
       : [...companies, updated]

@@ -9,6 +9,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { name: 'Início', path: '/' },
     { name: 'Novidades', path: '/blog' },
+    { name: 'Parceria', path: '/parceria' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -71,6 +72,9 @@ export const Navbar: React.FC = () => {
             ))}
             <Link to="/contact" className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-lg text-center">
               Agendar Demo
+            </Link>
+            <Link to="/parceria" className="w-full rounded-xl border border-blue-200 bg-blue-50 py-3 text-center font-semibold text-blue-700">
+              Programa de parceria
             </Link>
           </div>
         )}

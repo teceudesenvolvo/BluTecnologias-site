@@ -66,6 +66,7 @@ export const BluLoginPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-blue-600">
             <button type="button" className="hover:underline">Esqueceu a senha?</button>
             <Link to="/admin/onboarding" className="hover:underline">Criar conta</Link>
+            <Link to="/admin/parceiros/cadastro" className="hover:underline">Sou parceiro</Link>
           </div>
           <button type="button" onClick={demo} disabled={loading} className="text-sm font-medium text-slate-500 transition hover:text-blue-600 disabled:opacity-50">Explorar ambiente de demonstração</button>
         </div>
