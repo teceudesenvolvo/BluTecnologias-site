@@ -20,11 +20,21 @@ export type PlatformTeamMember = {
 };
 
 const platformCompanyId = 'blu-platform';
+const memberDocId = (email: string) => `${platformCompanyId}_${email.trim().toLowerCase().replace(/[^a-z0-9]+/gi, '_')}`;
 
 export const platformTeamService = {
   async list() {
     const snapshot = await getDocs(query(collection(db, 'bluTeamMembers'), where('companyId', '==', platformCompanyId)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlatformTeamMember));
+    const members = snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as PlatformTeamMember));
+    const unique = new Map<string, PlatformTeamMember>();
+    for (const member of members) {
+      const key = String(member.email || '').trim().toLowerCase() || member.id;
+      const existing = unique.get(key);
+      if (!existing || (existing.status !== 'active' && member.status === 'active')) {
+        unique.set(key, member);
+      }
+    }
+    return [...unique.values()];
   },
   async invite(value: Omit<PlatformTeamMember, 'id' | 'status'>) {
     const now = new Date().toISOString();
@@ -36,7 +46,7 @@ export const platformTeamService = {
       createdAt: now,
       expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
     });
-    await addDoc(collection(db, 'bluTeamMembers'), {
+    await setDoc(doc(db, 'bluTeamMembers', memberDocId(value.email)), {
       ...value,
       companyId: platformCompanyId,
       scope: 'platform',
@@ -44,7 +54,7 @@ export const platformTeamService = {
       status: 'invited',
       createdAt: now,
       updatedAt: now,
-    });
+    }, { merge: true });
     const link = `${window.location.origin}${window.location.pathname}#/admin/cadastro-membro?token=${invitation.id}&email=${encodeURIComponent(value.email)}&scope=platform`;
     await addDoc(collection(db, 'mail_queue'), {
       to: [value.email],
@@ -68,7 +78,7 @@ export const platformTeamService = {
     if (String(data.email).toLowerCase() !== email.toLowerCase()) throw new Error('Use o mesmo e-mail que recebeu o convite.');
     if (data.status !== 'pending' || new Date(data.expiresAt).getTime() < Date.now()) throw new Error('Este convite expirou ou já foi utilizado.');
     const now = new Date().toISOString();
-    await setDoc(doc(db, 'bluTeamMembers', `${platformCompanyId}_${credential.user.uid}`), {
+    await setDoc(doc(db, 'bluTeamMembers', memberDocId(email)), {
       name,
       email,
       phone: data.phone || '',

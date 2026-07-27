@@ -183,15 +183,22 @@ export interface ProspectFile {
 }
 export interface Prospect {
   id: string;
-  tipoOrgao: 'camara' | 'prefeitura' | 'secretaria';
+  tipoOrgao: 'camara' | 'prefeitura' | 'secretaria' | 'empresa';
   municipio: string;
   estado: string;
   sessaoOrdinaria: string;
   endereco: string;
   presidente: string;
+  razaoSocial?: string;
+  cnpj?: string;
+  email?: string;
+  phone?: string;
+  cep?: string;
+  contato?: string;
   files: ProspectFile[];
   userId?: string;
   visited?: boolean;
+  notes?: string;
 }
 
 export interface Task {

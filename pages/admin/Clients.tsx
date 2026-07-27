@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck } from 'lucide-react';
+import { Users, UserPlus, Mail, MapPin, Calendar, Loader2, CheckCircle, X, Phone, Plus, FileText, Trash2, Download, Edit2, Save, Upload, Settings, DollarSign, FileBarChart, TrendingUp, Paperclip, Send, FileCheck, Search, Building2 } from 'lucide-react';
 import { auth, contactService, clientService, prospectService, certificateService, storageService, financialService, ContactLead, Prospect, ProspectFile, Certificate, ClientInvoice, FinancialSettings, Company } from '../../services/firebase';
 import { companySettingsService, financialSettingsService } from '../../services/firestoreSettingsService';
 import { initialSoftwares } from '../../services/mockData';
+import { lookupCnpjData } from '../../services/cnpjLookup';
 import { ProspectsMap } from './ProspectsMap';
 
 export const Clients: React.FC = () => {
@@ -10,6 +11,12 @@ export const Clients: React.FC = () => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'prospecting' | 'prospecting-map'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'lead' | 'active'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'pncp' | 'manual'>('all');
+  const [prospectTypeFilter, setProspectTypeFilter] = useState<'all' | 'camara' | 'prefeitura' | 'secretaria' | 'empresa'>('all');
+  const [stateFilter, setStateFilter] = useState('');
+  const [selectedProspectIds, setSelectedProspectIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProspectModalOpen, setIsProspectModalOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -41,15 +48,22 @@ export const Clients: React.FC = () => {
   });
 
   const [prospectFormData, setProspectFormData] = useState<any>({
+    cnpj: '',
+    razaoSocial: '',
     municipio: '',
     estado: '',
     tipoOrgao: 'camara',
     sessaoOrdinaria: '',
     endereco: '',
     presidente: '',
+    contato: '',
+    email: '',
+    phone: '',
+    cep: '',
     files: [],
     visited: false,
-    visitDate: ''
+    visitDate: '',
+    notes: ''
   });
 
   const [billingForm, setBillingForm] = useState({
@@ -70,6 +84,71 @@ export const Clients: React.FC = () => {
 
   const resetSubItemForm = (tab: typeof manageTab = manageTab) => {
     setSubItemForm(tab === 'contracts' ? { startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10) } : {});
+  };
+
+  const prospectTypeLabel = (type: string) => {
+    switch (type) {
+      case 'camara':
+        return 'Câmara Municipal';
+      case 'prefeitura':
+        return 'Prefeitura';
+      case 'secretaria':
+        return 'Secretaria Municipal';
+      case 'empresa':
+        return 'Empresa';
+      default:
+        return 'Prospecto';
+    }
+  };
+
+  const prospectRoleLabel = (type: string) => {
+    switch (type) {
+      case 'camara':
+        return 'Presidente';
+      case 'prefeitura':
+        return 'Prefeito(a)';
+      case 'secretaria':
+        return 'Secretário(a)';
+      case 'empresa':
+        return 'Responsável Comercial';
+      default:
+        return 'Responsável';
+    }
+  };
+
+  const openWhatsApp = (phone?: string) => {
+    const digits = (phone || '').replace(/\D/g, '');
+    if (!digits) return;
+    const normalized = digits.length === 11 || digits.length === 10 ? `55${digits}` : digits;
+    window.open(`https://wa.me/${normalized}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const toggleProspectSelection = (id: string) => {
+    setSelectedProspectIds((current) =>
+      current.includes(id)
+        ? current.filter((prospectId) => prospectId !== id)
+        : [...current, id]
+    );
+  };
+
+  const clearProspectSelection = () => setSelectedProspectIds([]);
+
+  const deleteSelectedProspects = async () => {
+    if (!selectedProspectIds.length) return;
+    const count = selectedProspectIds.length;
+    const label = count === 1 ? 'esta prospecção' : `${count} prospecções`;
+    if (!confirm(`Deseja excluir ${label}? Esta ação não poderá ser desfeita.`)) return;
+
+    setSaving(true);
+    try {
+      const results = await Promise.all(selectedProspectIds.map((id) => prospectService.delete(id)));
+      if (results.some(Boolean)) {
+        await loadProspects();
+        clearProspectSelection();
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -125,21 +204,23 @@ export const Clients: React.FC = () => {
   const handleConvertProspect = (prospect: Prospect) => {
     setEditingClient(null);
     setFormData({
-      name: prospect.presidente || '',
-      razaoSocial: `${prospect.tipoOrgao === 'camara' ? 'Câmara Municipal' : prospect.tipoOrgao === 'prefeitura' ? 'Prefeitura' : 'Secretaria'} de ${prospect.municipio}`,
-      cnpj: '',
+      name: prospect.tipoOrgao === 'empresa' ? prospect.contato || prospect.presidente || '' : prospect.presidente || '',
+      razaoSocial: prospect.tipoOrgao === 'empresa'
+        ? prospect.razaoSocial || prospect.contato || 'Empresa'
+        : `${prospect.tipoOrgao === 'camara' ? 'Câmara Municipal' : prospect.tipoOrgao === 'prefeitura' ? 'Prefeitura' : 'Secretaria'} de ${prospect.municipio}`,
+      cnpj: prospect.cnpj || '',
       inscricaoMunicipal: '',
-      role: prospect.tipoOrgao === 'camara' ? 'Presidente' : prospect.tipoOrgao === 'prefeitura' ? 'Prefeito(a)' : 'Secretário(a)',
-      email: '',
-      phone: '',
-      city: prospect.municipio,
+      role: prospectRoleLabel(prospect.tipoOrgao),
+      email: prospect.email || '',
+      phone: prospect.phone || '',
+      city: prospect.tipoOrgao === 'empresa' ? prospect.municipio || '' : prospect.municipio,
       state: prospect.estado,
       address: prospect.endereco || '',
-      cep: '',
+      cep: prospect.cep || '',
       complement: '',
       financialContact: '',
       solution: '',
-      message: `Convertido de Prospecção técnica.`
+      message: `Convertido de Prospecção técnica. ${prospect.tipoOrgao === 'empresa' ? 'Prospecto do tipo empresa.' : ''}`.trim()
     });
     setIsModalOpen(true);
   };
@@ -181,30 +262,43 @@ export const Clients: React.FC = () => {
     setSaving(false);
   };
 
-  const fetchClientCnpjData = async () => {
-    const cleanCnpj = formData.cnpj.replace(/\D/g, '');
-    if (cleanCnpj.length !== 14) {
-      alert('Informe um CNPJ válido com 14 dígitos.');
-      return;
-    }
-    setCnpjLoading(true);
+  const applyCnpjDataToClientForm = async () => {
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
-      const data = await response.json();
-      if (!response.ok || data.message) throw new Error(data.message || 'CNPJ não encontrado.');
-      const phone = data.ddd_telefone_1 || data.telefone || '';
-      const address = [data.logradouro, data.numero, data.bairro].filter(Boolean).join(', ');
+      setCnpjLoading(true);
+      const data = await lookupCnpjData(formData.cnpj);
       setFormData((current) => ({
         ...current,
-        cnpj: cleanCnpj,
-        razaoSocial: data.razao_social || current.razaoSocial,
+        cnpj: data.cnpj,
+        razaoSocial: data.razaoSocial || current.razaoSocial,
         email: data.email || current.email,
-        phone: phone || current.phone,
-        city: data.municipio || current.city,
-        state: data.uf || current.state,
-        address: address || current.address,
+        phone: data.phone || current.phone,
+        city: data.city || current.city,
+        state: data.state || current.state,
+        address: data.address || current.address,
         cep: data.cep || current.cep,
-        complement: data.complemento || current.complement,
+        complement: data.complement || current.complement,
+      }));
+    } catch (error: any) {
+      alert(error?.message || 'Não foi possível buscar os dados do CNPJ.');
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
+  const applyCnpjDataToProspectForm = async () => {
+    try {
+      setCnpjLoading(true);
+      const data = await lookupCnpjData(prospectFormData.cnpj);
+      setProspectFormData((current: any) => ({
+        ...current,
+        cnpj: data.cnpj,
+        razaoSocial: data.razaoSocial || current.razaoSocial,
+        email: data.email || current.email,
+        phone: data.phone || current.phone,
+        municipio: data.city || current.municipio,
+        estado: data.state || current.estado,
+        endereco: data.address || current.endereco,
+        cep: data.cep || current.cep,
       }));
     } catch (error: any) {
       alert(error?.message || 'Não foi possível buscar os dados do CNPJ.');
@@ -277,28 +371,42 @@ export const Clients: React.FC = () => {
     if (prospect) {
       setEditingProspect(prospect);
       setProspectFormData({
+        cnpj: prospect.cnpj || '',
+        razaoSocial: prospect.razaoSocial || '',
         municipio: prospect.municipio,
         estado: prospect.estado,
         tipoOrgao: prospect.tipoOrgao || 'camara',
         sessaoOrdinaria: prospect.sessaoOrdinaria,
         endereco: prospect.endereco,
         presidente: prospect.presidente,
+        contato: prospect.contato || '',
+        email: prospect.email || '',
+        phone: prospect.phone || '',
+        cep: prospect.cep || '',
         files: prospect.files || [],
         visited: prospect.visited || false,
-        visitDate: (prospect as any).visitDate || ''
+        visitDate: (prospect as any).visitDate || '',
+        notes: prospect.notes || ''
       });
     } else {
       setEditingProspect(null);
       setProspectFormData({
+        cnpj: '',
+        razaoSocial: '',
         municipio: '',
         estado: '',
         tipoOrgao: 'camara',
         sessaoOrdinaria: '',
         endereco: '',
         presidente: '',
+        contato: '',
+        email: '',
+        phone: '',
+        cep: '',
         files: [],
         visited: false,
-        visitDate: ''
+        visitDate: '',
+        notes: ''
       });
     }
     setIsProspectModalOpen(true);
@@ -542,9 +650,54 @@ export const Clients: React.FC = () => {
     }
   };
 
-  const filteredContacts = filter === 'all' 
-    ? contacts 
-    : contacts.filter(c => c.status === filter);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredContacts = contacts.filter(contact => {
+    const matchesView = filter === 'active' ? contact.status === 'active' : true;
+    const matchesStatus = statusFilter === 'all' ? true : contact.status === statusFilter;
+    const matchesSource = sourceFilter === 'all' ? true : (contact.source || 'manual') === sourceFilter;
+    const matchesState = stateFilter ? contact.state?.toLowerCase() === stateFilter.trim().toLowerCase() : true;
+    const searchable = [
+      contact.name,
+      contact.razaoSocial,
+      contact.cnpj,
+      contact.email,
+      contact.phone,
+      contact.city,
+      contact.state,
+      contact.solution,
+      contact.role,
+      contact.message,
+      contact.financialContact,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return matchesView && matchesStatus && matchesSource && matchesState && (
+      !normalizedSearch || searchable.includes(normalizedSearch)
+    );
+  });
+
+  const filteredProspects = prospects.filter(prospect => {
+    const matchesType = prospectTypeFilter === 'all' ? true : prospect.tipoOrgao === prospectTypeFilter;
+    const searchable = [
+      prospect.razaoSocial,
+      prospect.cnpj,
+      prospect.municipio,
+      prospect.estado,
+      prospect.presidente,
+      prospect.contato,
+      prospect.email,
+      prospect.phone,
+      prospect.endereco,
+      prospect.notes,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return matchesType && (!normalizedSearch || searchable.includes(normalizedSearch));
+  });
 
   return (
     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 min-h-[600px] relative">
@@ -587,14 +740,58 @@ export const Clients: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
-          {loading && !filter.startsWith('prospecting') ? (
-             <div className="flex justify-center py-20 text-slate-400">
-               <Loader2 className="animate-spin" />
-             </div>
-          ) : (
-            filteredContacts.map((contact) => (
-              <div key={contact.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between gap-6">
+        <div className="mb-8 grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
+          <label className="relative md:col-span-2">
+            <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por empresa, email, CNPJ, cidade..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition-colors focus:border-blue-500"
+            />
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-blue-500"
+          >
+            <option value="all">Todos os status</option>
+            <option value="lead">Leads</option>
+            <option value="active">Clientes</option>
+          </select>
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-blue-500"
+          >
+            <option value="all">Todas as origens</option>
+            <option value="manual">Cadastro manual</option>
+            <option value="pncp">PNCP</option>
+          </select>
+          <input
+            type="text"
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value.toUpperCase())}
+            placeholder="Filtrar por UF"
+            maxLength={2}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase outline-none transition-colors focus:border-blue-500"
+          />
+        </div>
+
+        {filter !== 'prospecting' && filter !== 'prospecting-map' && (
+          <div className="grid grid-cols-1 gap-4">
+            {loading ? (
+              <div className="flex justify-center py-20 text-slate-400">
+                <Loader2 className="animate-spin" />
+              </div>
+            ) : filteredContacts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-20 text-center text-slate-400">
+                Nenhum cliente encontrado com os filtros aplicados.
+              </div>
+            ) : (
+              filteredContacts.map((contact) => (
+                <div key={contact.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between gap-6">
                  <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h4 className="font-bold text-slate-800 text-lg">{contact.razaoSocial}</h4>
@@ -607,7 +804,18 @@ export const Clients: React.FC = () => {
                     
                     <div className="flex flex-wrap gap-4 text-sm text-slate-500">
                       <div className="flex items-center gap-1"><Mail size={14}/> {contact.email}</div>
-                      <div className="flex items-center gap-1"><Phone size={14}/> {contact.phone}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1"><Phone size={14}/> {contact.phone}</span>
+                        {contact.phone && (
+                          <button
+                            type="button"
+                            onClick={() => openWhatsApp(contact.phone)}
+                            className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100"
+                          >
+                            WhatsApp
+                          </button>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1"><MapPin size={14}/> {contact.city}</div>
                       <div className="flex items-center gap-1"><Calendar size={14}/> {new Date(contact.date).toLocaleDateString('pt-BR')}</div>
                     </div>
@@ -639,39 +847,146 @@ export const Clients: React.FC = () => {
                         </button>
                      )}
                    </div>
-                 )}
+                  )}
               </div>
             ))
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {filter === 'prospecting' && (
           <div className="grid grid-cols-1 gap-4">
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Filtrar prospecções</span>
+              <select
+                value={prospectTypeFilter}
+                onChange={(e) => setProspectTypeFilter(e.target.value as typeof prospectTypeFilter)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none transition-colors focus:border-blue-500"
+              >
+                <option value="all">Todos os tipos</option>
+                <option value="camara">Câmara Municipal</option>
+                <option value="prefeitura">Prefeitura</option>
+                <option value="secretaria">Secretaria Municipal</option>
+                <option value="empresa">Empresa</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setProspectTypeFilter('all')}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+              >
+                Limpar filtro
+              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedProspectIds(filteredProspects.map((prospect) => prospect.id))}
+                  className="rounded-xl bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={clearProspectSelection}
+                  className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                >
+                  Limpar seleção
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelectedProspects}
+                  disabled={selectedProspectIds.length === 0 || saving}
+                  className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Excluir selecionadas ({selectedProspectIds.length})
+                </button>
+              </div>
+            </div>
             {loading ? (
               <div className="flex justify-center py-20 text-slate-400"><Loader2 className="animate-spin" /></div>
-            ) : prospects.length === 0 ? (
+            ) : filteredProspects.length === 0 ? (
               <div className="text-center py-20 text-slate-400">Nenhuma prospecção encontrada.</div>
             ) : (
-              prospects.map((prospect) => (
+              filteredProspects.map((prospect) => (
                 <div key={prospect.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <h4 className="font-bold text-slate-800 text-lg">{prospect.municipio} - {prospect.estado}</h4>
-                        <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">{prospect.tipoOrgao}</span>
-                        {prospect.visited && (
-                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-green-100 text-green-700 flex items-center gap-1">
-                            <CheckCircle size={12} /> Visitado
+                    <div className="flex items-start gap-4">
+                      <label className="mt-1 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedProspectIds.includes(prospect.id)}
+                          onChange={() => toggleProspectSelection(prospect.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                      <div>
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <h4 className="font-bold text-slate-800 text-lg">
+                            {prospect.tipoOrgao === 'empresa'
+                              ? prospect.razaoSocial || prospect.contato || 'Empresa sem nome'
+                              : `${prospect.municipio} - ${prospect.estado}`}
+                          </h4>
+                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">
+                            {prospectTypeLabel(prospect.tipoOrgao)}
                           </span>
-                        )}
-                        {prospect.tipoOrgao === 'camara' && prospect.sessaoOrdinaria && (
-                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">Sessão: {prospect.sessaoOrdinaria}</span>
+                          {prospect.visited && (
+                            <span className="text-xs px-2 py-1 rounded-full font-bold bg-green-100 text-green-700 flex items-center gap-1">
+                              <CheckCircle size={12} /> Visitado
+                            </span>
+                          )}
+                          {prospect.tipoOrgao === 'camara' && prospect.sessaoOrdinaria && (
+                            <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-700 capitalize">Sessão: {prospect.sessaoOrdinaria}</span>
+                          )}
+                        </div>
+                        {prospect.tipoOrgao === 'empresa' ? (
+                          <>
+                            <p className="text-slate-500 text-sm mb-2">Contato: {prospect.contato || prospect.presidente || 'Não informado'}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-slate-500 text-sm">
+                              <span>CNPJ: {prospect.cnpj || 'Não informado'}</span>
+                              {prospect.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => openWhatsApp(prospect.phone)}
+                                  className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100"
+                                >
+                                  WhatsApp
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-slate-500 text-sm mb-2 capitalize">{prospectRoleLabel(prospect.tipoOrgao)}: {prospect.presidente}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-slate-500 text-sm">
+                              <span>Sede: {prospect.endereco}</span>
+                              {prospect.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => openWhatsApp(prospect.phone)}
+                                  className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100"
+                                >
+                                  WhatsApp
+                                </button>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
-                      <p className="text-slate-500 text-sm mb-2 capitalize">{prospect.tipoOrgao === 'prefeitura' ? 'Prefeito(a)' : prospect.tipoOrgao === 'secretaria' ? 'Secretário(a)' : 'Presidente'}: {prospect.presidente}</p>
-                      <p className="text-slate-500 text-sm">Sede: {prospect.endereco}</p>
                     </div>
-                    <button onClick={() => openProspectModal(prospect)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 size={16} /></button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openProspectModal(prospect)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 size={16} /></button>
+                      <button
+                        onClick={async () => {
+                          if (confirm('Deseja excluir esta prospecção? Esta ação não poderá ser desfeita.')) {
+                            const success = await prospectService.delete(prospect.id);
+                            if (success) loadProspects();
+                          }
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-600"
+                        title="Excluir prospecção"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   {prospect.files && prospect.files.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-100">
@@ -727,7 +1042,7 @@ export const Clients: React.FC = () => {
                   <div className="flex gap-2">
                     <input type="text" required className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all" 
                       value={formData.cnpj} onChange={e => setFormData({...formData, cnpj: e.target.value})} />
-                    <button type="button" onClick={fetchClientCnpjData} disabled={cnpjLoading || formData.cnpj.replace(/\D/g, '').length !== 14} className="shrink-0 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 disabled:opacity-50">
+                    <button type="button" onClick={applyCnpjDataToClientForm} disabled={cnpjLoading || formData.cnpj.replace(/\D/g, '').length !== 14} className="shrink-0 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 disabled:opacity-50">
                       {cnpjLoading ? <Loader2 className="animate-spin" size={16} /> : 'Buscar'}
                     </button>
                   </div>
@@ -855,6 +1170,7 @@ export const Clients: React.FC = () => {
                     <option value="camara">Câmara Municipal</option>
                     <option value="prefeitura">Prefeitura</option>
                     <option value="secretaria">Secretaria Municipal</option>
+                    <option value="empresa">Empresa</option>
                   </select>
                 </div>
                 <div className="pt-6 flex items-center gap-4">
@@ -877,32 +1193,127 @@ export const Clients: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Município</label>
-                  <input type="text" required className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.municipio} onChange={e => setProspectFormData({...prospectFormData, municipio: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Estado</label>
-                  <input type="text" required maxLength={2} className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.estado} onChange={e => setProspectFormData({...prospectFormData, estado: e.target.value.toUpperCase()})} />
-                </div>
-              </div>
-              {prospectFormData.tipoOrgao === 'camara' && (
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Sessão Ordinária (Info)</label>
-                  <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.sessaoOrdinaria} onChange={e => setProspectFormData({...prospectFormData, sessaoOrdinaria: e.target.value})} />
-                </div>
+              {prospectFormData.tipoOrgao === 'empresa' ? (
+                <>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                    <div className="mb-4 flex items-center gap-2 text-blue-700">
+                      <Building2 size={18} />
+                      <span className="text-sm font-bold uppercase tracking-wide">Dados da empresa</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Razão Social</label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200"
+                          value={prospectFormData.razaoSocial}
+                          onChange={e => setProspectFormData({...prospectFormData, razaoSocial: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">CNPJ</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            required
+                            className="min-w-0 flex-1 px-4 py-2 rounded-xl border border-slate-200"
+                            value={prospectFormData.cnpj}
+                            onChange={e => setProspectFormData({...prospectFormData, cnpj: e.target.value})}
+                          />
+                          <button
+                            type="button"
+                            onClick={applyCnpjDataToProspectForm}
+                            disabled={cnpjLoading || prospectFormData.cnpj.replace(/\D/g, '').length !== 14}
+                            className="shrink-0 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 disabled:opacity-50"
+                          >
+                            {cnpjLoading ? <Loader2 className="animate-spin" size={16} /> : 'Buscar'}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Responsável</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200"
+                          value={prospectFormData.contato}
+                          onChange={e => setProspectFormData({...prospectFormData, contato: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Email</label>
+                        <input
+                          type="email"
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200"
+                          value={prospectFormData.email}
+                          onChange={e => setProspectFormData({...prospectFormData, email: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Telefone</label>
+                        <input
+                          type="tel"
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200"
+                          value={prospectFormData.phone}
+                          onChange={e => setProspectFormData({...prospectFormData, phone: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Município</label>
+                      <input type="text" required className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.municipio} onChange={e => setProspectFormData({...prospectFormData, municipio: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Estado</label>
+                      <input type="text" required maxLength={2} className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.estado} onChange={e => setProspectFormData({...prospectFormData, estado: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Endereço</label>
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.endereco} onChange={e => setProspectFormData({...prospectFormData, endereco: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">CEP</label>
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.cep} onChange={e => setProspectFormData({...prospectFormData, cep: e.target.value})} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Observações</label>
+                      <textarea className="w-full px-4 py-2 rounded-xl border border-slate-200 resize-none" rows={3} value={prospectFormData.notes} onChange={e => setProspectFormData({...prospectFormData, notes: e.target.value})} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Município</label>
+                      <input type="text" required className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.municipio} onChange={e => setProspectFormData({...prospectFormData, municipio: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Estado</label>
+                      <input type="text" required maxLength={2} className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.estado} onChange={e => setProspectFormData({...prospectFormData, estado: e.target.value.toUpperCase()})} />
+                    </div>
+                  </div>
+                  {prospectFormData.tipoOrgao === 'camara' && (
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Sessão Ordinária (Info)</label>
+                      <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.sessaoOrdinaria} onChange={e => setProspectFormData({...prospectFormData, sessaoOrdinaria: e.target.value})} />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Endereço (Sede)</label>
+                    <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.endereco} onChange={e => setProspectFormData({...prospectFormData, endereco: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                      {prospectRoleLabel(prospectFormData.tipoOrgao)} (Atual)
+                    </label>
+                    <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.presidente} onChange={e => setProspectFormData({...prospectFormData, presidente: e.target.value})} />
+                  </div>
+                </>
               )}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Endereço (Sede)</label>
-                <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.endereco} onChange={e => setProspectFormData({...prospectFormData, endereco: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  {prospectFormData.tipoOrgao === 'prefeitura' ? 'Prefeito(a)' : prospectFormData.tipoOrgao === 'secretaria' ? 'Secretário(a)' : 'Presidente'} (Atual)
-                </label>
-                <input type="text" className="w-full px-4 py-2 rounded-xl border border-slate-200" value={prospectFormData.presidente} onChange={e => setProspectFormData({...prospectFormData, presidente: e.target.value})} />
-              </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Arquivos</label>
                 <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer relative">
