@@ -26,12 +26,14 @@ const documentType = (item: DriveDocument) => {
 };
 
 const statusOf = (item: DriveDocument) => {
-  if (!item.expiryDate) return "valido";
+  if (!item.expiryDate) return "sem-vencimento";
   const diff = Math.ceil((new Date(`${item.expiryDate}T12:00:00`).getTime() - new Date(`${today()}T12:00:00`).getTime()) / 86400000);
   if (diff < 0) return "vencido";
   if (diff <= 7) return "vence-em-7-dias";
   return "valido";
 };
+const isValidDocument = (item: DriveDocument) => statusOf(item) !== "vencido";
+const isWarningDocument = (item: DriveDocument) => statusOf(item) === "vence-em-7-dias";
 
 const documentTypes = [
   "CND Federal",
@@ -108,7 +110,8 @@ export const DocumentDrivePage: React.FC = () => {
     return (
       (!filters.search || `${item.name} ${company} ${itemType}`.toLowerCase().includes(filters.search.toLowerCase())) &&
       (!filters.company || company === filters.company) &&
-      (filters.status === "all" || itemStatus === filters.status) &&
+      (filters.status === "all" ||
+        (filters.status === "valido" ? itemStatus === "valido" || itemStatus === "vence-em-7-dias" || itemStatus === "sem-vencimento" : itemStatus === filters.status)) &&
       (!filters.type || itemType === filters.type) &&
       (!filters.from || expiry >= filters.from) &&
       (!filters.to || expiry <= filters.to)
@@ -266,9 +269,9 @@ export const DocumentDrivePage: React.FC = () => {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Metric label="Total" value={documents.length} />
-        <Metric label="Válidos" value={documents.filter((item) => statusOf(item) === "valido").length} ok />
+        <Metric label="Válidos" value={documents.filter((item) => isValidDocument(item)).length} ok />
         <Metric label="Vencidos" value={documents.filter((item) => statusOf(item) === "vencido").length} danger />
-        <Metric label="Vencem em 7 dias" value={documents.filter((item) => statusOf(item) === "vence-em-7-dias").length} warning />
+        <Metric label="Próximos de vencer" value={documents.filter((item) => isWarningDocument(item)).length} warning />
         <Metric label="Selecionados" value={selected.length} />
       </section>
 
@@ -477,7 +480,7 @@ const Metric = ({ label, value, ok, danger, warning }: { label: string; value: n
 
 const Status = ({ status }: { status: string }) => {
   if (status === "valido") return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={13} />Válido</span>;
-  if (status === "vence-em-7-dias") return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><XCircle size={13} />Vence em 7 dias</span>;
+  if (status === "vence-em-7-dias") return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><CheckCircle2 size={13} />Válido · vence em 7 dias</span>;
   if (status === "vencido") return <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700"><XCircle size={13} />Vencido</span>;
   return <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">Sem vencimento</span>;
 };
