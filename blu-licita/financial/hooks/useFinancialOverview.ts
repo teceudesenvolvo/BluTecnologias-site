@@ -141,7 +141,7 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
   const availableCents = accounts.reduce((sum, item) => sum + Number(item.currentBalanceCents || 0) - Number(item.blockedBalanceCents || 0), 0);
   const receivables = data.accountsReceivable.filter((item) => matches(item) && !['received', 'cancelled'].includes(item.status));
   const payables = data.accountsPayable.filter((item) => matches(item) && !['paid', 'cancelled'].includes(item.status));
-  const collectionsData = data.collections.filter(matches);
+  const collectionsData = data.collections.filter((item) => matches(item) && !item.deletedAt);
   const taxes = data.taxRecords.filter(matches);
   const documents = data.fiscalDocuments.filter(matches);
   const projects = data.projects.filter(matches);

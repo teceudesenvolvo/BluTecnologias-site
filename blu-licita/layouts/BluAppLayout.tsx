@@ -156,19 +156,19 @@ export const BluAppLayout: React.FC = () => {
     catch { return null; }
   };
   const platformAdminEmail = String(user?.email || auth.currentUser?.email || readCachedUser()?.email || '').toLowerCase();
-  const isBluPlatformAdmin = platformAdminEmail === 'admin@blutecnologias.com.br';
-  const visibleNav = [...nav.filter((item) => canAccessPath(item.to) && (isBluPlatformAdmin || item.label !== 'Integrações')), ...(isBluPlatformAdmin ? platformAdminNav : [])];
+  const isBluPlatformStaff = platformAdminEmail === 'admin@blutecnologias.com.br' || String(user?.companyId || '').toLowerCase() === 'blu-platform' || /blu/i.test(String(user?.role || ''));
+  const visibleNav = [...nav.filter((item) => canAccessPath(item.to) && (platformAdminEmail === 'admin@blutecnologias.com.br' || item.label !== 'Integrações')), ...(isBluPlatformStaff ? platformAdminNav : [])];
   const title = [...nav, ...platformAdminNav].find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
   const subscriptionStatus = String(billing?.subscription?.status || '');
   const billingRestricted = subscriptionStatus === 'SUSPENDED' && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos');
   const searchableItems = React.useMemo(() => {
     const navItems = visibleNav.map((item) => ({ label: item.label, to: item.to, description: 'Abrir página do sistema', keywords: item.label }));
-    const featureItems = quickFeatures.filter((item) => canAccessPath(item.to) && (isBluPlatformAdmin || !item.to.startsWith('/admin/hq')) && visibleNav.some((navItem) => item.to.startsWith(navItem.to) || navItem.to.startsWith(item.to)));
+    const featureItems = quickFeatures.filter((item) => canAccessPath(item.to) && (isBluPlatformStaff || !item.to.startsWith('/admin/hq')) && visibleNav.some((navItem) => item.to.startsWith(navItem.to) || navItem.to.startsWith(item.to)));
     const unique = new Map<string, { label: string; to: string; description: string; keywords: string }>();
     [...navItems, ...featureItems].forEach((item) => unique.set(`${item.to}:${item.label}`, item));
     return [...unique.values()];
-  }, [visibleNav, currentRole.pages.join('|'), isBluPlatformAdmin]);
+  }, [visibleNav, currentRole.pages.join('|'), isBluPlatformStaff]);
   const searchResults = React.useMemo(() => {
     const term = searchQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
     if (!term) return searchableItems.slice(0, 8);
@@ -287,10 +287,10 @@ export const BluAppLayout: React.FC = () => {
             <button onClick={()=>setNotificationOpen((value)=>!value)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Notificações">
               <Bell size={19}/>{todayOpportunities.length+certificateAlerts.length>0&&<span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{todayOpportunities.length+certificateAlerts.length}</span>}
             </button>
-            {notificationOpen&&<div className="fixed inset-0 z-50">
-              <button aria-label="Fechar notificações" onClick={()=>setNotificationOpen(false)} className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px] dark:bg-black/55" />
-              <div className="absolute right-0 top-12 w-[min(420px,92vw)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.18)] ring-1 ring-white/60 dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_24px_100px_rgba(0,0,0,.55)] dark:ring-white/5">
-                <div className="border-b border-slate-100 bg-slate-50/70 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03]">
+            {notificationOpen&&<div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-[2px] dark:bg-black/65">
+              <button aria-label="Fechar notificações" onClick={()=>setNotificationOpen(false)} className="absolute inset-0" />
+              <div className="absolute right-0 top-12 w-[min(420px,92vw)] overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
+                <div className="border-b border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-white">Notificações</h3>

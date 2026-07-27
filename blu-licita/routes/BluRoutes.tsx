@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { BluAuthProvider, useBluAuth } from "../contexts/BluAuthContext";
 import { BluAppLayout } from "../layouts/BluAppLayout";
 import { DashboardPage } from "../pages/DashboardPage";
@@ -78,7 +78,10 @@ const PlatformAdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }
       return null;
     }
   }, []);
-  const isBluPlatformAdmin = String(user?.email || cachedUser?.email || "").toLowerCase() === "admin@blutecnologias.com.br";
+  const email = String(user?.email || cachedUser?.email || "").toLowerCase();
+  const companyId = String(user?.companyId || '');
+  const role = String(user?.role || '');
+  const isBluPlatformAdmin = email === "admin@blutecnologias.com.br" || companyId === 'blu-platform' || /blu/i.test(role);
   return isBluPlatformAdmin ? <>{children}</> : <Navigate to="/admin/dashboard" replace />;
 };
 
@@ -98,6 +101,9 @@ const UnifiedFinancialRoute: React.FC = () => {
     | "reports"
     | "settings";
   const [section, setSection] = React.useState<FinancialSection>("financialOverview");
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const operational: Array<[FinancialSection, string]> = [
     ["financialOverview", "Visão financeira"],
     ["cashFlow", "Fluxo de Caixa"],
@@ -155,6 +161,20 @@ const UnifiedFinancialRoute: React.FC = () => {
       "Configure categorias, contas, preferências, permissões e parâmetros financeiros.",
     ],
   } as const;
+
+  React.useEffect(() => {
+    const stateSection = (location.state as { section?: FinancialSection } | null)?.section;
+    const requested = (stateSection || searchParams.get("secao") || "financialOverview") as FinancialSection;
+    if (allFinancialSections.some(([id]) => id === requested) && requested !== section) {
+      setSection(requested);
+    }
+  }, [location.key, location.state, searchParams, allFinancialSections, section]);
+
+  const changeSection = React.useCallback((nextSection: FinancialSection) => {
+    setSection(nextSection);
+    navigate(`/admin/financeiro?secao=${encodeURIComponent(nextSection)}`, { replace: true });
+  }, [navigate]);
+
   return (
     <div className="mx-auto grid max-w-[1700px] gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
       <section className="rounded-2xl border border-white/65 bg-white/72 p-4 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:hidden dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
@@ -162,7 +182,7 @@ const UnifiedFinancialRoute: React.FC = () => {
           Seção financeira
           <select
             value={section}
-            onChange={(event) => setSection(event.target.value as FinancialSection)}
+            onChange={(event) => changeSection(event.target.value as FinancialSection)}
             className="mt-2 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/8 dark:text-white"
           >
             {allFinancialSections.map(([id, label, group]) => (
@@ -173,10 +193,10 @@ const UnifiedFinancialRoute: React.FC = () => {
       </section>
       <aside className="hidden h-fit rounded-2xl border border-white/65 bg-white/72 p-2 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:sticky xl:top-24 xl:block dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
         <p className="px-3 pb-2 pt-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">Sistema financeiro</p>
-        {operational.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-slate-950 text-white dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}><span>{label}</span>{!['financialOverview','cashFlow','collections','taxes','invoices','banking','reconciliation','projects','costCenters','budgets','dre','reports','settings'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300 dark:text-blue-200':'text-slate-400 dark:text-slate-500'}`}>Em breve</span>}</button>)}
+        {operational.map(([id,label])=><button key={id} onClick={()=>changeSection(id)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-slate-950 text-white dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}><span>{label}</span>{!['financialOverview','cashFlow','collections','taxes','invoices','banking','reconciliation','projects','costCenters','budgets','dre','reports','settings'].includes(id)&&<span className={`text-[8px] font-bold uppercase ${section===id?'text-slate-300 dark:text-blue-200':'text-slate-400 dark:text-slate-500'}`}>Em breve</span>}</button>)}
         <div className="my-3 border-t border-slate-100 dark:border-white/10"/>
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">Operação diária</p>
-        {core.map(([id,label])=><button key={id} onClick={()=>setSection(id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-blue-50 text-blue-700 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}>{label}</button>)}
+        {core.map(([id,label])=><button key={id} onClick={()=>changeSection(id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${section===id?'bg-blue-50 text-blue-700 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:ring-1 dark:ring-blue-300/20':'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}>{label}</button>)}
       </aside>
       <main className="min-w-0">
         {section === "financialOverview" ? <FinancialExecutiveOverviewPage /> : core.some(([id])=>id===section) ? <FinancialPhaseOnePage view={section as FinancialCoreView} embedded /> : section === "collections" ? <CollectionsPage /> : section === "invoices" ? <FiscalDocumentsPage /> : section === "taxes" ? <TaxManagementPage /> : section === "reconciliation" ? <BankReconciliationPage /> : section === "settings" ? <FinancialSettingsPage /> : section === "banking" ? <BankAccountsPage /> : section === "costCenters" ? <CostCentersPage /> : section === "projects" ? <FinancialProjectsPage /> : section === "dre" ? <DreManagementPage /> : section === "reports" ? <FinancialReportsPage /> : section === "cashFlow" ? <CashFlowPage /> : <FinancialSectionLanding title={planned[section as keyof typeof planned][0]} description={planned[section as keyof typeof planned][1]} />}

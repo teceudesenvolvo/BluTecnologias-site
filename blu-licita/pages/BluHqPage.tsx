@@ -3,6 +3,7 @@ import { ArrowUpRight, Building2, CreditCard, DollarSign, Headphones, Loader2, M
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { hqService, type HqCustomerRow, type HqOverview } from '../services/hqService';
+import { platformTeamService, type PlatformTeamMember } from '../services/platformTeamService';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value / 100);
 
@@ -21,6 +22,10 @@ export const BluHqPage: React.FC = () => {
   const [search, setSearch] = React.useState('');
   const [selectedTenantId, setSelectedTenantId] = React.useState('');
   const [prospectsOpen, setProspectsOpen] = React.useState(false);
+  const [bluTeamMembers, setBluTeamMembers] = React.useState<PlatformTeamMember[]>([]);
+  const [bluTeamOpen, setBluTeamOpen] = React.useState(false);
+  const [bluTeamSaving, setBluTeamSaving] = React.useState(false);
+  const [bluTeamForm, setBluTeamForm] = React.useState({ name: '', email: '', phone: '', role: 'Blu Team', department: 'Plataforma Blu' });
   const [savingTenant, setSavingTenant] = React.useState(false);
   const [tenantForm, setTenantForm] = React.useState({
     displayName: '',
@@ -63,6 +68,9 @@ export const BluHqPage: React.FC = () => {
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    platformTeamService.list().then(setBluTeamMembers).catch(() => setBluTeamMembers([]));
+  }, []);
 
   const tenants = React.useMemo(
     () => (data?.tenants || []).filter((item) => `${item.company} ${item.owner} ${item.plan} ${item.status}`.toLowerCase().includes(search.toLowerCase())),
@@ -78,6 +86,24 @@ export const BluHqPage: React.FC = () => {
   );
   const selectedTenant = React.useMemo(() => data?.tenants.find((item) => item.id === selectedTenantId) || null, [data?.tenants, selectedTenantId]);
   const tenantMembers = React.useMemo(() => (data?.members || []).filter((item) => item.companyId === selectedTenantId), [data?.members, selectedTenantId]);
+
+  const saveBluTeamMember = async () => {
+    if (!bluTeamForm.name || !bluTeamForm.email) return;
+    setBluTeamSaving(true);
+    try {
+      await platformTeamService.invite({
+        name: bluTeamForm.name,
+        email: bluTeamForm.email,
+        phone: bluTeamForm.phone,
+        role: bluTeamForm.role,
+        department: bluTeamForm.department,
+      });
+      setBluTeamForm({ name: '', email: '', phone: '', role: 'Blu Team', department: 'Plataforma Blu' });
+      await platformTeamService.list().then(setBluTeamMembers).catch(() => setBluTeamMembers([]));
+    } finally {
+      setBluTeamSaving(false);
+    }
+  };
 
   React.useEffect(() => {
     if (!selectedTenant) return;
@@ -310,6 +336,44 @@ export const BluHqPage: React.FC = () => {
                     </article>
                   ))}
                   {!data?.supportQueue?.length && <EmptyState title="Fila de suporte vazia" description="Chamados abertos aparecerão aqui." compact />}
+                </div>
+              </section>
+              <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-black">Equipe Blu</h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Pessoas com acesso aos itens da Plataforma Blu do menu.</p>
+                  </div>
+                  <button onClick={() => setBluTeamOpen((value) => !value)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-100 dark:hover:bg-white/[0.08]">
+                    {bluTeamOpen ? 'Fechar formulário' : 'Novo membro Blu'}
+                  </button>
+                </div>
+                {bluTeamOpen && (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <Field label="Nome" value={bluTeamForm.name} onChange={(value) => setBluTeamForm((current) => ({ ...current, name: value }))} />
+                    <Field label="E-mail" value={bluTeamForm.email} onChange={(value) => setBluTeamForm((current) => ({ ...current, email: value }))} />
+                    <Field label="Telefone" value={bluTeamForm.phone} onChange={(value) => setBluTeamForm((current) => ({ ...current, phone: value }))} />
+                    <Field label="Cargo" value={bluTeamForm.role} onChange={(value) => setBluTeamForm((current) => ({ ...current, role: value }))} />
+                    <Field label="Departamento" value={bluTeamForm.department} onChange={(value) => setBluTeamForm((current) => ({ ...current, department: value }))} />
+                    <div className="flex items-end">
+                      <button onClick={saveBluTeamMember} disabled={bluTeamSaving || !bluTeamForm.name || !bluTeamForm.email} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{bluTeamSaving ? 'Enviando...' : 'Convidar membro Blu'}</button>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-4 space-y-2">
+                  {bluTeamMembers.map((member) => (
+                    <article key={member.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black">{member.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-300">{member.email}</p>
+                        </div>
+                        <Badge tone={member.status === 'active' ? 'emerald' : 'amber'}>{member.status}</Badge>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{member.role} · {member.department || 'Plataforma Blu'}</p>
+                    </article>
+                  ))}
+                  {!bluTeamMembers.length && <EmptyState title="Nenhum membro Blu" description="Convide pessoas para acessar os itens da Plataforma Blu." compact />}
                 </div>
               </section>
               <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">

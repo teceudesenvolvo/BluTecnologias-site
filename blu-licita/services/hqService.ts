@@ -73,6 +73,32 @@ export type HqProspect = {
   date?: string;
 };
 
+export type HqPlatformCustomer = {
+  id: string;
+  companyId?: string;
+  userId?: string;
+  user?: { id?: string; name?: string; email?: string; phone?: string };
+  company?: Record<string, any>;
+  subscriptionId?: string;
+  planId?: string;
+  status?: string;
+  source?: string;
+  trialDays?: number;
+  trialStartedAt?: string;
+  trialEndsAt?: string;
+  accessStatus?: string;
+  companyDocument?: string;
+  companyName?: string;
+  companyLegalName?: string;
+  companyTradeName?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  goals?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type HqCustomerRow = {
   id: string;
   company: string;
@@ -186,7 +212,7 @@ export const hqService = {
     if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
-    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships] = await Promise.all([
+    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers] = await Promise.all([
       asList<HqCompany>('companies'),
       asList<HqSubscription>('subscriptions'),
       asList<HqPlan>('plans'),
@@ -196,6 +222,7 @@ export const hqService = {
       asList<HqProspect>('prospects').catch(() => []),
       asList<HqProspect>('clients').catch(() => []),
       asList<any>('companyUsers').catch(() => []),
+      asList<HqPlatformCustomer>('platformCustomers').catch(() => []),
     ]);
 
     const plansById = new Map(plans.map((plan) => [plan.id, plan]));
@@ -216,10 +243,12 @@ export const hqService = {
     const downgrades = orders.filter((order) => String(order.type || '').toUpperCase() === 'DOWNGRADE').length;
     const leads = clients.filter((client) => client.status === 'lead').length;
 
-    const companyIds = new Set<string>([...companies.map((item) => item.id), ...memberships.map((item) => String(item.companyId || ''))].filter(Boolean));
+    const platformCustomersByCompany = new Map(platformCustomers.map((customer) => [customer.companyId || customer.id, customer]));
+    const companyIds = new Set<string>([...companies.map((item) => item.id), ...memberships.map((item) => String(item.companyId || '')), ...platformCustomers.map((item) => String(item.companyId || item.id || ''))].filter(Boolean));
     const tenants = [...companyIds]
       .map((company) => {
-        const companyDoc = companies.find((item) => item.id === company);
+        const platformCustomer = platformCustomersByCompany.get(company);
+        const companyDoc = companies.find((item) => item.id === company) || platformCustomer?.company;
         const subscription = subscriptionsByCompany.get(company);
         const plan = subscription?.planId ? plansById.get(subscription.planId) : undefined;
         const companyMembers = memberships.filter((item) => String(item.companyId || '') === company);
@@ -229,45 +258,45 @@ export const hqService = {
           : 0;
         return {
           id: company,
-          company: companyDoc?.nomeFantasia || companyDoc?.razaoSocial || companyDoc?.tradeName || companyDoc?.name || companyDoc?.legalName || companyDoc?.document || company,
+          company: companyDoc?.nomeFantasia || companyDoc?.razaoSocial || companyDoc?.tradeName || companyDoc?.name || companyDoc?.legalName || companyDoc?.document || platformCustomer?.companyName || platformCustomer?.companyTradeName || platformCustomer?.companyLegalName || company,
           owner: ownersByCompany.get(company) || ownerMember?.name || ownerMember?.email || companyDoc?.ownerUserId || 'Responsável não informado',
           plan: plan?.name || subscription?.planId || 'Sem plano',
           status: normalizeStatus(subscription?.status || companyDoc?.accessStatus || ownerMember?.status),
           mrr,
           health: healthFromStatus(subscription?.status || companyDoc?.accessStatus || ownerMember?.status),
-          logoUrl: companyDoc?.logoUrl,
-          companyDocument: companyDoc?.document,
-          companyLegalName: companyDoc?.razaoSocial || companyDoc?.legalName || companyDoc?.name,
-          companyName: companyDoc?.name || companyDoc?.razaoSocial,
-          companyTradeName: companyDoc?.tradeName || companyDoc?.razaoSocial,
-          companyFantasyName: companyDoc?.nomeFantasia,
-          companySize: companyDoc?.porte,
-          companyLegalNature: companyDoc?.naturezaJuridica,
-          companyStateRegistration: companyDoc?.inscricaoEstadual,
-          companyMunicipalRegistration: companyDoc?.inscricaoMunicipal,
-          companyEmail: companyDoc?.email,
-          companyPhone: companyDoc?.phone,
-          companyMobile: companyDoc?.telefoneCelular,
-          zipCode: companyDoc?.cep,
-          street: companyDoc?.logradouro,
-          number: companyDoc?.numero,
-          complement: companyDoc?.complemento,
-          neighborhood: companyDoc?.bairro,
-          city: companyDoc?.municipio,
-          state: companyDoc?.uf,
-          partners: Array.isArray((companyDoc as any)?.socios) ? (companyDoc as any).socios : [],
-          representatives: Array.isArray((companyDoc as any)?.representantes) ? (companyDoc as any).representantes : [],
-          activities: Array.isArray((companyDoc as any)?.atividades) ? (companyDoc as any).atividades : [],
-          statements: Array.isArray((companyDoc as any)?.demonstrativos) ? (companyDoc as any).demonstrativos : [],
+          logoUrl: (companyDoc as any)?.logoUrl,
+          companyDocument: (companyDoc as any)?.document || platformCustomer?.companyDocument,
+          companyLegalName: (companyDoc as any)?.razaoSocial || (companyDoc as any)?.legalName || (companyDoc as any)?.name || platformCustomer?.companyLegalName,
+          companyName: (companyDoc as any)?.name || (companyDoc as any)?.razaoSocial || platformCustomer?.companyName,
+          companyTradeName: (companyDoc as any)?.tradeName || (companyDoc as any)?.razaoSocial || platformCustomer?.companyTradeName,
+          companyFantasyName: (companyDoc as any)?.nomeFantasia || platformCustomer?.companyTradeName,
+          companySize: (companyDoc as any)?.porte,
+          companyLegalNature: (companyDoc as any)?.naturezaJuridica,
+          companyStateRegistration: (companyDoc as any)?.inscricaoEstadual,
+          companyMunicipalRegistration: (companyDoc as any)?.inscricaoMunicipal,
+          companyEmail: (companyDoc as any)?.email || platformCustomer?.ownerEmail,
+          companyPhone: (companyDoc as any)?.phone || platformCustomer?.ownerPhone,
+          companyMobile: (companyDoc as any)?.telefoneCelular || platformCustomer?.ownerPhone,
+          zipCode: (companyDoc as any)?.cep,
+          street: (companyDoc as any)?.logradouro,
+          number: (companyDoc as any)?.numero,
+          complement: (companyDoc as any)?.complemento,
+          neighborhood: (companyDoc as any)?.bairro,
+          city: (companyDoc as any)?.municipio,
+          state: (companyDoc as any)?.uf,
+          partners: Array.isArray((companyDoc as any)?.socios) ? (companyDoc as any).socios : Array.isArray(platformCustomer?.company?.socios) ? platformCustomer?.company?.socios : [],
+          representatives: Array.isArray((companyDoc as any)?.representantes) ? (companyDoc as any).representantes : Array.isArray(platformCustomer?.company?.representantes) ? platformCustomer?.company?.representantes : [],
+          activities: Array.isArray((companyDoc as any)?.atividades) ? (companyDoc as any).atividades : Array.isArray(platformCustomer?.company?.atividades) ? platformCustomer?.company?.atividades : [],
+          statements: Array.isArray((companyDoc as any)?.demonstrativos) ? (companyDoc as any).demonstrativos : Array.isArray(platformCustomer?.company?.demonstrativos) ? platformCustomer?.company?.demonstrativos : [],
           subscriptionId: subscription?.id,
           planId: subscription?.planId,
           planSlug: plan?.slug,
           planLimits: plan?.limits || undefined,
           companyUsersCount: companyMembers.length,
-          trialEndsAt: subscription?.trialEndsAt,
-          currentPeriodEndsAt: subscription?.currentPeriodEndsAt,
-          nextBillingDate: subscription?.nextBillingDate,
-          accessStatus: companyDoc?.accessStatus,
+          trialEndsAt: subscription?.trialEndsAt || platformCustomer?.trialEndsAt,
+          currentPeriodEndsAt: subscription?.currentPeriodEndsAt || platformCustomer?.trialEndsAt,
+          nextBillingDate: subscription?.nextBillingDate || platformCustomer?.trialEndsAt,
+          accessStatus: (companyDoc as any)?.accessStatus || platformCustomer?.accessStatus,
         };
       })
       .sort((a, b) => a.company.localeCompare(b.company));

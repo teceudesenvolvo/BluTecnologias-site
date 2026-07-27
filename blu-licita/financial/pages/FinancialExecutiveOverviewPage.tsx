@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -24,9 +25,7 @@ import { useFinancialOverview } from '../hooks/useFinancialOverview';
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const money = (value: number, hidden: boolean) => (hidden ? 'R$ •••••' : brl.format((value || 0) / 100));
-const go = (path: string) => {
-  window.location.hash = `#${path}`;
-};
+const financialSectionPath = (section: string) => ({ pathname: '/admin/financeiro', state: { section, nonce: Date.now() } });
 
 const glass =
   'border border-white/65 bg-white/72 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20';
@@ -35,6 +34,7 @@ const fieldInputClass =
   'mt-2 w-full rounded-xl border border-slate-200 bg-white/78 px-3 py-2.5 text-sm font-normal normal-case text-slate-900 outline-none transition focus:border-blue-300 dark:border-white/10 dark:bg-white/8 dark:text-white';
 
 export const FinancialExecutiveOverviewPage = () => {
+  const navigate = useNavigate();
   const { data, filters, setFilters, loading, error, reload } = useFinancialOverview();
   const [hidden, setHidden] = React.useState(false);
   const [detail, setDetail] = React.useState<any>();
@@ -51,19 +51,19 @@ export const FinancialExecutiveOverviewPage = () => {
   const charts = data?.charts || {};
   const options = data?.options || {};
   const cards = [
-    ['Saldo disponível', metrics.availableCents, 'realizado', WalletCards, '/admin/financeiro/contas-bancarias'],
-    ['Saldo consolidado', metrics.consolidatedCents, 'realizado', Landmark, '/admin/financeiro/contas-bancarias'],
-    ['Contas a receber', metrics.receivableCents, 'previsto', ArrowUpRight, '/admin/financeiro'],
-    ['Contas a pagar', metrics.payableCents, 'previsto', ArrowDownRight, '/admin/financeiro'],
-    ['Valores vencidos', metrics.overdueCents, 'pendente', AlertTriangle, '/admin/financeiro'],
-    ['Receitas do período', metrics.incomeCents, 'realizado', TrendingUp, '/admin/financeiro/fluxo-de-caixa'],
-    ['Despesas do período', metrics.expenseCents, 'realizado', ArrowDownRight, '/admin/financeiro/fluxo-de-caixa'],
-    ['Resultado do período', metrics.resultCents, 'realizado', Scale, '/admin/financeiro/dre-gerencial'],
-    ['Fluxo projetado', metrics.projectedCashCents, 'previsto', BarChart3, '/admin/financeiro/fluxo-de-caixa'],
-    ['Impostos estimados', metrics.estimatedTaxesCents, 'previsto', ShieldCheck, '/admin/financeiro/gestao-tributaria'],
-    ['Faturamento', metrics.billingCents, 'realizado', ReceiptText, '/admin/financeiro/notas-fiscais'],
-    ['Valor recebido', metrics.receivedCents, 'realizado', Banknote, '/admin/financeiro/cobrancas'],
-    ['Margem', metrics.marginCents, 'gerencial', TrendingUp, '/admin/financeiro/dre-gerencial'],
+    ['Saldo disponível', metrics.availableCents, 'realizado', WalletCards, financialSectionPath('banking')],
+    ['Saldo consolidado', metrics.consolidatedCents, 'realizado', Landmark, financialSectionPath('banking')],
+    ['Contas a receber', metrics.receivableCents, 'previsto', ArrowUpRight, financialSectionPath('receivables')],
+    ['Contas a pagar', metrics.payableCents, 'previsto', ArrowDownRight, financialSectionPath('payables')],
+    ['Valores vencidos', metrics.overdueCents, 'pendente', AlertTriangle, financialSectionPath('collections')],
+    ['Receitas do período', metrics.incomeCents, 'realizado', TrendingUp, financialSectionPath('cashFlow')],
+    ['Despesas do período', metrics.expenseCents, 'realizado', ArrowDownRight, financialSectionPath('cashFlow')],
+    ['Resultado do período', metrics.resultCents, 'realizado', Scale, financialSectionPath('dre')],
+    ['Fluxo projetado', metrics.projectedCashCents, 'previsto', BarChart3, financialSectionPath('cashFlow')],
+    ['Impostos estimados', metrics.estimatedTaxesCents, 'previsto', ShieldCheck, financialSectionPath('taxes')],
+    ['Faturamento', metrics.billingCents, 'realizado', ReceiptText, financialSectionPath('invoices')],
+    ['Valor recebido', metrics.receivedCents, 'realizado', Banknote, financialSectionPath('collections')],
+    ['Margem', metrics.marginCents, 'gerencial', TrendingUp, financialSectionPath('dre')],
     ['Contratos ativos', metrics.activeContracts, 'quantidade', BriefcaseBusiness, '/admin/contratos'],
     ['Saldo contratual', metrics.contractBalanceCents, 'previsto', BriefcaseBusiness, '/admin/contratos'],
   ];
@@ -100,7 +100,7 @@ export const FinancialExecutiveOverviewPage = () => {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {cards.map(([label, value, mode, Icon, path]: any) => (
-          <button key={label} onClick={() => go(path)} className={`rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-300 ${glass}`}>
+            <button key={label} onClick={() => navigate(path as any)} className={`rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-300 ${glass}`}>
             <div className="flex items-start justify-between">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-50 text-slate-600 dark:bg-white/8 dark:text-slate-200">
                 <Icon size={17} />
@@ -128,17 +128,17 @@ export const FinancialExecutiveOverviewPage = () => {
         <h2 className="mb-3 font-bold text-slate-950 dark:text-white">Atalhos rápidos</h2>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
-            ['Nova receita', '/admin/financeiro/fluxo-de-caixa', Plus],
-            ['Nova despesa', '/admin/financeiro/fluxo-de-caixa', ArrowDownRight],
-            ['Nova cobrança', '/admin/financeiro/cobrancas', ReceiptText],
-            ['Nova nota fiscal', '/admin/financeiro/notas-fiscais', FilePlus2],
-            ['Registrar recebimento', '/admin/financeiro/cobrancas', ArrowUpRight],
-            ['Registrar pagamento', '/admin/financeiro', ArrowDownRight],
-            ['Importar extrato', '/admin/financeiro/conciliacao', Landmark],
-            ['Conciliar', '/admin/financeiro/conciliacao', Scale],
-            ['Criar orçamento', '/admin/financeiro/orcamentos', BriefcaseBusiness],
+            ['Nova receita', financialSectionPath('cashFlow'), Plus],
+            ['Nova despesa', financialSectionPath('cashFlow'), ArrowDownRight],
+            ['Nova cobrança', financialSectionPath('collections'), ReceiptText],
+            ['Nova nota fiscal', financialSectionPath('invoices'), FilePlus2],
+            ['Registrar recebimento', financialSectionPath('collections'), ArrowUpRight],
+            ['Registrar pagamento', financialSectionPath('cashFlow'), ArrowDownRight],
+            ['Importar extrato', financialSectionPath('reconciliation'), Landmark],
+            ['Conciliar', financialSectionPath('reconciliation'), Scale],
+            ['Criar orçamento', '/admin/orcamentos', BriefcaseBusiness],
           ].map(([label, path, Icon]: any) => (
-            <button key={label} onClick={() => go(path)} className="Secondary shrink-0">
+            <button key={label} onClick={() => navigate(path as any)} className="Secondary shrink-0">
               <Icon size={16} />{label}
             </button>
           ))}

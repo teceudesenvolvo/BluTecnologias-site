@@ -74,7 +74,9 @@ const legacy = (clients: any[], companyId: string): FinancialCollection[] => cli
 export class FirebaseCollectionAdapter implements CollectionRepository {
   async list(context: CollectionContext) {
     const [current, clients] = await Promise.all([list<FinancialCollection>('collections', context.companyId), list<any>('clients', context.companyId)]);
-    return [...current, ...legacy(clients, context.companyId)].sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+    return [...current, ...legacy(clients, context.companyId)]
+      .filter(item => !item.deletedAt && item.status !== 'cancelled')
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   }
   events(context: CollectionContext) { return list<CollectionEvent>('collectionEvents', context.companyId); }
   async auxiliary(context: CollectionContext): Promise<CollectionAuxiliary> {
@@ -111,5 +113,5 @@ export class FirebaseCollectionAdapter implements CollectionRepository {
     await httpsCallable(functions, 'receiveCollection')({ id, amountCents, date, bankAccountId, authorizationReason, idempotencyKey: crypto.randomUUID() });
   }
   async event(_context: CollectionContext, id: string, type: CollectionEvent['type'], description: string, extra?: Record<string, unknown>) { await httpsCallable(functions, 'addCollectionEvent')({ id, type, description, ...extra }); }
-  async command(_context: CollectionContext, id: string, action: 'send' | 'renegotiate' | 'cancel' | 'secondCopy', reason?: string) { await httpsCallable(functions, 'commandCollection')({ id, action, reason, idempotencyKey: crypto.randomUUID() }); }
+  async command(_context: CollectionContext, id: string, action: 'send' | 'renegotiate' | 'cancel' | 'secondCopy' | 'delete', reason?: string) { await httpsCallable(functions, 'commandCollection')({ id, action, reason, idempotencyKey: crypto.randomUUID() }); }
 }

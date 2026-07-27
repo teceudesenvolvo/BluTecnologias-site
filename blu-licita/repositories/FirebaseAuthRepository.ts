@@ -63,6 +63,41 @@ export class FirebaseAuthRepository implements AuthRepository {
       updatedAt: now.toISOString(),
     };
 
+    const platformCustomerPayload = {
+      id: companyId,
+      companyId,
+      userId: credential.user.uid,
+      user: {
+        id: credential.user.uid,
+        name: displayName,
+        email: input.user.email,
+        phone: input.user.phone || '',
+      },
+      company: {
+        ...companyPayload,
+        companyId,
+      },
+      subscriptionId,
+      planId: input.plan,
+      status: 'trial',
+      source: 'trial-signup',
+      trialDays: 7,
+      trialStartedAt: now.toISOString(),
+      trialEndsAt: trialEndsAt.toISOString(),
+      accessStatus: 'TRIALING',
+      companyDocument: input.company.document,
+      companyName: companyPayload.name,
+      companyLegalName: companyPayload.legalName,
+      companyTradeName: companyPayload.tradeName,
+      ownerName: displayName,
+      ownerEmail: input.user.email,
+      ownerPhone: input.user.phone || '',
+      goals: input.goals || [],
+      createdBy: credential.user.uid,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
     const subscriptionPayload = {
       id: subscriptionId,
       customerCompanyId: companyId,
@@ -83,6 +118,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       setDoc(doc(db, 'companies', companyId), companyPayload, { merge: true }),
       setDoc(doc(db, 'companyUsers', membershipPayload.id), membershipPayload, { merge: true }),
       setDoc(doc(db, 'subscriptions', subscriptionId), subscriptionPayload, { merge: true }),
+      setDoc(doc(db, 'platformCustomers', companyId), platformCustomerPayload, { merge: true }),
       setDoc(doc(db, 'companies', companyId, 'settings', 'subscription'), { plan: input.plan, status: 'trial', updatedAt: now.toISOString(), updatedBy: credential.user.uid }, { merge: true }),
     ]).catch(() => undefined);
 
