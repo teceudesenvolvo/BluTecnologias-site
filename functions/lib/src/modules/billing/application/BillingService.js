@@ -169,7 +169,7 @@ class BillingService {
                 orderNsu: String(event.orderNsu),
                 transactionNsu: String(event.transactionNsu),
                 slug: String(event.invoiceSlug),
-                actorId: 'webhook:infinitepay',
+                actorId: 'webhook:asaas',
             });
             await eventRef.update({ processingStatus: 'PROCESSED', processedAt: iso(), result });
         }

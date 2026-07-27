@@ -15,6 +15,7 @@ export {
   billingPublicPlans,
   billingPaymentCheck,
   infinitePayWebhook,
+  asaasWebhook,
   processBillingWebhookEvent,
   dailyBillingMaintenance,
 } from './src/modules/billing/presentation/billingFunctions';

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.InfinitePayBillingProvider = void 0;
+exports.InfinitePayBillingProvider = exports.AsaasBillingProvider = void 0;
 const https = require("https");
 const billingTypes_1 = require("../domain/billingTypes");
 const jsonPost = (url, payload, timeoutMs = 12000) => new Promise((resolve, reject) => {
@@ -15,7 +15,7 @@ const jsonPost = (url, payload, timeoutMs = 12000) => new Promise((resolve, reje
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Content-Length': Buffer.byteLength(body),
-            'User-Agent': 'Blu-Billing-InfinitePay/1.0',
+            'User-Agent': 'Blu-Billing-Asaas/1.0',
         },
     }, (response) => {
         const chunks = [];
@@ -30,7 +30,7 @@ const jsonPost = (url, payload, timeoutMs = 12000) => new Promise((resolve, reje
                 parsed = { raw: text };
             }
             if ((response.statusCode || 500) >= 400)
-                reject(billingTypes_1.billingErrors.checkoutCreation(`InfinitePay retornou HTTP ${response.statusCode}.`));
+                reject(billingTypes_1.billingErrors.checkoutCreation(`Asaas retornou HTTP ${response.statusCode}.`));
             else
                 resolve(parsed);
         });
@@ -45,7 +45,7 @@ const jsonPost = (url, payload, timeoutMs = 12000) => new Promise((resolve, reje
 });
 const stringField = (value) => typeof value === 'string' ? value.trim() : '';
 const intField = (value) => Number.isSafeInteger(Number(value)) ? Number(value) : 0;
-class InfinitePayBillingProvider {
+class AsaasBillingProvider {
     apiBaseUrl;
     constructor(apiBaseUrl) {
         this.apiBaseUrl = apiBaseUrl;
@@ -75,7 +75,7 @@ class InfinitePayBillingProvider {
         const raw = await jsonPost(`${this.apiBaseUrl}/links`, payload);
         const checkoutUrl = stringField(raw.url);
         if (!checkoutUrl)
-            throw billingTypes_1.billingErrors.checkoutCreation('A InfinitePay não retornou a URL do checkout.');
+            throw billingTypes_1.billingErrors.checkoutCreation('O gateway Asaas não retornou a URL do checkout.');
         return { checkoutUrl, raw };
     }
     async checkPayment(input) {
@@ -104,11 +104,11 @@ class InfinitePayBillingProvider {
         const transactionNsu = stringField(data.transaction_nsu);
         const amountInCents = intField(data.amount);
         if (!orderNsu || !invoiceSlug || !transactionNsu || amountInCents <= 0) {
-            throw new Error('Payload inválido da InfinitePay.');
+            throw new Error('Payload inválido do Asaas.');
         }
         return {
-            provider: 'infinitepay',
-            eventKey: `infinitepay:${transactionNsu || `${orderNsu}:${invoiceSlug}`}`,
+            provider: 'asaas',
+            eventKey: `asaas:${transactionNsu || `${orderNsu}:${invoiceSlug}`}`,
             orderNsu,
             invoiceSlug,
             transactionNsu,
@@ -121,5 +121,6 @@ class InfinitePayBillingProvider {
         };
     }
 }
-exports.InfinitePayBillingProvider = InfinitePayBillingProvider;
+exports.AsaasBillingProvider = AsaasBillingProvider;
+exports.InfinitePayBillingProvider = AsaasBillingProvider;
 //# sourceMappingURL=InfinitePayBillingProvider.js.map

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = void 0;
+exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.asaasWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const cors = require("cors");
@@ -11,15 +11,15 @@ const BillingService_1 = require("../application/BillingService");
 const corsHandler = cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'] });
 const db = () => admin.firestore();
 const env = (name, fallback = '') => process.env[name] || fallback;
-const apiBaseUrl = () => env('INFINITEPAY_API_BASE_URL', 'https://api.checkout.infinitepay.io').replace(/\/$/, '');
+const apiBaseUrl = () => env('ASAAS_API_BASE_URL', 'https://api.asaas.com').replace(/\/$/, '');
 const appPublicUrl = () => env('APP_PUBLIC_URL', 'http://localhost:5173').replace(/\/$/, '');
 const publicFunctionUrl = () => env('APP_FUNCTIONS_PUBLIC_URL', appPublicUrl()).replace(/\/$/, '');
-const webhookUrl = () => env('INFINITEPAY_WEBHOOK_URL', `${publicFunctionUrl()}/api/webhooks/infinitepay`);
-const redirectUrl = () => env('INFINITEPAY_REDIRECT_URL', `${appPublicUrl()}/#/admin/assinatura/retorno`);
-const infinitePayHandle = () => env('INFINITEPAY_HANDLE');
+const webhookUrl = () => env('ASAAS_WEBHOOK_URL', `${publicFunctionUrl()}/api/webhooks/asaas`);
+const redirectUrl = () => env('ASAAS_REDIRECT_URL', `${appPublicUrl()}/#/admin/assinatura/retorno`);
+const asaasHandle = () => env('ASAAS_HANDLE');
 const billingService = () => new BillingService_1.BillingService(db(), new InfinitePayBillingProvider_1.InfinitePayBillingProvider(apiBaseUrl()), {
-    providerId: 'infinitepay',
-    handle: infinitePayHandle(),
+    providerId: 'asaas',
+    handle: asaasHandle(),
     redirectUrl: redirectUrl(),
     webhookUrl: webhookUrl(),
     graceDays: Number(env('BLU_BILLING_GRACE_DAYS', '7')),
@@ -48,7 +48,7 @@ exports.billingCheckout = functions.https.onRequest((req, res) => {
         if (req.method !== 'POST')
             return json(res, 405, { message: 'Método não permitido.' });
         try {
-            if (!infinitePayHandle())
+            if (!asaasHandle())
                 throw billingTypes_1.billingErrors.providerUnavailable();
             const user = await requireAuth(req);
             const planId = String(req.body?.planId || '');
@@ -127,6 +127,7 @@ exports.infinitePayWebhook = functions.https.onRequest((req, res) => {
         }
     });
 });
+exports.asaasWebhook = exports.infinitePayWebhook;
 exports.processBillingWebhookEvent = functions.firestore.document('billingWebhookEvents/{eventId}').onCreate(async (snapshot) => {
     await billingService().processWebhookEvent(snapshot.id);
 });

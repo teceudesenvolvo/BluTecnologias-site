@@ -55,9 +55,25 @@ export const SubscriptionPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button onClick={load} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold"><RefreshCw size={17} />Atualizar</button>
           <a href="#/admin/planos" className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700"><ArrowUpRight size={17} />Mudar plano</a>
+          <a href="#/admin/planos" className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700"><CreditCard size={17} />Alterar forma de pagamento</a>
           <button onClick={pay} disabled={paying || !plan} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{paying ? <Loader2 className="animate-spin" size={17} /> : <CreditCard size={17} />}Pagar agora</button>
         </div>
       </header>
+
+      {plan && (
+        <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-700">Plano do proprietário</p>
+              <h2 className="mt-2 text-xl font-black">{plan.name}</h2>
+              <p className="mt-1 text-sm text-blue-900/75">O plano exibido aqui é o contratado pela empresa. Os limites valem para toda a equipe.</p>
+            </div>
+            <div className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+              Forma de pagamento via checkout seguro Asaas
+            </div>
+          </div>
+        </section>
+      )}
 
       {blocked && <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800"><div className="flex gap-3"><AlertTriangle className="shrink-0" /><p className="text-sm font-semibold">Sua assinatura está suspensa por atraso superior ao período de tolerância. Os dados permanecem preservados; para voltar a escrever no sistema, regularize o pagamento.</p></div></section>}
 

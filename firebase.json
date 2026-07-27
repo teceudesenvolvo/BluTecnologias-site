@@ -40,8 +40,8 @@
         "function": "billingPaymentCheck"
       },
       {
-        "source": "/api/webhooks/infinitepay",
-        "function": "infinitePayWebhook"
+        "source": "/api/webhooks/asaas",
+        "function": "asaasWebhook"
       },
       {
         "source": "**",

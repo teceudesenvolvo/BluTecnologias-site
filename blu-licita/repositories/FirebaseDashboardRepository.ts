@@ -214,7 +214,7 @@ export class FirebaseDashboardRepository implements DashboardRepository {
       metrics: [
         { label: 'Receber este mês', value: toCurrency(receivableThisMonth.reduce((sum, item) => sum + item.balance, 0)), change: `${toCurrency(overdueReceivables.reduce((sum, item) => sum + item.balance, 0))} em atraso`, tone: overdueReceivables.length ? 'rose' : 'blue' },
         { label: 'Contratos ativos', value: String(activeContracts.length), change: `${compact(contractTotal)} contratados`, tone: 'emerald' },
-        { label: 'Oportunidades compatíveis', value: String(opportunities.length), change: `${opportunities.filter((item) => Number(item.compatibility || item.score || 0) >= 80).length} com alta prioridade`, tone: 'blue' },
+        { label: 'Novas oportunidades', value: String(opportunities.length), change: `${opportunities.filter((item) => Number(item.compatibility || item.score || 0) >= 80).length} com alta prioridade`, tone: 'blue' },
         { label: 'Cobranças pendentes', value: String(openReceivables.length), change: `${overdueReceivables.length} vencida(s)`, tone: overdueReceivables.length ? 'rose' : 'emerald' },
         { label: 'Fluxo de caixa projetado', value: toCurrency(openReceivables.reduce((sum, item) => sum + item.balance, 0) - monthExpenses), change: 'Recebíveis abertos menos despesas do mês', tone: 'emerald' },
         { label: 'Margem média', value: pct(margin), change: `${toCurrency(monthIncome - monthExpenses)} no mês`, tone: margin < 0 ? 'rose' : 'emerald' },

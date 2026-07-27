@@ -71,7 +71,14 @@ const ProtectedLayout: React.FC = () => {
 
 const PlatformAdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useBluAuth();
-  const isBluPlatformAdmin = String(user?.email || "").toLowerCase() === "admin@blutecnologias.com.br";
+  const cachedUser = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("blu-licita:user") || "null") as { email?: string } | null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const isBluPlatformAdmin = String(user?.email || cachedUser?.email || "").toLowerCase() === "admin@blutecnologias.com.br";
   return isBluPlatformAdmin ? <>{children}</> : <Navigate to="/admin/dashboard" replace />;
 };
 
@@ -236,7 +243,7 @@ export const BluRoutes: React.FC = () => (
         />
         <Route path="calendario" element={<CalendarPage />} />
         <Route path="relatorios" element={<ReportsPage />} />
-        <Route path="integracoes" element={<IntegrationsPage />} />
+        <Route path="integracoes" element={<PlatformAdminOnly><IntegrationsPage /></PlatformAdminOnly>} />
         <Route
           path="certidoes"
           element={<Navigate to="/admin/documentos" replace />}
@@ -280,10 +287,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="webmail" element={<Webmail />} />
         <Route path="privacidade" element={<PrivacyPolicyGenerator />} />
         <Route path="configuracoes" element={<SettingsPage />} />
-        <Route
-          path="configuracoes/integracoes"
-          element={<IntegrationsPage />}
-        />
+        <Route path="configuracoes/integracoes" element={<PlatformAdminOnly><IntegrationsPage /></PlatformAdminOnly>} />
         <Route
           path="configuracoes/areas-interesse"
           element={<InterestSettingsPage />}

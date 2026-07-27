@@ -43,7 +43,7 @@ const quickFeatures = [
   { label: 'Áreas de interesse', to: '/admin/oportunidades', description: 'Configurar filtros de objetos e estados de interesse', keywords: 'areas interesse filtros estados oportunidades notificações notificacoes' },
   { label: 'Gerar proposta', to: '/admin/licitacoes', description: 'Gerar propostas, impugnações, esclarecimentos e parecer com IA', keywords: 'proposta impugnação impugnacao esclarecimento parecer ia edital saved licitacoes' },
   { label: 'Novo orçamento', to: '/admin/orcamentos', description: 'Criar orçamento e PDF timbrado da proposta', keywords: 'orcamento orçamento pdf proposta itens produto serviço servico impostos' },
-  { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email' },
+  { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email asaas' },
   { label: 'Contas bancárias', to: '/admin/financeiro/contas-bancarias', description: 'Gerenciar bancos, caixas, recebimentos e pagamentos', keywords: 'banco conta bancaria bancária pix saldo transferência transferencia' },
   { label: 'Fluxo de caixa', to: '/admin/financeiro/fluxo-de-caixa', description: 'Entradas, saídas, previsto, realizado e vencimentos', keywords: 'fluxo caixa entrada saida saída receita despesa vencido previsto realizado' },
   { label: 'Notas fiscais', to: '/admin/financeiro/notas-fiscais', description: 'Notas emitidas, recebidas, XML, PDF e vínculos financeiros', keywords: 'nfse nfe nota fiscal xml pdf retenção retencao tributo' },
@@ -52,7 +52,7 @@ const quickFeatures = [
   { label: 'Upload de documentos', to: '/admin/documentos', description: 'Cadastrar documentos, certidões e baixar ZIP', keywords: 'documento certidão certidao upload validade vencimento zip download' },
   { label: 'Abrir chamado', to: '/admin/suporte', description: 'Chat com suporte, SAC e acompanhamento de chamados', keywords: 'suporte chamado chat sac atendimento ajuda problema ticket' },
   { label: 'Níveis de acesso', to: '/admin/configuracoes/niveis-acesso', description: 'Configurar permissões por tipo de usuário', keywords: 'permissão permissao acesso perfil usuário usuario tipo equipe admin' },
-  { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança infinitepay upgrade uso limite' },
+  { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança asaas upgrade uso limite' },
   { label: 'Migração de dados', to: '/admin/migracao', description: 'Migrar dados do Firebase para o backend Blu', keywords: 'migração migracao firebase backend banco dados render postgres' },
 ];
 
@@ -76,6 +76,53 @@ const latestCertificateVersions = (items: Certificate[]) => {
     if (itemIssue > currentIssue || (itemIssue === currentIssue && (item.expiryDate || '') > (current.expiryDate || ''))) latest.set(reference, item);
   });
   return [...latest.values()];
+};
+
+const isCertificateValid = (item: Certificate, referenceToday = new Date()) => {
+  if (!item.expiryDate) return true;
+  const today = new Date(referenceToday);
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(`${item.expiryDate}T12:00:00`);
+  return Number.isFinite(expiry.getTime()) && expiry.getTime() >= today.getTime();
+};
+
+const certificateAlertItems = (items: Certificate[]) => {
+  const grouped = new Map<string, Certificate[]>();
+  items.forEach((item) => {
+    const reference = certificateReference(item);
+    const bucket = grouped.get(reference) || [];
+    bucket.push(item);
+    grouped.set(reference, bucket);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return [...grouped.values()]
+    .map((bucket) => {
+      const sorted = [...bucket].sort((a, b) => {
+        const aIssue = a.issueDate || '';
+        const bIssue = b.issueDate || '';
+        if (aIssue !== bIssue) return aIssue > bIssue ? -1 : 1;
+        const aExpiry = a.expiryDate || '';
+        const bExpiry = b.expiryDate || '';
+        if (aExpiry !== bExpiry) return aExpiry > bExpiry ? -1 : 1;
+        const aUpdated = (a as Certificate & { updatedAt?: string }).updatedAt || '';
+        const bUpdated = (b as Certificate & { updatedAt?: string }).updatedAt || '';
+        return aUpdated > bUpdated ? -1 : aUpdated < bUpdated ? 1 : 0;
+      });
+      const latest = sorted[0];
+      return { bucket, latest };
+    })
+    .filter(({ bucket, latest }) => {
+      if (!latest?.expiryDate) return false;
+      if (bucket.some((item) => item !== latest && isCertificateValid(item, today))) return false;
+      const expiry = new Date(`${latest.expiryDate}T12:00:00`);
+      if (!Number.isFinite(expiry.getTime())) return false;
+      const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
+      return days <= 7;
+    })
+    .map(({ latest }) => latest);
 };
 
 export const BluAppLayout: React.FC = () => {
@@ -104,8 +151,13 @@ export const BluAppLayout: React.FC = () => {
     if (!key) return true;
     return currentRole.pages.includes(key);
   };
-  const isBluPlatformAdmin = String(user?.email || '').toLowerCase() === 'admin@blutecnologias.com.br';
-  const visibleNav = [...nav.filter((item) => canAccessPath(item.to)), ...(isBluPlatformAdmin ? platformAdminNav : [])];
+  const readCachedUser = () => {
+    try { return JSON.parse(window.localStorage.getItem('blu-licita:user') || 'null') as { email?: string } | null; }
+    catch { return null; }
+  };
+  const platformAdminEmail = String(user?.email || auth.currentUser?.email || readCachedUser()?.email || '').toLowerCase();
+  const isBluPlatformAdmin = platformAdminEmail === 'admin@blutecnologias.com.br';
+  const visibleNav = [...nav.filter((item) => canAccessPath(item.to) && (isBluPlatformAdmin || item.label !== 'Integrações')), ...(isBluPlatformAdmin ? platformAdminNav : [])];
   const title = [...nav, ...platformAdminNav].find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
   const subscriptionStatus = String(billing?.subscription?.status || '');
@@ -135,9 +187,22 @@ export const BluAppLayout: React.FC = () => {
     setSearchOpen(false);
     navigate(to);
   };
+  const navGroups = [
+    { title: 'Essencial', labels: ['Dashboard', 'Oportunidades', 'CRM', 'Equipe', 'Licitações'] },
+    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos'] },
+    { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
+    { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
+  ] as const;
+  const navByLabel = new Map([...nav, ...platformAdminNav].map((item) => [item.label, item] as const));
+  const renderNavItem = ({ label, to, icon: Icon }: (typeof nav)[number]) => (
+    <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} title={collapsed ? label : undefined} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-[#0877ff] shadow-sm dark:border dark:border-blue-300/20 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:shadow-blue-950/20' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-100'} ${collapsed ? 'justify-center' : ''}`}>
+      <Icon size={18} strokeWidth={1.9} />
+      {!collapsed && <span>{label}</span>}
+    </NavLink>
+  );
 
   useEffect(()=>{if(!user||!firebaseUid)return;const today=new Date().toISOString().slice(0,10);Promise.all([integrationOpportunityService.listModalities(),interestSettingsService.get(user.companyId)]).then(async([modalities,keywords])=>{const auction=modalities.find((item)=>item.nome.toLowerCase().includes('pregão')&&item.nome.toLowerCase().includes('eletr'));if(!auction)return;const result=await integrationOpportunityService.list('pncp',{startDate:today,endDate:today,modalityCode:auction.id,pageSize:50});setTodayOpportunities(result.data.filter((item)=>item.publicationDate?.slice(0,10)===today&&(keywords.length===0||interestSettingsService.matches(item.object,keywords))).slice(0,20))}).catch(()=>setTodayOpportunities([]))},[user,firebaseUid]);
-  useEffect(()=>{if(!user||!firebaseUid)return;certificateService.getAll().then(items=>{const today=new Date();today.setHours(0,0,0,0);setCertificateAlerts(latestCertificateVersions(items).filter(item=>{if(!item.expiryDate)return false;const expiry=new Date(`${item.expiryDate}T12:00:00`);const days=Math.ceil((expiry.getTime()-today.getTime())/86400000);return days<=7}))}).catch(()=>setCertificateAlerts([]))},[user,firebaseUid]);
+  useEffect(()=>{if(!user||!firebaseUid)return;certificateService.getAll().then(items=>{setCertificateAlerts(certificateAlertItems(latestCertificateVersions(items)))}).catch(()=>setCertificateAlerts([]))},[user,firebaseUid]);
   useEffect(()=>{if(!user)return;accessControlService.get(user.companyId).then((settings)=>setAccessRoles(settings.roles)).catch(()=>setAccessRoles(defaultAccessRoles))},[user]);
   useEffect(()=>{if(!user||!firebaseUid)return;billingClient.summary().then(setBilling).catch(()=>setBilling(null))},[user,firebaseUid]);
   useEffect(()=>{const read=()=>{setAuthDisplayName(auth.currentUser?.displayName||'');setFirebaseUid(auth.currentUser?.uid||'')};read();const unsubscribe=onAuthStateChanged(auth,()=>read());window.addEventListener('blu:profile-updated',read);return()=>{unsubscribe();window.removeEventListener('blu:profile-updated',read)}},[]);
@@ -157,12 +222,18 @@ export const BluAppLayout: React.FC = () => {
           <BluLogo compact={collapsed} />
           <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-white/10" onClick={() => setMobileOpen(false)}><X size={19} /></button>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map(({ label, to, icon: Icon }) => (
-            <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} title={collapsed ? label : undefined} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-[#0877ff] shadow-sm dark:border dark:border-blue-300/20 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:shadow-blue-950/20' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white'} ${collapsed ? 'justify-center' : ''}`}>
-              <Icon size={18} strokeWidth={1.9} />{!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
+        <nav className="flex-1 space-y-3 overflow-y-auto p-3">
+          {navGroups.map((group) => {
+            const items = group.labels.map((label) => navByLabel.get(label)).filter(Boolean) as typeof nav;
+            const visibleItems = items.filter((item) => visibleNav.some((visible) => visible.to === item.to));
+            if (!visibleItems.length) return null;
+            return (
+              <section key={group.title} className="space-y-1">
+                {!collapsed && <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[.18em] text-slate-400 dark:text-slate-500">{group.title}</p>}
+                {visibleItems.map(renderNavItem)}
+              </section>
+            );
+          })}
         </nav>
         <div className="border-t border-slate-100 p-3 dark:border-white/10">
           <button onClick={() => navigate('/admin/perfil')} title="Meu perfil" className={`flex w-full items-center gap-3 rounded-xl p-2 hover:bg-slate-50 dark:hover:bg-white/8 ${collapsed ? 'justify-center' : ''}`}>
@@ -216,14 +287,25 @@ export const BluAppLayout: React.FC = () => {
             <button onClick={()=>setNotificationOpen((value)=>!value)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Notificações">
               <Bell size={19}/>{todayOpportunities.length+certificateAlerts.length>0&&<span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{todayOpportunities.length+certificateAlerts.length}</span>}
             </button>
-            {notificationOpen&&<div className="absolute right-0 top-12 z-50 w-[min(400px,90vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-              <div className="border-b border-slate-100 p-4"><h3 className="font-bold">Notificações</h3><p className="mt-1 text-xs text-slate-500">Oportunidades e documentos que precisam da sua atenção.</p></div>
-              <div className="max-h-[460px] overflow-y-auto">
-                {certificateAlerts.length>0&&<div><p className="bg-amber-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-700">Certidões</p>{certificateAlerts.map(item=>{const today=new Date();today.setHours(0,0,0,0);const days=Math.ceil((new Date(`${item.expiryDate}T12:00:00`).getTime()-today.getTime())/86400000);return <button key={item.id} onClick={()=>{setNotificationOpen(false);navigate('/admin/documentos')}} className="block w-full border-b border-slate-100 p-4 text-left hover:bg-amber-50"><p className="text-sm font-semibold text-slate-800">{item.name}</p><p className={`mt-1 text-xs font-semibold ${days<=0?'text-rose-600':'text-amber-600'}`}>{days<0?'Certidão vencida':days===0?'Vence hoje':`Vence em ${days} dia${days===1?'':'s'}`}</p></button>})}</div>}
-                {todayOpportunities.length>0&&<div><p className="bg-blue-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-blue-700">Oportunidades de hoje</p>{todayOpportunities.map((item)=><button key={item.externalId} onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="block w-full border-b border-slate-100 p-4 text-left hover:bg-slate-50"><p className="text-xs font-bold uppercase text-blue-600">{item.organizationName}</p><p className="mt-1 line-clamp-2 text-sm font-semibold">{item.object}</p><p className="mt-2 text-xs text-slate-400">Publicado hoje · {item.processNumber||item.procurementNumber}</p></button>)}</div>}
-                {todayOpportunities.length===0&&certificateAlerts.length===0&&<p className="p-8 text-center text-sm text-slate-500">Nenhuma notificação nova.</p>}
+            {notificationOpen&&<div className="fixed inset-0 z-50">
+              <button aria-label="Fechar notificações" onClick={()=>setNotificationOpen(false)} className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px] dark:bg-black/55" />
+              <div className="absolute right-0 top-12 w-[min(420px,92vw)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.18)] ring-1 ring-white/60 dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_24px_100px_rgba(0,0,0,.55)] dark:ring-white/5">
+                <div className="border-b border-slate-100 bg-slate-50/70 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white">Notificações</h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">Oportunidades e documentos que precisam da sua atenção.</p>
+                    </div>
+                    <button onClick={()=>setNotificationOpen(false)} className="rounded-xl p-2 text-slate-500 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Fechar notificações"><X size={18}/></button>
+                  </div>
+                </div>
+                <div className="max-h-[min(70vh,560px)] overflow-y-auto bg-white/95 dark:bg-slate-950/95">
+                  {certificateAlerts.length>0&&<div><p className="bg-amber-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-400/10 dark:text-amber-200">Certidões</p>{certificateAlerts.map(item=>{const today=new Date();today.setHours(0,0,0,0);const days=Math.ceil((new Date(`${item.expiryDate}T12:00:00`).getTime()-today.getTime())/86400000);return <button key={item.id} onClick={()=>{setNotificationOpen(false);navigate('/admin/documentos')}} className="block w-full border-b border-slate-100 p-4 text-left transition hover:bg-amber-50/80 dark:border-white/10 dark:hover:bg-white/8"><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.name}</p><p className={`mt-1 text-xs font-semibold ${days<=0?'text-rose-600 dark:text-rose-300':'text-amber-600 dark:text-amber-300'}`}>{days<0?'Certidão vencida':days===0?'Vence hoje':`Vence em ${days} dia${days===1?'':'s'}`}</p></button>})}</div>}
+                  {todayOpportunities.length>0&&<div><p className="bg-blue-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">Oportunidades de hoje</p>{todayOpportunities.map((item)=><button key={item.externalId} onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="block w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/8"><p className="text-xs font-bold uppercase text-blue-600 dark:text-blue-300">{item.organizationName}</p><p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{item.object}</p><p className="mt-2 text-xs text-slate-400 dark:text-slate-400">Publicado hoje · {item.processNumber||item.procurementNumber}</p></button>)}</div>}
+                  {todayOpportunities.length===0&&certificateAlerts.length===0&&<p className="p-8 text-center text-sm text-slate-500 dark:text-slate-300">Nenhuma notificação nova.</p>}
+                </div>
+                <button onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="w-full border-t border-slate-100 bg-slate-50/80 p-3 text-xs font-semibold text-blue-600 backdrop-blur-md hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-blue-300 dark:hover:bg-white/[0.06]">Configurar áreas de interesse</button>
               </div>
-              <button onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="w-full border-t border-slate-100 p-3 text-xs font-semibold text-blue-600">Configurar áreas de interesse</button>
             </div>}
           </div>
         </header>

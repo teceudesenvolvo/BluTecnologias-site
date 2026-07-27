@@ -14,8 +14,8 @@ export const teamService = {
   async invite(value: Omit<TeamMember, 'id' | 'status'>) {
     const invitation = await addDoc(collection(db, 'teamInvitations'), { ...value, ...owner(), status: 'pending', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
     await addDoc(collection(db, 'teamMembers'), { ...value, ...owner(), invitationId: invitation.id, status: 'invited', createdAt: new Date().toISOString() });
-    const link = `${window.location.origin}${window.location.pathname}#/admin/cadastro-membro?token=${invitation.id}`;
-    await addDoc(collection(db, 'mail_queue'), { to: [value.email], userId: auth.currentUser?.uid, message: { subject: 'Convite para fazer parte da equipe Blu', text: `Você foi convidado para fazer parte da equipe na Blu. Acesse: ${link}`, html: `<p>Olá, ${value.name}.</p><p>Você foi convidado para fazer parte da equipe na Blu.</p><p><a href="${link}">Criar minha conta</a></p>` } });
+    const link = `${window.location.origin}${window.location.pathname}#/admin/cadastro-membro?token=${invitation.id}&email=${encodeURIComponent(value.email)}`;
+    await addDoc(collection(db, 'mail_queue'), { to: [value.email], userId: auth.currentUser?.uid, message: { subject: 'Convite para fazer parte da equipe Blu', text: `Você foi convidado para fazer parte da equipe na Blu. E-mail vinculado: ${value.email}. Acesse: ${link}`, html: `<p>Olá, ${value.name}.</p><p>Você foi convidado para fazer parte da equipe na Blu.</p><p><strong>E-mail vinculado:</strong> ${value.email}</p><p><a href="${link}">Criar minha conta</a></p>` } });
     return link;
   },
   async accept(token: string, name: string, email: string, password: string) {

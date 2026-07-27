@@ -116,12 +116,12 @@ export const MigrationPage: React.FC = () => {
           Administração da plataforma
         </p>
         <h1 className="mt-3 text-3xl font-black tracking-tight">
-          Migração Firebase → Backend Blu
+          Migração Firebase → backend Blu em Firebase
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
           Solicite a prévia ou execução da migração dos dados atuais do Firebase
-          para o backend próprio da Blu, mantendo segregação por empresa,
-          auditoria e validação de totais.
+          para o backend Blu executado em Firebase Functions, mantendo
+          segregação por empresa, auditoria e validação de totais.
         </p>
       </header>
 

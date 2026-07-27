@@ -32,7 +32,7 @@ export class BillingService {
     private readonly db: admin.firestore.Firestore,
     private readonly provider: BillingProvider,
     private readonly config: {
-      providerId: 'infinitepay';
+      providerId: 'asaas';
       handle: string;
       redirectUrl: string;
       webhookUrl: string;
@@ -175,7 +175,7 @@ export class BillingService {
         orderNsu: String(event.orderNsu),
         transactionNsu: String(event.transactionNsu),
         slug: String(event.invoiceSlug),
-        actorId: 'webhook:infinitepay',
+        actorId: 'webhook:asaas',
       });
       await eventRef.update({ processingStatus: 'PROCESSED', processedAt: iso(), result });
     } catch (error) {

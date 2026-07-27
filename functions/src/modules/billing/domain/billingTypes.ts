@@ -104,7 +104,7 @@ export type PaymentCheckResult = {
 };
 
 export type NormalizedWebhookEvent = {
-  provider: 'infinitepay';
+  provider: 'asaas';
   eventKey: string;
   orderNsu: string;
   invoiceSlug: string;

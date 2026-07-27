@@ -81,10 +81,58 @@ export type HqCustomerRow = {
   status: string;
   mrr: number;
   health: string;
+  logoUrl?: string;
+  companyDocument?: string;
+  companyLegalName?: string;
+  companyName?: string;
+  companyTradeName?: string;
+  companyFantasyName?: string;
+  companySize?: string;
+  companyLegalNature?: string;
+  companyStateRegistration?: string;
+  companyMunicipalRegistration?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyMobile?: string;
+  zipCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  partners?: any[];
+  representatives?: any[];
+  activities?: any[];
+  statements?: any[];
+  subscriptionId?: string;
+  planId?: string;
+  planSlug?: string;
+  planLimits?: Record<string, number | null>;
+  companyUsersCount?: number;
+  trialEndsAt?: string;
+  currentPeriodEndsAt?: string;
+  nextBillingDate?: string;
+  accessStatus?: string;
+};
+
+export type HqIncompleteCustomer = {
+  id: string;
+  company: string;
+  owner: string;
+  email: string;
+  phone: string;
+  plan: string;
+  status: string;
+  reason: string;
+  companyDocument?: string;
+  subscriptionId?: string;
 };
 
 export type HqOverview = {
   tenants: HqCustomerRow[];
+  incompleteCustomers: HqIncompleteCustomer[];
+  members: Array<{ id: string; companyId: string; name: string; email: string; company: string; role: string; status: string }>;
   prospects: Array<{ id: string; name: string; source: string; stage: string; value: string }>;
   supportQueue: Array<{ id: string; company: string; subject: string; status: string }>;
   metrics: {
@@ -92,10 +140,24 @@ export type HqOverview = {
     prospects: number;
     mrr: number;
     criticalCharges: number;
+    users: number;
+    trialCompanies: number;
+    upgrades: number;
+    downgrades: number;
+    leads: number;
+    incompleteCustomers: number;
   };
 };
 
 const platformAdminEmail = 'admin@blutecnologias.com.br';
+const readCachedUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('blu-licita:user') || 'null') as { email?: string } | null;
+  } catch {
+    return null;
+  }
+};
+const currentAdminEmail = () => String(auth.currentUser?.email || readCachedUser()?.email || '').toLowerCase();
 const asList = async <T,>(name: string): Promise<T[]> => {
   const snapshot = await getDocs(collection(db, name));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T);
@@ -120,7 +182,8 @@ const healthFromStatus = (status?: string) => {
 
 export const hqService = {
   async overview(): Promise<HqOverview> {
-    const email = auth.currentUser?.email?.toLowerCase();
+    const email = currentAdminEmail();
+    if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
     const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships] = await Promise.all([
@@ -148,24 +211,101 @@ export const hqService = {
       .filter((payment) => String(payment.status || '').toUpperCase() === 'PAID')
       .forEach((payment) => paidByCompany.set(String(payment.companyId || ''), (paidByCompany.get(String(payment.companyId || '')) || 0) + Number(payment.paidAmountInCents || payment.amountInCents || 0)));
 
-    const tenants = companies
+    const trialCompanies = subscriptions.filter((subscription) => String(subscription.status || '').toUpperCase() === 'TRIALING').length;
+    const upgrades = orders.filter((order) => String(order.type || '').toUpperCase() === 'UPGRADE').length;
+    const downgrades = orders.filter((order) => String(order.type || '').toUpperCase() === 'DOWNGRADE').length;
+    const leads = clients.filter((client) => client.status === 'lead').length;
+
+    const companyIds = new Set<string>([...companies.map((item) => item.id), ...memberships.map((item) => String(item.companyId || ''))].filter(Boolean));
+    const tenants = [...companyIds]
       .map((company) => {
-        const subscription = subscriptionsByCompany.get(company.id);
+        const companyDoc = companies.find((item) => item.id === company);
+        const subscription = subscriptionsByCompany.get(company);
         const plan = subscription?.planId ? plansById.get(subscription.planId) : undefined;
+        const companyMembers = memberships.filter((item) => String(item.companyId || '') === company);
+        const ownerMember = companyMembers.find((item) => String(item.role || '').toLowerCase().includes('propriet')) || companyMembers[0];
         const mrr = subscription?.status === 'ACTIVE' || subscription?.status === 'TRIALING'
           ? Number(plan?.priceInCents || 0)
           : 0;
         return {
-          id: company.id,
-          company: company.tradeName || company.name || company.legalName || company.document || company.id,
-          owner: ownersByCompany.get(company.id) || company.ownerUserId || 'Responsável não informado',
+          id: company,
+          company: companyDoc?.nomeFantasia || companyDoc?.razaoSocial || companyDoc?.tradeName || companyDoc?.name || companyDoc?.legalName || companyDoc?.document || company,
+          owner: ownersByCompany.get(company) || ownerMember?.name || ownerMember?.email || companyDoc?.ownerUserId || 'Responsável não informado',
           plan: plan?.name || subscription?.planId || 'Sem plano',
-          status: normalizeStatus(subscription?.status || company.accessStatus),
+          status: normalizeStatus(subscription?.status || companyDoc?.accessStatus || ownerMember?.status),
           mrr,
-          health: healthFromStatus(subscription?.status || company.accessStatus),
+          health: healthFromStatus(subscription?.status || companyDoc?.accessStatus || ownerMember?.status),
+          logoUrl: companyDoc?.logoUrl,
+          companyDocument: companyDoc?.document,
+          companyLegalName: companyDoc?.razaoSocial || companyDoc?.legalName || companyDoc?.name,
+          companyName: companyDoc?.name || companyDoc?.razaoSocial,
+          companyTradeName: companyDoc?.tradeName || companyDoc?.razaoSocial,
+          companyFantasyName: companyDoc?.nomeFantasia,
+          companySize: companyDoc?.porte,
+          companyLegalNature: companyDoc?.naturezaJuridica,
+          companyStateRegistration: companyDoc?.inscricaoEstadual,
+          companyMunicipalRegistration: companyDoc?.inscricaoMunicipal,
+          companyEmail: companyDoc?.email,
+          companyPhone: companyDoc?.phone,
+          companyMobile: companyDoc?.telefoneCelular,
+          zipCode: companyDoc?.cep,
+          street: companyDoc?.logradouro,
+          number: companyDoc?.numero,
+          complement: companyDoc?.complemento,
+          neighborhood: companyDoc?.bairro,
+          city: companyDoc?.municipio,
+          state: companyDoc?.uf,
+          partners: Array.isArray((companyDoc as any)?.socios) ? (companyDoc as any).socios : [],
+          representatives: Array.isArray((companyDoc as any)?.representantes) ? (companyDoc as any).representantes : [],
+          activities: Array.isArray((companyDoc as any)?.atividades) ? (companyDoc as any).atividades : [],
+          statements: Array.isArray((companyDoc as any)?.demonstrativos) ? (companyDoc as any).demonstrativos : [],
+          subscriptionId: subscription?.id,
+          planId: subscription?.planId,
+          planSlug: plan?.slug,
+          planLimits: plan?.limits || undefined,
+          companyUsersCount: companyMembers.length,
+          trialEndsAt: subscription?.trialEndsAt,
+          currentPeriodEndsAt: subscription?.currentPeriodEndsAt,
+          nextBillingDate: subscription?.nextBillingDate,
+          accessStatus: companyDoc?.accessStatus,
         };
       })
       .sort((a, b) => a.company.localeCompare(b.company));
+    const incompleteCustomers = tenants
+      .filter((item) => !item.companyDocument || !item.subscriptionId || !item.companyEmail || !item.owner || item.owner === 'Responsável não informado')
+      .map((item) => {
+        const reasons = [
+          !item.companyDocument ? 'CNPJ ausente' : '',
+          !item.subscriptionId ? 'Assinatura ausente' : '',
+          !item.companyEmail ? 'E-mail ausente' : '',
+          !item.companyPhone && !item.companyMobile ? 'Telefone ausente' : '',
+          !item.owner || item.owner === 'Responsável não informado' ? 'Responsável não informado' : '',
+        ].filter(Boolean);
+        return {
+          id: item.id,
+          company: item.company,
+          owner: item.owner,
+          email: item.companyEmail || '',
+          phone: item.companyMobile || item.companyPhone || '',
+          plan: item.plan,
+          status: item.status,
+          reason: reasons.join(' · '),
+          companyDocument: item.companyDocument,
+          subscriptionId: item.subscriptionId,
+        };
+      });
+
+    const members = memberships
+      .map((membership) => ({
+        id: membership.id,
+        companyId: String(membership.companyId || ''),
+        name: membership.name || membership.email || 'Usuário sem nome',
+        email: membership.email || '',
+        company: tenants.find((tenant) => tenant.id === membership.companyId)?.company || membership.companyId || 'Empresa não identificada',
+        role: membership.role || 'Não informado',
+        status: membership.status || 'active',
+      }))
+      .sort((a, b) => a.company.localeCompare(b.company) || a.name.localeCompare(b.name));
 
     const realProspects = [...prospects, ...clients.filter((client) => client.status === 'lead')]
       .map((item) => ({
@@ -193,6 +333,7 @@ export const hqService = {
 
     return {
       tenants,
+      members,
       prospects: realProspects,
       supportQueue,
       metrics: {
@@ -200,6 +341,12 @@ export const hqService = {
         prospects: realProspects.length,
         mrr: tenants.reduce((sum, tenant) => sum + tenant.mrr, 0),
         criticalCharges,
+        users: members.length,
+        trialCompanies,
+        upgrades,
+        downgrades,
+        leads,
+        incompleteCustomers: incompleteCustomers.length,
       },
     };
   },

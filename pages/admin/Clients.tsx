@@ -9,7 +9,7 @@ export const Clients: React.FC = () => {
   const [contacts, setContacts] = useState<ContactLead[]>([]);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'lead' | 'active' | 'prospecting' | 'prospecting-map'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'prospecting' | 'prospecting-map'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProspectModalOpen, setIsProspectModalOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -562,7 +562,7 @@ export const Clients: React.FC = () => {
             </button>
         </div>
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h3 className="text-xl font-bold text-slate-700">Gestão de Clientes e Leads</h3>
+          <h3 className="text-xl font-bold text-slate-700">Gestão de Clientes</h3>
           
           <div className="flex bg-slate-100 p-1 rounded-xl">
             
@@ -571,12 +571,6 @@ export const Clients: React.FC = () => {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'active' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Clientes Ativos
-            </button>
-            <button 
-              onClick={() => setFilter('lead')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'lead' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Leads (Fale Conosco)
             </button>
             <button 
               onClick={() => setFilter('prospecting')}

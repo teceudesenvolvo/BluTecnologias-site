@@ -206,8 +206,8 @@ export const DashboardPage: React.FC = () => {
         <section className={`overflow-hidden rounded-2xl ${glass}`}>
           <div className="flex items-center justify-between border-b border-slate-100 p-5 dark:border-white/10">
             <div>
-              <h3 className="font-bold text-slate-950 dark:text-white">Oportunidades que valem atenção</h3>
-              <p className={`mt-1 text-xs ${mutedText}`}>Compatibilidade comercial, não apenas palavras-chave</p>
+              <h3 className="font-bold text-slate-950 dark:text-white">Novas oportunidades</h3>
+              <p className={`mt-1 text-xs ${mutedText}`}>Processos recém-publicados com maior aderência</p>
             </div>
             <button onClick={() => navigate('/admin/oportunidades')} className="text-sm font-semibold text-blue-600 dark:text-blue-300">Ver todas</button>
           </div>

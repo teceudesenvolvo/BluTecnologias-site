@@ -1,7 +1,8 @@
 import React from "react";
-import { CheckCircle2, Save, ShieldAlert } from "lucide-react";
+import { CheckCircle2, CreditCard, Save, ShieldAlert } from "lucide-react";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { subscriptionPlanService, subscriptionPlans, type CompanySubscription, type PlanKey, type PlanLimits } from "../services/subscriptionPlanService";
+import { billingClient, type BillingSummary } from "../billing/services/billingClient";
 
 const labels: Record<keyof PlanLimits, string> = {
   companies: "Empresas / CNPJs",
@@ -34,13 +35,22 @@ const formatLimit = (key: keyof PlanLimits, value: any) => {
 export const PlansSettingsPage: React.FC = () => {
   const { user } = useBluAuth();
   const [subscription, setSubscription] = React.useState<CompanySubscription>({ plan: "essential", status: "active" });
+  const [billing, setBilling] = React.useState<BillingSummary | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState("");
 
   React.useEffect(() => {
     if (!user) return;
-    subscriptionPlanService.get(user.companyId).then(setSubscription).finally(() => setLoading(false));
+    Promise.all([
+      subscriptionPlanService.get(user.companyId),
+      billingClient.summary().catch(() => null),
+    ])
+      .then(([planSubscription, billingSummary]) => {
+        setSubscription(planSubscription);
+        setBilling(billingSummary);
+      })
+      .finally(() => setLoading(false));
   }, [user]);
 
   const save = async () => {
@@ -76,6 +86,20 @@ export const PlansSettingsPage: React.FC = () => {
         <div className="flex gap-3">
           <ShieldAlert className="mt-0.5 shrink-0" size={20} />
           <p className="text-sm leading-6">Nesta etapa, a tela centraliza a política comercial e prepara o modelo de dados. Para impedir ultrapassagem de limite com segurança, cada operação crítica precisa validar estes limites em Cloud Functions/backend, não apenas na interface.</p>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-700">Plano do proprietário</p>
+            <h2 className="mt-2 text-xl font-black">{billing?.plan?.name || currentPlan.name}</h2>
+            <p className="mt-1 text-sm text-blue-900/75">Os limites abaixo valem para toda a empresa e toda a equipe. Upgrades, downgrades e pagamento são gerenciados em assinatura.</p>
+          </div>
+          <a href="#/admin/assinatura" className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-blue-700 shadow-sm">
+            <CreditCard size={17} />
+            Ir para assinatura
+          </a>
         </div>
       </section>
 

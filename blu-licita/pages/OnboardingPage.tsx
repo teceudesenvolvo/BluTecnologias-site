@@ -25,7 +25,8 @@ export const OnboardingPage: React.FC = () => {
   const [companyForm, setCompanyForm] = useState({ legalName: '', tradeName: '', document: '', segment: '', city: '', state: '' });
   const { createTrialAccount } = useBluAuth();
   const navigate = useNavigate();
-  const currentPlan = useMemo(() => subscriptionPlans.find((item) => item.key === plan) || subscriptionPlans[1], [plan]);
+  const selectablePlans = useMemo(() => subscriptionPlans.filter((item) => item.key !== 'enterprise'), []);
+  const currentPlan = useMemo(() => selectablePlans.find((item) => item.key === plan) || selectablePlans[1], [plan, selectablePlans]);
   const progress = step * 25;
 
   const next = () => {
@@ -90,7 +91,7 @@ export const OnboardingPage: React.FC = () => {
               <>
                 <StepTitle icon={<Sparkles />} title="Escolha seu plano para o teste" description="Todos os planos possuem as funcionalidades da Blu. O que muda é a capacidade operacional." />
                 <div className="mt-7 grid gap-4 md:grid-cols-2">
-                  {subscriptionPlans.map((item) => (
+                  {selectablePlans.map((item) => (
                     <button key={item.key} type="button" onClick={() => setPlan(item.key)} className={`rounded-3xl border p-5 text-left transition ${plan === item.key ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div><h3 className="text-xl font-black">{item.name.replace('Plano ', '')}</h3><p className="mt-1 text-sm text-slate-500">{item.subtitle}</p></div>

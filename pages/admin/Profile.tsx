@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, Loader2, Shield, Building2, Users, FileText, Briefcase, Upload, Trash2, Plus, Search, MapPin, Send, Edit2, X } from 'lucide-react';
-import { auth, Company, onAuthStateChanged, storageService } from '../../services/firebase';
+import { auth, Company, onAuthStateChanged, signOut, storageService } from '../../services/firebase';
 import { companySettingsService, userSettingsService } from '../../services/firestoreSettingsService';
 import { updateProfile, updatePassword, type User as FirebaseUser } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 import { PlanLimitWarning, usePlanLimits } from '../../blu-licita/hooks/usePlanLimits';
 
 export const Profile: React.FC = () => {
@@ -30,6 +31,7 @@ export const Profile: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null); // Company being edited
   const plan = usePlanLimits();
+  const navigate = useNavigate();
   const [currentCompanyFormData, setCurrentCompanyFormData] = useState<Partial<Company>>({ // Data for the modal form
     cnpj: '',
     razaoSocial: '',
@@ -373,34 +375,54 @@ export const Profile: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate('/login');
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-96"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
   }
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h3 className="text-xl font-bold text-slate-700">Dados da Empresa</h3>
-          <p className="text-slate-500">Gerencie as informações cadastrais e societárias.</p>
-        </div>
-        <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-            {user?.displayName?.charAt(0).toUpperCase() || <User size={16} />}
+    <div className="space-y-6 rounded-[2rem] border border-white/10 bg-white/70 p-4 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 rounded-[1.75rem] border border-slate-200 bg-gradient-to-br from-slate-950 to-blue-950 p-6 text-white shadow-sm dark:border-white/10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-[11px] font-black uppercase tracking-[.22em] text-blue-200">Perfil e acesso</p>
+            <h3 className="text-2xl font-black tracking-tight">Sua conta e as empresas vinculadas</h3>
+            <p className="max-w-3xl text-sm leading-6 text-slate-300">Aqui você edita seu nome de exibição, senha, e-mails de saída e os dados cadastrais das empresas. Também pode sair da sessão com um clique.</p>
           </div>
-          <span className="text-sm font-medium text-slate-700">{user?.email}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-white text-slate-950 font-black">
+                {(user?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U')}
+              </div>
+              <div>
+                <p className="text-sm font-bold">{user?.displayName || 'Usuário Blu'}</p>
+                <p className="text-xs text-slate-300">{user?.email || 'E-mail não informado'}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15"
+            >
+              <X size={16} /> Sair do sistema
+            </button>
+          </div>
         </div>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-xl mb-6 text-sm font-medium flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+        <div className={`p-4 rounded-2xl text-sm font-medium flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100 dark:bg-green-500/10 dark:text-green-100 dark:border-green-400/20' : 'bg-red-50 text-red-700 border border-red-100 dark:bg-red-500/10 dark:text-red-100 dark:border-red-400/20'}`}>
           {message.type === 'success' ? <Shield size={18} /> : <Lock size={18} />}
           {message.text}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 overflow-x-auto mb-8">
+      <div className="flex overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]">
         {[
           { id: 'company', label: 'Empresas', icon: Building2 }, // Changed label
           { id: 'access', label: 'Dados de Acesso', icon: Lock },
@@ -409,9 +431,9 @@ export const Profile: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-4 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === tab.id
-              ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-              : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'
+            className={`flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
+              ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white'
+              : 'text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white'
               }`}
           >
             <tab.icon size={18} /> {tab.label}

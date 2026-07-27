@@ -1,9 +1,12 @@
 import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
 import { auth, db } from "../../../services/firebase";
 
+// provider-agnostic billing client (Asaas / future gateways)
+const apiBaseUrl = () => (import.meta.env.VITE_BLU_API_BASE_URL as string | undefined || "").replace(/\/$/, "");
+
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
   const token = await auth.currentUser?.getIdToken();
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
