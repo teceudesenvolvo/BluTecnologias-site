@@ -40,8 +40,12 @@
         "function": "billingPaymentCheck"
       },
       {
-        "source": "/api/webhooks/asaas",
-        "function": "asaasWebhook"
+        "source": "/api/billing/admin/plans",
+        "function": "billingAdminPlans"
+      },
+      {
+        "source": "/api/webhooks/pagarme",
+        "function": "pagarmeWebhook"
       },
       {
         "source": "**",

@@ -1,22 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, Loader2, Shield, Building2, Users, FileText, Briefcase, Upload, Trash2, Plus, Search, MapPin, Send, Edit2, X } from 'lucide-react';
-import { auth, Company, onAuthStateChanged, signOut, storageService } from '../../services/firebase';
+import { auth, Company, db, onAuthStateChanged, signOut, storageService } from '../../services/firebase';
 import { companySettingsService, userSettingsService } from '../../services/firestoreSettingsService';
 import { updateProfile, updatePassword, type User as FirebaseUser } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { PlanLimitWarning, usePlanLimits } from '../../blu-licita/hooks/usePlanLimits';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { lookupCepData } from '../../services/cepLookup';
 
 export const Profile: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
-  const [activeTab, setActiveTab] = useState<'company' | 'partners' | 'representatives' | 'activities' | 'financials' | 'access' | 'email'>('company');
+  const [activeTab, setActiveTab] = useState<'personal' | 'company' | 'partners' | 'representatives' | 'activities' | 'financials' | 'access' | 'email'>('company');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // User Access State
   const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [phone, setPhone] = useState('');
+  const [document, setDocument] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [personalSaving, setPersonalSaving] = useState(false);
+  const [personalBilling, setPersonalBilling] = useState({
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    municipio: '',
+    uf: '',
+    telefone: '',
+  });
 
   // Email Configuration State
   const [smtpSettings, setSmtpSettings] = useState<any>({
@@ -32,6 +48,9 @@ export const Profile: React.FC = () => {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null); // Company being edited
   const plan = usePlanLimits();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [billingCompletionHint, setBillingCompletionHint] = useState<string[]>([]);
+  const [billingCompanyId, setBillingCompanyId] = useState('');
   const [currentCompanyFormData, setCurrentCompanyFormData] = useState<Partial<Company>>({ // Data for the modal form
     cnpj: '',
     razaoSocial: '',
@@ -57,13 +76,65 @@ export const Profile: React.FC = () => {
     demonstrativos: []
   });
   
+  const onlyDigits = (value: string) => value.replace(/\D/g, '');
+  const maskCpf = (value: string) => {
+    const digits = onlyDigits(value).slice(0, 11);
+    return digits
+      .replace(/^(\d{3})(\d)/, '$1.$2')
+      .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+  };
+  const maskCnpj = (value: string) => {
+    const digits = onlyDigits(value).slice(0, 14);
+    return digits
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
+      .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+  };
+  const maskCep = (value: string) => onlyDigits(value).slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
+  const maskPhone = (value: string) => {
+    const digits = onlyDigits(value).slice(0, 11);
+    const first = digits.replace(/^(\d{2})(\d)/, '($1) $2');
+    return digits.length > 10
+      ? first.replace(/^(\(\d{2}\)\s\d{5})(\d)/, '$1-$2')
+      : first.replace(/^(\(\d{2}\)\s\d{4})(\d)/, '$1-$2');
+  };
+
 
   useEffect(() => {
+    const stateTab = (location.state as { section?: typeof activeTab } | null)?.section;
+    const searchTab = new URLSearchParams(location.search).get('tab') as typeof activeTab | null;
+    const requestedTab = stateTab || searchTab || 'company';
+    if (requestedTab) setActiveTab(requestedTab);
+
     const unsubscribe = onAuthStateChanged(auth, currentUser => {
       setUser(currentUser);
       if (currentUser) {
         setDisplayName(currentUser.displayName || '');
-        loadCompanyData();
+        getDoc(doc(db, 'users', currentUser.uid))
+          .then((snapshot) => {
+            if (!snapshot.exists()) return;
+            const data = snapshot.data() as Record<string, any>;
+            const savedBillingCompanyId = String(data.billingCompanyId || data.primaryBillingCompanyId || '');
+            setDisplayName(String(data.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || ''));
+            setPhone(String(data.phone || data.phoneNumber || ''));
+            setDocument(String(data.document || data.cpf || ''));
+            setBirthDate(String(data.birthDate || ''));
+            setPersonalBilling({
+              cep: String(data.billingCep || data.cep || data.companyCep || ''),
+              logradouro: String(data.billingStreet || data.logradouro || data.companyStreet || ''),
+              numero: String(data.billingNumber || data.numero || data.companyNumber || ''),
+              complemento: String(data.billingComplement || data.complemento || ''),
+              bairro: String(data.billingNeighborhood || data.bairro || data.companyNeighborhood || ''),
+              municipio: String(data.billingCity || data.municipio || data.companyCity || ''),
+              uf: String(data.billingState || data.uf || data.companyState || ''),
+              telefone: String(data.billingPhone || data.phone || data.phoneNumber || ''),
+            });
+            setBillingCompanyId(savedBillingCompanyId);
+            loadCompanyData(currentUser, savedBillingCompanyId);
+          })
+          .catch(() => loadCompanyData(currentUser));
         loadSmtpSettings();
       } else {
         setCompanies([]);
@@ -71,7 +142,7 @@ export const Profile: React.FC = () => {
       }
     });
     return unsubscribe;
-  }, []);
+  }, [location.search, location.state]);
 
   const loadSmtpSettings = async () => {
     try {
@@ -82,10 +153,60 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const loadCompanyData = async () => { // Renamed from loadCompanyData
+  const loadCompanyData = async (currentUser = user, selectedBillingCompanyId = billingCompanyId) => { // Renamed from loadCompanyData
     setLoading(true);
     try {
-      setCompanies(await companySettingsService.getAll());
+      const list = await companySettingsService.getAll();
+      setCompanies(list);
+      const selectedCompany = list.find((item) => String(item.id || '') === String(selectedBillingCompanyId || billingCompanyId || ''));
+      if (selectedCompany) {
+        setPersonalBilling({
+          cep: String((selectedCompany as any).cep || (selectedCompany as any).companyCep || personalBilling.cep || ''),
+          logradouro: String((selectedCompany as any).logradouro || (selectedCompany as any).companyStreet || personalBilling.logradouro || ''),
+          numero: String((selectedCompany as any).numero || (selectedCompany as any).companyNumber || personalBilling.numero || ''),
+          complemento: String((selectedCompany as any).complemento || personalBilling.complemento || ''),
+          bairro: String((selectedCompany as any).bairro || (selectedCompany as any).companyNeighborhood || personalBilling.bairro || ''),
+          municipio: String((selectedCompany as any).municipio || (selectedCompany as any).city || (selectedCompany as any).companyCity || personalBilling.municipio || ''),
+          uf: String((selectedCompany as any).uf || (selectedCompany as any).state || (selectedCompany as any).companyState || personalBilling.uf || ''),
+          telefone: String((selectedCompany as any).telefoneCelular || (selectedCompany as any).telefoneFixo || (selectedCompany as any).phone || personalBilling.telefone || ''),
+        });
+      }
+      if (!selectedBillingCompanyId && list.length > 0) {
+        const fallbackId = String(list[0].id || '');
+        if (fallbackId) {
+          setBillingCompanyId(fallbackId);
+          try {
+            if (currentUser) {
+              const payload = {
+                displayName,
+                email: currentUser.email,
+                phone,
+                document,
+                birthDate,
+                billingCompanyId: fallbackId,
+                primaryBillingCompanyId: fallbackId,
+                updatedAt: new Date().toISOString(),
+              };
+              await userSettingsService.updateProfile(payload);
+              await setDoc(doc(db, 'users', currentUser.uid), payload, { merge: true });
+              try {
+                const cached = JSON.parse(localStorage.getItem('blu-licita:user') || 'null');
+                if (cached) {
+                  localStorage.setItem('blu-licita:user', JSON.stringify({
+                    ...cached,
+                    billingCompanyId: fallbackId,
+                    primaryBillingCompanyId: fallbackId,
+                  }));
+                }
+              } catch {
+                // ignore cache issues
+              }
+            }
+          } catch (error) {
+            console.warn('Não foi possível definir a empresa principal automaticamente.', error);
+          }
+        }
+      }
     } catch (error) {
       console.error("Erro ao carregar dados das empresas:", error);
     } finally {
@@ -191,6 +312,25 @@ export const Profile: React.FC = () => {
     setIsCompanyModalOpen(true);
   };
 
+  const handleLookupPersonalCep = async (rawCep: string) => {
+    const cep = onlyDigits(rawCep);
+    if (cep.length !== 8) return;
+    try {
+      const data = await lookupCepData(cep);
+      setPersonalBilling((current) => ({
+        ...current,
+        cep: data.cep,
+        logradouro: data.street || current.logradouro,
+        bairro: data.neighborhood || current.bairro,
+        municipio: data.city || current.municipio,
+        uf: data.state || current.uf,
+        complemento: data.complement || current.complemento,
+      }));
+    } catch (error) {
+      console.warn('Não foi possível consultar o CEP do perfil.', error);
+    }
+  };
+
   const fetchCnpjData = async (cnpj: string) => {
     const cleanCnpj = cnpj.replace(/\D/g, '');
     if (cleanCnpj.length === 14) {
@@ -278,6 +418,62 @@ export const Profile: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const company = companies.find((item) => item.id === billingCompanyId) || companies[0];
+    if (!company) {
+      setBillingCompletionHint([]);
+      return;
+    }
+    const missing = [
+      !company.cnpj && 'CNPJ',
+      !company.email && 'E-mail da empresa',
+      !company.telefoneCelular && !company.telefoneFixo && 'Telefone da empresa',
+      !company.cep && 'CEP',
+      !company.logradouro && 'Logradouro',
+      !company.numero && 'Número',
+      !company.bairro && 'Bairro',
+      !company.municipio && 'Município',
+      !company.uf && 'UF',
+    ].filter(Boolean) as string[];
+    setBillingCompletionHint(missing);
+  }, [companies, billingCompanyId]);
+
+  const persistBillingCompanySelection = async (companyId: string) => {
+    setBillingCompanyId(companyId);
+    try {
+      if (!user) return;
+      const payload = {
+        displayName,
+        email: user.email,
+        phone,
+        document,
+        birthDate,
+        billingCompanyId: companyId,
+        primaryBillingCompanyId: companyId,
+        updatedAt: new Date().toISOString(),
+      };
+      await userSettingsService.updateProfile(payload);
+      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+      try {
+        const cached = JSON.parse(localStorage.getItem('blu-licita:user') || 'null');
+        if (cached) {
+          localStorage.setItem('blu-licita:user', JSON.stringify({
+            ...cached,
+            billingCompanyId: companyId,
+            primaryBillingCompanyId: companyId,
+          }));
+        }
+      } catch {
+        // ignore cache issues
+      }
+      window.dispatchEvent(new Event('blu:profile-updated'));
+      setMessage({ type: 'success', text: 'Empresa principal para cobrança atualizada.' });
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: 'error', text: 'Não foi possível salvar a empresa principal de cobrança.' });
+    }
+  };
+
   // Generic List Handlers (Socios, Representantes, Atividades)
   const addItem = (field: string, item: any) => {
     setCurrentCompanyFormData((prev: any) => ({
@@ -329,12 +525,23 @@ export const Profile: React.FC = () => {
         await userSettingsService.updateProfile({
           displayName,
           email: user.email,
+          phone,
+          document,
+          birthDate,
           updatedAt: new Date().toISOString()
         });
+        await setDoc(doc(db, 'users', user.uid), {
+          displayName,
+          email: user.email,
+          phone,
+          document,
+          birthDate,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
 
         try {
           const cached = JSON.parse(localStorage.getItem('blu-licita:user') || 'null');
-          if (cached) localStorage.setItem('blu-licita:user', JSON.stringify({ ...cached, name: displayName }));
+          if (cached) localStorage.setItem('blu-licita:user', JSON.stringify({ ...cached, name: displayName, billingCompanyId }));
           window.dispatchEvent(new Event('blu:profile-updated'));
         } catch {
           window.dispatchEvent(new Event('blu:profile-updated'));
@@ -380,6 +587,103 @@ export const Profile: React.FC = () => {
     navigate('/login');
   };
 
+  const handleSavePersonalData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      if (!user) throw new Error('Usuário não autenticado.');
+      await updateProfile(user, { displayName });
+      await setDoc(doc(db, 'users', user.uid), {
+        displayName,
+        email: user.email,
+        phone,
+        document,
+        birthDate,
+        billingCep: personalBilling.cep,
+        billingStreet: personalBilling.logradouro,
+        billingNumber: personalBilling.numero,
+        billingComplement: personalBilling.complemento,
+        billingNeighborhood: personalBilling.bairro,
+        billingCity: personalBilling.municipio,
+        billingState: personalBilling.uf,
+        billingPhone: personalBilling.telefone,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      await userSettingsService.updateProfile({
+        displayName,
+        email: user.email,
+        phone,
+        document,
+        birthDate,
+        billingCep: personalBilling.cep,
+        billingStreet: personalBilling.logradouro,
+        billingNumber: personalBilling.numero,
+        billingComplement: personalBilling.complemento,
+        billingNeighborhood: personalBilling.bairro,
+        billingCity: personalBilling.municipio,
+        billingState: personalBilling.uf,
+        billingPhone: personalBilling.telefone,
+        updatedAt: new Date().toISOString()
+      });
+      if (billingCompanyId) {
+        const billingPayload = {
+          cep: personalBilling.cep,
+          zipCode: personalBilling.cep,
+          logradouro: personalBilling.logradouro,
+          street: personalBilling.logradouro,
+          numero: personalBilling.numero,
+          number: personalBilling.numero,
+          complemento: personalBilling.complemento,
+          bairro: personalBilling.bairro,
+          neighborhood: personalBilling.bairro,
+          municipio: personalBilling.municipio,
+          city: personalBilling.municipio,
+          uf: personalBilling.uf,
+          state: personalBilling.uf,
+          telefone: personalBilling.telefone,
+          phone: personalBilling.telefone,
+          telefoneCelular: personalBilling.telefone,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user.uid,
+        };
+        await companySettingsService.update(billingCompanyId, billingPayload);
+        setCompanies((current) => current.map((company) =>
+          company.id === billingCompanyId
+            ? { ...company, ...billingPayload }
+            : company
+        ));
+      }
+      try {
+        const cached = JSON.parse(localStorage.getItem('blu-licita:user') || 'null');
+        if (cached) {
+          localStorage.setItem('blu-licita:user', JSON.stringify({
+            ...cached,
+            name: displayName,
+            billingCompanyId,
+            billingCep: personalBilling.cep,
+            billingStreet: personalBilling.logradouro,
+            billingNumber: personalBilling.numero,
+            billingComplement: personalBilling.complemento,
+            billingNeighborhood: personalBilling.bairro,
+            billingCity: personalBilling.municipio,
+            billingState: personalBilling.uf,
+            billingPhone: personalBilling.telefone,
+          }));
+        }
+      } catch {
+        // ignore cache issues
+      }
+      window.dispatchEvent(new Event('blu:profile-updated'));
+      setMessage({ type: 'success', text: 'Dados pessoais atualizados com sucesso!' });
+    } catch (error: any) {
+      console.error(error);
+      setMessage({ type: 'error', text: error?.message || 'Erro ao atualizar dados pessoais.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-96"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
   }
@@ -412,6 +716,12 @@ export const Profile: React.FC = () => {
             </button>
           </div>
         </div>
+        {billingCompletionHint.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/95 p-4 text-amber-900">
+            <p className="text-[11px] font-black uppercase tracking-[.18em]">Dados de cobrança incompletos</p>
+            <p className="mt-1 text-sm leading-6">Antes de pagar planos ou renovar a assinatura, complete em <b>Empresas</b>: {billingCompletionHint.join(', ')}.</p>
+          </div>
+        )}
       </div>
 
       {message && (
@@ -424,6 +734,7 @@ export const Profile: React.FC = () => {
       {/* Tabs */}
       <div className="flex overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]">
         {[
+          { id: 'personal', label: 'Dados pessoais', icon: User },
           { id: 'company', label: 'Empresas', icon: Building2 }, // Changed label
           { id: 'access', label: 'Dados de Acesso', icon: Lock },
           { id: 'email', label: 'Configurações de E-mail', icon: Send },
@@ -443,14 +754,224 @@ export const Profile: React.FC = () => {
 
       {/* Tab Content */}
       <div className="min-h-[400px]">
+        {activeTab === 'personal' && (
+          <form onSubmit={handleSavePersonalData} className="space-y-8 animate-fade-in-up max-w-3xl">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.05]">
+              <h4 className="flex items-center gap-2 text-lg font-black text-slate-800 dark:text-white">
+                <User size={19} className="text-blue-600" /> Dados pessoais
+              </h4>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">
+                Atualize seus dados para convite de equipe, assinatura e validações de cadastro.
+              </p>
+
+              <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">Nome de Exibição</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-4 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      placeholder="Seu nome completo"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">CPF</label>
+                  <input
+                    type="text"
+                    value={document}
+                    onChange={e => setDocument(maskCpf(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">Data de nascimento</label>
+                  <input
+                    type="date"
+                    value={birthDate}
+                    onChange={e => setBirthDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">Telefone / WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(maskPhone(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                    placeholder="(85) 99999-9999"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">E-mail</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                      type="email"
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">O e-mail principal não pode ser alterado aqui.</p>
+                </div>
+
+                <div className="md:col-span-2 mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <h5 className="flex items-center gap-2 text-sm font-black text-slate-800 dark:text-white">
+                    <MapPin size={17} className="text-blue-600" /> Endereço de cobrança da empresa principal
+                  </h5>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Esses dados serão usados no checkout e podem ser preenchidos automaticamente pelo CEP.</p>
+                  <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 md:col-span-2">
+                      CEP
+                      <input
+                        type="text"
+                        value={maskCep(personalBilling.cep)}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, cep: maskCep(e.target.value) }))}
+                        onBlur={(e) => handleLookupPersonalCep(e.target.value)}
+                        placeholder="00000-000"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 md:col-span-2">
+                      Logradouro
+                      <input
+                        type="text"
+                        value={personalBilling.logradouro}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, logradouro: e.target.value }))}
+                        placeholder="Rua, avenida..."
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Número
+                      <input
+                        type="text"
+                        value={personalBilling.numero}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, numero: e.target.value }))}
+                        placeholder="123"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Complemento
+                      <input
+                        type="text"
+                        value={personalBilling.complemento}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, complemento: e.target.value }))}
+                        placeholder="Sala, bloco..."
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Bairro
+                      <input
+                        type="text"
+                        value={personalBilling.bairro}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, bairro: e.target.value }))}
+                        placeholder="Centro"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Município
+                      <input
+                        type="text"
+                        value={personalBilling.municipio}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, municipio: e.target.value }))}
+                        placeholder="Fortaleza"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      UF
+                      <input
+                        type="text"
+                        value={personalBilling.uf}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, uf: e.target.value.toUpperCase() }))}
+                        placeholder="CE"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                        maxLength={2}
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 md:col-span-2">
+                      Telefone da empresa
+                      <input
+                        type="tel"
+                        value={personalBilling.telefone}
+                        onChange={(e) => setPersonalBilling((current) => ({ ...current, telefone: maskPhone(e.target.value) }))}
+                        placeholder="(85) 99999-9999"
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-70"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  Salvar dados pessoais
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
         {activeTab === 'company' && (
           <div className="space-y-6 animate-fade-in-up">
-            <div className="flex justify-between items-center">
-            <h4 className="font-bold text-slate-700">Minhas Empresas</h4>
-            <button onClick={handleAddNewCompany} disabled={!plan.allowed('companies', companies.length)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
-              <Plus size={18} /> Adicionar Empresa
-            </button>
-          </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="space-y-1">
+                  <h4 className="font-black text-slate-800 dark:text-white">Minhas Empresas</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-300">
+                    Selecione qual empresa será usada como base para cobrança, planos e checkout.
+                  </p>
+                </div>
+                <button onClick={handleAddNewCompany} disabled={!plan.allowed('companies', companies.length)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  <Plus size={18} /> Adicionar Empresa
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">Empresa principal para cobrança</label>
+                  <select
+                    value={billingCompanyId}
+                    onChange={(e) => persistBillingCompanySelection(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                    disabled={!companies.length}
+                  >
+                    {companies.length === 0 ? (
+                      <option value="">Nenhuma empresa cadastrada</option>
+                    ) : (
+                      companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.razaoSocial || company.nomeFantasia || company.cnpj || company.id}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
+                  A cobrança e o checkout usarão os dados da empresa selecionada.
+                </div>
+              </div>
+            </div>
+
           <p className="text-xs font-semibold text-slate-400">Uso do plano: {companies.length}/{plan.label('companies')} empresa(s)</p>
           {!plan.allowed('companies', companies.length) && (
             <PlanLimitWarning>{plan.message('empresas/CNPJs', 'companies')} Você ainda pode editar empresas já cadastradas.</PlanLimitWarning>
@@ -461,11 +982,16 @@ export const Profile: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {companies.map(company => (
-                <div key={company.id} className="border border-slate-100 rounded-2xl p-6 hover:bg-slate-50 transition-colors flex flex-col justify-between relative group">
+                <div key={company.id} className={`border rounded-2xl p-6 transition-colors flex flex-col justify-between relative group ${billingCompanyId === company.id ? 'border-blue-300 bg-blue-50/70 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10' : 'border-slate-100 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5'}`}>
                   <div>
                     {company.logoUrl && (
                       <div className="w-16 h-16 rounded-xl overflow-hidden mb-4 border border-slate-200 bg-white">
                         <img src={company.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                    {billingCompanyId === company.id && (
+                      <div className="mb-3 inline-flex rounded-full bg-blue-600 px-3 py-1 text-[11px] font-black uppercase tracking-[.18em] text-white">
+                        Principal para cobrança
                       </div>
                     )}
                     <h5 className="font-bold text-slate-800 text-lg mb-1">{company.razaoSocial}</h5>
@@ -490,14 +1016,15 @@ export const Profile: React.FC = () => {
 
         {/* Company Modal (for Add/Edit) */}
         {isCompanyModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+          <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm">
+            <div className="flex h-full w-full items-stretch justify-stretch p-0 md:p-4">
+              <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:rounded-[2rem] dark:bg-slate-950">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5 dark:border-white/10 dark:bg-slate-950">
                 <h3 className="text-xl font-bold text-slate-800">{editingCompany ? 'Editar Empresa' : 'Nova Empresa'}</h3>
                 <button onClick={() => setIsCompanyModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
               </div>
 
-              <form onSubmit={handleSaveCompany} className="p-6 space-y-6">
+              <form onSubmit={handleSaveCompany} className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
                 {/* Seletor de Logomarca */}
                 <div className="flex justify-center mb-6">
                   <div className="relative group cursor-pointer">
@@ -541,7 +1068,7 @@ export const Profile: React.FC = () => {
                           required
                           className="w-full px-4 py-2 rounded-lg border border-slate-200 pr-10"
                           value={currentCompanyFormData.cnpj}
-                          onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, cnpj: e.target.value })}
+                          onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, cnpj: maskCnpj(e.target.value) })}
                           onBlur={e => fetchCnpjData(e.target.value)}
                         />
                         <button
@@ -598,11 +1125,11 @@ export const Profile: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Telefone Fixo</label>
-                      <input type="tel" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.telefoneFixo} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, telefoneFixo: e.target.value })} />
+                      <input type="tel" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.telefoneFixo} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, telefoneFixo: maskPhone(e.target.value) })} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Telefone Celular</label>
-                      <input type="tel" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.telefoneCelular} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, telefoneCelular: e.target.value })} />
+                      <input type="tel" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.telefoneCelular} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, telefoneCelular: maskPhone(e.target.value) })} />
                     </div>
                   </div>
                 </div>
@@ -613,7 +1140,7 @@ export const Profile: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="relative">
                       <label className="block text-xs font-bold text-slate-500 mb-1">CEP *</label>
-                      <input type="text" required className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.cep} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, cep: e.target.value })} onBlur={e => handleCepBlur(e.target.value)} />
+                      <input type="text" required className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.cep} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, cep: maskCep(e.target.value) })} onBlur={e => handleCepBlur(e.target.value)} />
                       <Search size={14} className="absolute right-3 top-8 text-slate-400" />
                     </div>
                     <div className="md:col-span-2">
@@ -626,7 +1153,7 @@ export const Profile: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Complemento</label>
-                      <input type="text" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.complemento} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, complement: e.target.value })} />
+                      <input type="text" className="w-full px-4 py-2 rounded-lg border border-slate-200" value={currentCompanyFormData.complemento} onChange={e => setCurrentCompanyFormData({ ...currentCompanyFormData, complemento: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">Bairro</label>
@@ -790,12 +1317,13 @@ export const Profile: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-slate-100">
+                <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-white/10">
                   <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all disabled:opacity-70 flex items-center gap-2">
                     {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} Salvar Empresa
                   </button>
                 </div>
               </form>
+            </div>
             </div>
           </div>
         )}

@@ -1,8 +1,8 @@
-# Billing Blu + Asaas
+# Billing Blu + Pagar.me
 
-Integração incremental do billing da Blu com checkout hospedado pelo Asaas.
+Integração incremental do billing da Blu com checkout hospedado pelo Pagar.me.
 
-A Asaas é somente o gateway de pagamento. A Blu mantém a verdade sobre:
+O Pagar.me é somente o gateway de pagamento. A Blu mantém a verdade sobre:
 
 - cliente
 - plano
@@ -22,10 +22,10 @@ A Asaas é somente o gateway de pagamento. A Blu mantém a verdade sobre:
 
 ## Variáveis de ambiente
 
-- `ASAAS_API_KEY`
-- `ASAAS_API_BASE_URL`
-- `ASAAS_WEBHOOK_URL`
-- `ASAAS_REDIRECT_URL`
+- `PAGARME_SECRET_KEY`
+- `PAGARME_API_BASE_URL`
+- `PAGARME_WEBHOOK_URL`
+- `PAGARME_REDIRECT_URL`
 - `APP_PUBLIC_URL`
 - `APP_FUNCTIONS_PUBLIC_URL`
 - `BLU_BILLING_GRACE_DAYS`
@@ -36,17 +36,17 @@ A Asaas é somente o gateway de pagamento. A Blu mantém a verdade sobre:
 - `GET /api/billing/summary`
 - `GET /api/billing/plans`
 - `POST /api/billing/payment-check`
-- `POST /api/webhooks/asaas`
+- `POST /api/webhooks/pagarme`
 
 ## Fluxo resumido
 
 1. O usuário escolhe um plano.
 2. O backend cria a cobrança interna.
-3. O checkout hospedado é gerado pelo Asaas.
+3. O checkout hospedado é gerado pelo Pagar.me.
 4. O usuário finaliza o pagamento no gateway.
 5. O webhook chega ao Firebase Functions.
 6. O backend confirma o pagamento e atualiza assinatura, cobrança e auditoria.
 
 ## Observação
 
-Não armazene segredos no frontend. A chave do Asaas deve ficar apenas em ambiente seguro do backend/Firebase Functions.
+Não armazene segredos no frontend. A chave do Pagar.me deve ficar apenas em ambiente seguro do backend/Firebase Functions.

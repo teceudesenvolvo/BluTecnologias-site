@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.asaasWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
+exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -25,9 +25,11 @@ var billingFunctions_1 = require("./src/modules/billing/presentation/billingFunc
 Object.defineProperty(exports, "billingCheckout", { enumerable: true, get: function () { return billingFunctions_1.billingCheckout; } });
 Object.defineProperty(exports, "billingSummary", { enumerable: true, get: function () { return billingFunctions_1.billingSummary; } });
 Object.defineProperty(exports, "billingPublicPlans", { enumerable: true, get: function () { return billingFunctions_1.billingPublicPlans; } });
+Object.defineProperty(exports, "billingGatewayPublic", { enumerable: true, get: function () { return billingFunctions_1.billingGatewayPublic; } });
+Object.defineProperty(exports, "billingAdminPlans", { enumerable: true, get: function () { return billingFunctions_1.billingAdminPlans; } });
 Object.defineProperty(exports, "billingPaymentCheck", { enumerable: true, get: function () { return billingFunctions_1.billingPaymentCheck; } });
 Object.defineProperty(exports, "infinitePayWebhook", { enumerable: true, get: function () { return billingFunctions_1.infinitePayWebhook; } });
-Object.defineProperty(exports, "asaasWebhook", { enumerable: true, get: function () { return billingFunctions_1.asaasWebhook; } });
+Object.defineProperty(exports, "pagarmeWebhook", { enumerable: true, get: function () { return billingFunctions_1.pagarmeWebhook; } });
 Object.defineProperty(exports, "processBillingWebhookEvent", { enumerable: true, get: function () { return billingFunctions_1.processBillingWebhookEvent; } });
 Object.defineProperty(exports, "dailyBillingMaintenance", { enumerable: true, get: function () { return billingFunctions_1.dailyBillingMaintenance; } });
 const financialConfigurationCollections = {
@@ -346,6 +348,143 @@ exports.mutateFinancialConfiguration = functions.https.onCall(async (payload, co
         transaction.set(audit, { companyId: membership.companyId, action, entityType: section, entityId: reference.id, userId: context.auth.uid, createdAt: timestamp, before, after, source: 'mutateFinancialConfiguration' });
     });
     return { id: reference.id };
+});
+exports.mutateBillingProvider = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
+    const email = String(context.auth.token.email || context.auth.token.firebase?.identities?.email?.[0] || '').toLowerCase();
+    if (email !== 'admin@blutecnologias.com.br') {
+        throw new functions.https.HttpsError('permission-denied', 'Apenas o administrador da Blu pode alterar o gateway.');
+    }
+    const action = String(payload?.action || 'get').toLowerCase();
+    const providerId = String(payload?.providerId || payload?.id || 'pagarme').trim() || 'pagarme';
+    const reference = admin.firestore().collection('billingProviders').doc(providerId);
+    const firstString = (...values) => values.map((value) => String(value || '').trim()).find(Boolean) || '';
+    if (action === 'get') {
+        const snapshot = await reference.get();
+        if (!snapshot.exists) {
+            return {
+                provider: {
+                    id: providerId,
+                    name: 'Pagar.me',
+                    type: 'payment_gateway',
+                    enabled: false,
+                    environment: 'production',
+                    handle: '',
+                    publicKey: '',
+                    capabilities: ['checkout_link', 'pix', 'credit_card', 'installments', 'webhook', 'payment_check'],
+                },
+            };
+        }
+        const raw = snapshot.data() || {};
+        return {
+            provider: {
+                id: snapshot.id,
+                ...raw,
+                handle: firstString(raw.handle, raw.secretKey, raw.apiKey, raw.secret_key),
+                publicKey: firstString(raw.publicKey, raw.publishableKey, raw.publicApiKey, raw.clientKey, raw.public_key),
+            },
+        };
+    }
+    if (action !== 'save') {
+        throw new functions.https.HttpsError('invalid-argument', 'Ação inválida.');
+    }
+    const input = cleanFinancialValue(payload?.value || {});
+    const rawHandle = firstString(input.handle, input.secretKey, input.apiKey, input.secret_key);
+    const rawPublicKey = firstString(input.publicKey, input.publishableKey, input.publicApiKey, input.clientKey, input.public_key);
+    const handle = rawHandle.startsWith('pk_') ? '' : rawHandle;
+    const publicKey = rawPublicKey || (rawHandle.startsWith('pk_') ? rawHandle : '');
+    if (!handle) {
+        throw new functions.https.HttpsError('invalid-argument', 'Informe a chave secreta do gateway.');
+    }
+    const now = new Date().toISOString();
+    const snapshot = await reference.get();
+    const before = snapshot.exists ? snapshot.data() || null : null;
+    const after = {
+        id: providerId,
+        name: String(input.name || 'Pagar.me').trim() || 'Pagar.me',
+        type: String(input.type || 'payment_gateway').trim() || 'payment_gateway',
+        enabled: input.enabled !== false,
+        environment: String(input.environment || 'production').trim() || 'production',
+        handle,
+        accountId: String(input.accountId || '').trim(),
+        publicKey,
+        secretKey: handle,
+        publishableKey: publicKey,
+        capabilities: Array.isArray(input.capabilities) && input.capabilities.length
+            ? input.capabilities.map((item) => String(item).trim()).filter(Boolean)
+            : ['checkout_link', 'pix', 'credit_card', 'installments', 'webhook', 'payment_check'],
+        updatedAt: now,
+        createdAt: before?.createdAt || now,
+        createdBy: before?.createdBy || context.auth.uid,
+        updatedBy: context.auth.uid,
+    };
+    await reference.set(after, { merge: true });
+    await admin.firestore().collection('financialAuditLogs').doc().set({
+        companyId: 'blu-platform',
+        action: 'saveGateway',
+        entityType: 'billingProvider',
+        entityId: providerId,
+        userId: context.auth.uid,
+        createdAt: now,
+        before,
+        after,
+        source: 'mutateBillingProvider',
+    });
+    return { provider: after };
+});
+exports.deleteBluHqUser = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
+    const email = String(context.auth.token.email || context.auth.token.firebase?.identities?.email?.[0] || '').toLowerCase();
+    if (email !== 'admin@blutecnologias.com.br') {
+        throw new functions.https.HttpsError('permission-denied', 'Apenas o administrador da Blu pode excluir usuários da plataforma.');
+    }
+    const userId = String(payload?.userId || '').trim();
+    if (!userId)
+        throw new functions.https.HttpsError('invalid-argument', 'Informe o usuário a ser excluído.');
+    if (context.auth.uid === userId)
+        throw new functions.https.HttpsError('failed-precondition', 'Não é possível excluir o usuário autenticado no momento.');
+    const now = new Date().toISOString();
+    const db = admin.firestore();
+    const relatedCollections = ['companyUsers', 'platformCustomers', 'bluTeamMembers', 'partnerUsers'];
+    const snapshots = await Promise.all(relatedCollections.map((name) => db.collection(name).where('userId', '==', userId).get()));
+    const docsToDelete = snapshots.flatMap((snapshot) => snapshot.docs);
+    const firstMatch = docsToDelete[0]?.data() || null;
+    const companyId = String(firstMatch?.companyId || firstMatch?.partnerId || 'blu-platform');
+    await db.runTransaction(async (transaction) => {
+        for (const snapshot of snapshots) {
+            snapshot.docs.forEach((item) => transaction.delete(item.ref));
+        }
+        transaction.set(db.collection('financialAuditLogs').doc(), {
+            companyId,
+            action: 'deleteBluHqUser',
+            entityType: 'platformUser',
+            entityId: userId,
+            userId: context.auth.uid,
+            createdAt: now,
+            before: {
+                userId,
+                email: firstMatch?.email || '',
+                name: firstMatch?.name || '',
+                companyId,
+                deletedCollections: relatedCollections.filter((name, index) => snapshots[index].docs.length > 0),
+            },
+            after: null,
+            source: 'deleteBluHqUser',
+        });
+    });
+    try {
+        await admin.auth().deleteUser(userId);
+    }
+    catch (error) {
+        console.error('deleteBluHqUser: auth deletion failed', error?.message || error);
+        throw new functions.https.HttpsError('internal', 'Os registros foram removidos do Firestore, mas não foi possível excluir o usuário no Auth. Verifique as permissões do Admin SDK.');
+    }
+    return {
+        userId,
+        deletedCollections: relatedCollections.filter((name, index) => snapshots[index].docs.length > 0),
+    };
 });
 // Inicializa o admin apenas uma vez. Em alguns ambientes a Database URL
 // não é detectada automaticamente, então tentamos montar a databaseURL a

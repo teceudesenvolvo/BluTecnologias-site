@@ -147,6 +147,8 @@ export type HqCustomerRow = {
   neighborhood?: string;
   city?: string;
   state?: string;
+  billingDiscountPercent?: number;
+  billingDiscountCents?: number;
   partners?: any[];
   representatives?: any[];
   activities?: any[];
@@ -179,7 +181,7 @@ export type HqOverview = {
   tenants: HqCustomerRow[];
   incompleteCustomers: HqIncompleteCustomer[];
   partners: HqPartner[];
-  members: Array<{ id: string; companyId: string; name: string; email: string; company: string; role: string; status: string }>;
+  members: Array<{ id: string; companyId: string; userId?: string; name: string; email: string; company: string; role: string; status: string }>;
   prospects: Array<{ id: string; name: string; source: string; stage: string; value: string }>;
   supportQueue: Array<{ id: string; company: string; subject: string; status: string }>;
   metrics: {
@@ -307,6 +309,8 @@ export const hqService = {
           neighborhood: (companyDoc as any)?.bairro,
           city: (companyDoc as any)?.municipio,
           state: (companyDoc as any)?.uf,
+          billingDiscountPercent: Number((companyDoc as any)?.billingDiscountPercent || 0),
+          billingDiscountCents: Number((companyDoc as any)?.billingDiscountCents || 0),
           partners: Array.isArray((companyDoc as any)?.socios) ? (companyDoc as any).socios : Array.isArray(platformCustomer?.company?.socios) ? platformCustomer?.company?.socios : [],
           representatives: Array.isArray((companyDoc as any)?.representantes) ? (companyDoc as any).representantes : Array.isArray(platformCustomer?.company?.representantes) ? platformCustomer?.company?.representantes : [],
           activities: Array.isArray((companyDoc as any)?.atividades) ? (companyDoc as any).atividades : Array.isArray(platformCustomer?.company?.atividades) ? platformCustomer?.company?.atividades : [],
@@ -351,6 +355,7 @@ export const hqService = {
       .map((membership) => ({
         id: membership.id,
         companyId: String(membership.companyId || ''),
+        userId: String(membership.userId || ''),
         name: membership.name || membership.email || 'Usuário sem nome',
         email: membership.email || '',
         company: tenants.find((tenant) => tenant.id === membership.companyId)?.company || membership.companyId || 'Empresa não identificada',

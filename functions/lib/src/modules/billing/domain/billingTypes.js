@@ -9,7 +9,13 @@ exports.DEFAULT_BILLING_PLANS = [
         description: 'Plano de validação para testar a jornada de compra com cobrança simbólica de R$ 1,00.',
         priceInCents: 100,
         billingInterval: 'month',
+        intervalCount: 1,
         trialDays: 7,
+        billingType: 'prepaid',
+        cycles: null,
+        startAt: null,
+        paymentMethods: ['credit_card', 'boleto', 'debit_card'],
+        installments: [1],
         limits: {
             companies: 1,
             activeContracts: 1,

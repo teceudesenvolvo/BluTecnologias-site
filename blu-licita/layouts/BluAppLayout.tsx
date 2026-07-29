@@ -8,7 +8,7 @@ import type { ExternalOpportunity } from '../integrations/core/integrationTypes'
 import { integrationOpportunityService } from '../services/integrationOpportunityService';
 import { interestSettingsService } from '../services/interestSettingsService';
 import { accessControlService, defaultAccessRoles, type AccessRole } from '../services/accessControlService';
-import { billingClient, type BillingSummary } from '../billing/services/billingClient';
+import { billingClient, normalizeBillingStatus, type BillingSummary } from '../billing/services/billingClient';
 
 const nav = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
@@ -43,7 +43,7 @@ const quickFeatures = [
   { label: 'Áreas de interesse', to: '/admin/oportunidades', description: 'Configurar filtros de objetos e estados de interesse', keywords: 'areas interesse filtros estados oportunidades notificações notificacoes' },
   { label: 'Gerar proposta', to: '/admin/licitacoes', description: 'Gerar propostas, impugnações, esclarecimentos e parecer com IA', keywords: 'proposta impugnação impugnacao esclarecimento parecer ia edital saved licitacoes' },
   { label: 'Novo orçamento', to: '/admin/orcamentos', description: 'Criar orçamento e PDF timbrado da proposta', keywords: 'orcamento orçamento pdf proposta itens produto serviço servico impostos' },
-  { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email asaas' },
+  { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email pagarme checkout pix cartão' },
   { label: 'Contas bancárias', to: '/admin/financeiro/contas-bancarias', description: 'Gerenciar bancos, caixas, recebimentos e pagamentos', keywords: 'banco conta bancaria bancária pix saldo transferência transferencia' },
   { label: 'Fluxo de caixa', to: '/admin/financeiro/fluxo-de-caixa', description: 'Entradas, saídas, previsto, realizado e vencimentos', keywords: 'fluxo caixa entrada saida saída receita despesa vencido previsto realizado' },
   { label: 'Notas fiscais', to: '/admin/financeiro/notas-fiscais', description: 'Notas emitidas, recebidas, XML, PDF e vínculos financeiros', keywords: 'nfse nfe nota fiscal xml pdf retenção retencao tributo' },
@@ -52,7 +52,7 @@ const quickFeatures = [
   { label: 'Upload de documentos', to: '/admin/documentos', description: 'Cadastrar documentos, certidões e baixar ZIP', keywords: 'documento certidão certidao upload validade vencimento zip download' },
   { label: 'Abrir chamado', to: '/admin/suporte', description: 'Chat com suporte, SAC e acompanhamento de chamados', keywords: 'suporte chamado chat sac atendimento ajuda problema ticket' },
   { label: 'Níveis de acesso', to: '/admin/configuracoes/niveis-acesso', description: 'Configurar permissões por tipo de usuário', keywords: 'permissão permissao acesso perfil usuário usuario tipo equipe admin' },
-  { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança asaas upgrade uso limite' },
+  { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança pagarme upgrade uso limite checkout pix cartão' },
   { label: 'Migração de dados', to: '/admin/migracao', description: 'Migrar dados do Firebase para o backend Blu', keywords: 'migração migracao firebase backend banco dados render postgres' },
 ];
 
@@ -160,8 +160,8 @@ export const BluAppLayout: React.FC = () => {
   const visibleNav = [...nav.filter((item) => canAccessPath(item.to) && (platformAdminEmail === 'admin@blutecnologias.com.br' || item.label !== 'Integrações')), ...(isBluPlatformStaff ? platformAdminNav : [])];
   const title = [...nav, ...platformAdminNav].find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
-  const subscriptionStatus = String(billing?.subscription?.status || '');
-  const billingRestricted = subscriptionStatus === 'SUSPENDED' && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos');
+  const subscriptionStatus = normalizeBillingStatus(billing?.subscription?.status || billing?.subscription?.accessStatus || '');
+  const billingRestricted = ['PAYMENT_PENDING', 'SUSPENDED'].includes(subscriptionStatus) && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos') && !location.pathname.startsWith('/admin/assinatura/checkout') && !location.pathname.startsWith('/admin/assinatura/retorno');
   const searchableItems = React.useMemo(() => {
     const navItems = visibleNav.map((item) => ({ label: item.label, to: item.to, description: 'Abrir página do sistema', keywords: item.label }));
     const featureItems = quickFeatures.filter((item) => canAccessPath(item.to) && (isBluPlatformStaff || !item.to.startsWith('/admin/hq')) && visibleNav.some((navItem) => item.to.startsWith(navItem.to) || navItem.to.startsWith(item.to)));
@@ -308,7 +308,7 @@ export const BluAppLayout: React.FC = () => {
         </header>
         <main className="p-4 md:p-7">
           {['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
-            {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Você tem até 7 dias de tolerância antes do bloqueio de escrita.'}
+            {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Regularize o plano para continuar usando a Blu.'}
             <button onClick={()=>navigate('/admin/assinatura')} className="ml-3 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">Atualizar pagamento</button>
           </div>}
           {billingRestricted ? <div className="mx-auto max-w-2xl rounded-3xl border border-rose-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso temporariamente bloqueado</h2><p className="mt-2 text-sm text-slate-500">O pagamento está em atraso acima do período de tolerância. Seus dados estão preservados; regularize a assinatura para continuar usando a Blu.</p><button onClick={()=>navigate('/admin/assinatura')} className="mt-5 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Atualizar pagamento</button></div> : currentPageAllowed ? <Outlet /> : <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso restrito</h2><p className="mt-2 text-sm text-slate-500">Seu tipo de usuário não possui permissão para acessar esta página. Solicite ajuste em Configurações › Níveis de acesso.</p><button onClick={()=>navigate('/admin/dashboard')} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Voltar ao dashboard</button></div>}

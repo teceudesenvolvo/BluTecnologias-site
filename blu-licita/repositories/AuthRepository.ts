@@ -1,8 +1,6 @@
 import type { BluUser } from '../types';
-import type { PlanKey } from '../services/subscriptionPlanService';
-
 export interface TrialSignupInput {
-  plan: PlanKey;
+  plan: string;
   user: {
     name: string;
     email: string;
@@ -16,6 +14,13 @@ export interface TrialSignupInput {
     segment?: string;
     city?: string;
     state?: string;
+    email?: string;
+    phone?: string;
+    cep?: string;
+    street?: string;
+    number?: string;
+    neighborhood?: string;
+    complement?: string;
   };
   goals?: string[];
   partnerCode?: string;

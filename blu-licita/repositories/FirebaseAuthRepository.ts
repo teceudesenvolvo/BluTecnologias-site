@@ -11,6 +11,8 @@ const toBluUser = async (user: User): Promise<BluUser> => {
   const membership = memberships.docs[0]?.data();
   const partners = await getDocs(query(collection(db, 'partnerUsers'), where('userId', '==', user.uid), limit(1))).catch(() => ({ docs: [] as any[] }));
   const partnerMembership = partners.docs[0]?.data();
+  const userProfile = await getDoc(doc(db, 'users', user.uid)).catch(() => null);
+  const userProfileData = userProfile?.exists() ? userProfile.data() : null;
   if (partnerMembership) {
     const partnerCompany = await getDoc(doc(db, 'partners', partnerMembership.partnerId || partnerMembership.companyId || `partner-${user.uid}`)).catch(() => null);
     const partnerData = partnerCompany?.exists() ? partnerCompany.data() : null;
@@ -21,11 +23,20 @@ const toBluUser = async (user: User): Promise<BluUser> => {
       role: partnerMembership.role || 'Parceiro',
       companyId: String(partnerMembership.partnerId || partnerMembership.companyId || `partner-${user.uid}`),
       companyName: String(partnerData?.companyName || partnerData?.tradeName || partnerData?.legalName || 'Portal do Parceiro'),
+      billingCompanyId: String(userProfileData?.billingCompanyId || userProfileData?.primaryBillingCompanyId || partnerMembership.partnerId || partnerMembership.companyId || `partner-${user.uid}`),
     };
   }
   const companyId = membership?.companyId || `company-${user.uid}`;
   const company = await getDoc(doc(db, 'companies', companyId)).catch(() => null);
-  return { id: user.uid, name: user.displayName || user.email?.split('@')[0] || 'Usuário Blu', email: user.email || '', role: membership?.role || 'Administrador', companyId, companyName: company?.exists() ? company.data().name || 'Minha empresa' : 'Minha empresa' };
+  return {
+    id: user.uid,
+    name: user.displayName || user.email?.split('@')[0] || 'Usuário Blu',
+    email: user.email || '',
+    role: membership?.role || 'Administrador',
+    companyId,
+    companyName: company?.exists() ? company.data().name || 'Minha empresa' : 'Minha empresa',
+    billingCompanyId: String(userProfileData?.billingCompanyId || userProfileData?.primaryBillingCompanyId || companyId),
+  };
 };
 
 export class FirebaseAuthRepository implements AuthRepository {
@@ -45,7 +56,9 @@ export class FirebaseAuthRepository implements AuthRepository {
     }, { scope: 'global' });
     const credential = await createUserWithEmailAndPassword(auth, input.user.email, input.user.password);
     const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const trialDays = input.plan === 'test-1-real' ? 0 : 7;
+    const trialEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+    const subscriptionStatus = input.plan === 'test-1-real' ? 'PAYMENT_PENDING' : 'TRIALING';
     const displayName = input.user.name.trim() || input.user.email.split('@')[0];
     const companyId = `company-${credential.user.uid}`;
     const subscriptionId = `sub-${companyId}`;
@@ -61,10 +74,17 @@ export class FirebaseAuthRepository implements AuthRepository {
       segment: input.company.segment || '',
       city: input.company.city || '',
       state: input.company.state || '',
+      email: input.company.email || input.user.email,
+      phone: input.company.phone || input.user.phone || '',
+      cep: input.company.cep || '',
+      logradouro: input.company.street || '',
+      numero: input.company.number || '',
+      complemento: input.company.complement || '',
+      bairro: input.company.neighborhood || '',
       ownerUserId: credential.user.uid,
       ownerCompanyId: companyId,
       subscriptionId,
-      accessStatus: 'TRIALING',
+      accessStatus: subscriptionStatus,
       onboardingGoals: input.goals || [],
       referredByPartnerCode: input.partnerCode || '',
       createdBy: credential.user.uid,
@@ -102,16 +122,22 @@ export class FirebaseAuthRepository implements AuthRepository {
       },
       subscriptionId,
       planId: input.plan,
-      status: 'trial',
+      status: input.plan === 'test-1-real' ? 'payment_pending' : 'trial',
       source: 'trial-signup',
-      trialDays: 7,
+      trialDays,
       trialStartedAt: now.toISOString(),
       trialEndsAt: trialEndsAt.toISOString(),
-      accessStatus: 'TRIALING',
+      accessStatus: subscriptionStatus,
       companyDocument: input.company.document,
       companyName: companyPayload.name,
       companyLegalName: companyPayload.legalName,
       companyTradeName: companyPayload.tradeName,
+      companyEmail: companyPayload.email,
+      companyPhone: companyPayload.phone,
+      companyCep: companyPayload.cep,
+      companyStreet: companyPayload.logradouro,
+      companyNumber: companyPayload.numero,
+      companyNeighborhood: companyPayload.bairro,
       ownerName: displayName,
       ownerEmail: input.user.email,
       ownerPhone: input.user.phone || '',
@@ -126,8 +152,8 @@ export class FirebaseAuthRepository implements AuthRepository {
       id: subscriptionId,
       customerCompanyId: companyId,
       planId: input.plan,
-      status: 'TRIALING',
-      provider: 'asaas',
+      status: subscriptionStatus,
+      provider: 'pagarme',
       trialStartedAt: now.toISOString(),
       trialEndsAt: trialEndsAt.toISOString(),
       currentPeriodStartedAt: now.toISOString(),
@@ -153,6 +179,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       role: 'Administrador',
       companyId,
       companyName: companyPayload.name,
+      billingCompanyId: companyId,
     };
   }
 
@@ -262,6 +289,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       role: 'Parceiro',
       companyId: partnerId,
       companyName: partnerPayload.companyName || 'Portal do Parceiro Blu',
+      billingCompanyId: partnerId,
     };
   }
 
@@ -273,6 +301,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       role: 'Administrador',
       companyId: 'demo-company',
       companyName: 'Distribuidora Nordeste Ltda.',
+      billingCompanyId: 'demo-company',
     };
   }
 

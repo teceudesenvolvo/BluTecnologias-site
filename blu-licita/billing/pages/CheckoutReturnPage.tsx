@@ -11,14 +11,12 @@ export const CheckoutReturnPage: React.FC = () => {
 
   React.useEffect(() => {
     const order_nsu = params.get("order_nsu") || "";
-    const transaction_nsu = params.get("transaction_nsu") || "";
-    const slug = params.get("slug") || "";
-    if (!order_nsu || !transaction_nsu || !slug) {
+    if (!order_nsu) {
       setState("pending");
-      setMessage("Não recebemos todos os dados para verificar o pagamento. Abra a página de Assinatura para consultar a cobrança.");
+      setMessage("Não recebemos o identificador do pedido para verificar o pagamento. Abra a página de Assinatura para consultar a cobrança.");
       return;
     }
-    billingClient.checkPayment({ order_nsu, transaction_nsu, slug })
+    billingClient.checkPayment({ order_nsu })
       .then(() => {
         setState("approved");
         setMessage("Pagamento confirmado pelo backend. Sua assinatura foi atualizada.");

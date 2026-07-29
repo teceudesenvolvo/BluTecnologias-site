@@ -45,6 +45,16 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/portal-compras-publicas/, ''),
       },
+      '/api/billing': {
+        target: 'https://us-central1-blutecnologias-site.cloudfunctions.net',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/billing\/admin\/plans/, '/billingAdminPlans')
+          .replace(/^\/api\/billing\/checkout/, '/billingCheckout')
+          .replace(/^\/api\/billing\/summary/, '/billingSummary')
+          .replace(/^\/api\/billing\/plans/, '/billingPublicPlans')
+          .replace(/^\/api\/billing\/payment-check/, '/billingPaymentCheck'),
+      },
     },
   },
   resolve: {

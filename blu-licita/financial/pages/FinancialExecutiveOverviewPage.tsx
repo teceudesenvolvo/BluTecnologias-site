@@ -145,7 +145,7 @@ export const FinancialExecutiveOverviewPage = () => {
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <MonthlyChart data={charts.monthly || []} hidden={hidden} />
         <DualChart title="Fluxo realizado x previsto" data={(charts.monthly || []).map((item: any) => ({ label: item.month.slice(5), primary: item.resultCents, secondary: item.forecastCents }))} primary="Realizado" secondary="Previsto" hidden={hidden} />
         <HorizontalChart title="Faturamento por órgão" data={charts.billingByOrganization || []} hidden={hidden} open={setDetail} />
@@ -195,7 +195,7 @@ const DualChart = ({ title, data, primary, secondary, hidden }: { title: string;
   const max = Math.max(1, ...data.flatMap((item) => [Math.abs(item.primary || 0), Math.abs(item.secondary || 0)]));
   return (
     <Chart title={title}>
-      <div className="flex h-48 items-end gap-3">
+      <div className="flex h-48 min-w-0 items-end gap-3 overflow-hidden">
         {data.map((item, index) => (
           <button key={`${item.label}-${index}`} title={`${primary}: ${money(item.primary, hidden)} · ${secondary}: ${money(item.secondary, hidden)}`} className="flex flex-1 items-end justify-center gap-1">
             <i style={{ height: `${Math.max(4, (Math.abs(item.primary || 0) / max) * 150)}px` }} className="w-2/5 rounded-t bg-blue-500 dark:bg-blue-400" />
@@ -203,7 +203,7 @@ const DualChart = ({ title, data, primary, secondary, hidden }: { title: string;
           </button>
         ))}
       </div>
-      <div className="mt-3 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
+      <div className="mt-3 flex flex-wrap justify-between gap-2 text-[10px] text-slate-400 dark:text-slate-500">
         {data.map((item, index) => <span key={`${item.label}-${index}`}>{item.label}</span>)}
       </div>
       <Legend a={primary} b={secondary} />
@@ -240,7 +240,7 @@ const BalanceChart = ({ data, hidden }: { data: any[]; hidden: boolean }) => {
 };
 
 const Chart = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className={`rounded-2xl p-5 ${glass}`}>
+  <section className={`min-w-0 overflow-hidden rounded-2xl p-5 ${glass}`}>
     <h2 className="mb-5 font-bold text-slate-950 dark:text-white">{title}</h2>
     {children}
   </section>

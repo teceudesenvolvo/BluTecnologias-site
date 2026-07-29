@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../services/firebase';
+import { emailTemplateAdminService } from './emailTemplateAdminService';
 
 export type PlatformTeamMember = {
   id: string;
@@ -56,14 +57,16 @@ export const platformTeamService = {
       updatedAt: now,
     }, { merge: true });
     const link = `${window.location.origin}${window.location.pathname}#/admin/cadastro-membro?token=${invitation.id}&email=${encodeURIComponent(value.email)}&scope=platform`;
+    const template = (await emailTemplateAdminService.list()).find((item) => item.key === 'platform_team_invite') || emailTemplateAdminService.defaults.platform_team_invite;
+    const message = emailTemplateAdminService.render(template, {
+      name: value.name,
+      email: value.email,
+      link,
+    });
     await addDoc(collection(db, 'mail_queue'), {
       to: [value.email],
       userId: auth.currentUser?.uid,
-      message: {
-        subject: 'Convite para a equipe Blu',
-        text: `Você foi convidado para a equipe Blu. E-mail vinculado: ${value.email}. Acesse: ${link}`,
-        html: `<p>Olá, ${value.name}.</p><p>Você foi convidado para a equipe Blu.</p><p><strong>E-mail vinculado:</strong> ${value.email}</p><p><a href="${link}">Criar minha conta</a></p>`,
-      },
+      message,
     });
     return link;
   },

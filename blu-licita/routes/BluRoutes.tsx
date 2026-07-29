@@ -55,6 +55,7 @@ import { PlansSettingsPage } from "../pages/PlansSettingsPage";
 import { PlansPage } from "../billing/pages/PlansPage";
 import { SubscriptionPage } from "../billing/pages/SubscriptionPage";
 import { CheckoutReturnPage } from "../billing/pages/CheckoutReturnPage";
+import { BillingCheckoutPage } from "../billing/pages/BillingCheckoutPage";
 import { BluHqPage } from "../pages/BluHqPage";
 import { SupportPage } from "../pages/SupportPage";
 import { MigrationPage } from "../pages/MigrationPage";
@@ -248,7 +249,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="planos" element={<PlansPage />} />
         <Route path="assinatura" element={<SubscriptionPage />} />
-        <Route path="assinatura/checkout" element={<PlansPage />} />
+        <Route path="assinatura/checkout" element={<BillingCheckoutPage />} />
         <Route path="assinatura/retorno" element={<CheckoutReturnPage />} />
         <Route path="assinatura/cobrancas" element={<SubscriptionPage />} />
         <Route path="assinatura/pagamentos" element={<SubscriptionPage />} />

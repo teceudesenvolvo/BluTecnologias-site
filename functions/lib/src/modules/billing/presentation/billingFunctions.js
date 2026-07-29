@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.asaasWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = void 0;
+exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const cors = require("cors");
@@ -11,19 +11,50 @@ const BillingService_1 = require("../application/BillingService");
 const corsHandler = cors({ origin: true, methods: ['GET', 'POST', 'OPTIONS'] });
 const db = () => admin.firestore();
 const env = (name, fallback = '') => process.env[name] || fallback;
-const apiBaseUrl = () => env('ASAAS_API_BASE_URL', 'https://api.asaas.com').replace(/\/$/, '');
-const appPublicUrl = () => env('APP_PUBLIC_URL', 'http://localhost:5173').replace(/\/$/, '');
-const publicFunctionUrl = () => env('APP_FUNCTIONS_PUBLIC_URL', appPublicUrl()).replace(/\/$/, '');
-const webhookUrl = () => env('ASAAS_WEBHOOK_URL', `${publicFunctionUrl()}/api/webhooks/asaas`);
-const redirectUrl = () => env('ASAAS_REDIRECT_URL', `${appPublicUrl()}/#/admin/assinatura/retorno`);
-const asaasHandle = () => env('ASAAS_HANDLE');
-const billingService = () => new BillingService_1.BillingService(db(), new InfinitePayBillingProvider_1.InfinitePayBillingProvider(apiBaseUrl()), {
-    providerId: 'asaas',
-    handle: asaasHandle(),
-    redirectUrl: redirectUrl(),
-    webhookUrl: webhookUrl(),
-    graceDays: Number(env('BLU_BILLING_GRACE_DAYS', '7')),
-});
+const apiBaseUrl = (handle = '', environment = '') => {
+    const configured = env('PAGARME_API_BASE_URL', '').trim();
+    if (configured)
+        return configured.replace(/\/$/, '');
+    const key = String(handle || '').trim();
+    if (key.startsWith('sk_test_'))
+        return 'https://sdx-api.pagar.me/core/v5';
+    if (key.startsWith('sk_'))
+        return 'https://api.pagar.me/core/v5';
+    const envValue = String(environment || '').trim().toLowerCase();
+    if (envValue === 'sandbox' || envValue === 'hmlg' || envValue === 'homologation' || envValue === 'test')
+        return 'https://sdx-api.pagar.me/core/v5';
+    if (envValue === 'production' || envValue === 'prod' || envValue === 'productional')
+        return 'https://api.pagar.me/core/v5';
+    return 'https://api.pagar.me/core/v5';
+};
+const appPublicUrl = () => env('APP_PUBLIC_URL', 'https://blutecnologias-site.web.app').replace(/\/$/, '');
+const publicFunctionUrl = () => env('APP_FUNCTIONS_PUBLIC_URL', 'https://us-central1-blutecnologias-site.cloudfunctions.net').replace(/\/$/, '');
+const webhookUrl = () => env('PAGARME_WEBHOOK_URL', `${publicFunctionUrl()}/pagarmeWebhook`);
+const redirectUrl = () => env('PAGARME_REDIRECT_URL', `${appPublicUrl()}/#/admin/assinatura/retorno`);
+const normalizePaymentMethods = (methods) => (Array.isArray(methods) ? methods : ['credit_card', 'boleto', 'debit_card'])
+    .map((method) => String(method).toLowerCase())
+    .filter((method) => ['credit_card', 'boleto', 'debit_card'].includes(method));
+const firstString = (...values) => values.map((value) => String(value || '').trim()).find(Boolean) || '';
+const pagarmeProvider = async () => {
+    const snapshot = await db().collection('billingProviders').doc('pagarme').get().catch(() => null);
+    const providerData = snapshot?.exists ? snapshot.data() || {} : {};
+    const savedHandle = firstString(providerData.secretKey, providerData.handle, providerData.apiKey, providerData.secret_key, env('PAGARME_SECRET_KEY'), env('PAGARME_API_KEY'));
+    const savedPublicKey = firstString(providerData.publicKey, providerData.publishableKey, providerData.publicApiKey, providerData.clientKey, providerData.public_key, env('VITE_PAGARME_PUBLIC_KEY'), env('PAGARME_PUBLIC_KEY'));
+    const handle = savedHandle.startsWith('pk_') ? '' : savedHandle;
+    const publicKey = savedPublicKey || (savedHandle.startsWith('pk_') ? savedHandle : '');
+    const environment = String(providerData.environment || providerData.env || env('PAGARME_ENVIRONMENT') || 'production').trim().toLowerCase();
+    return { handle, publicKey, environment };
+};
+const billingService = async () => {
+    const provider = await pagarmeProvider();
+    return new BillingService_1.BillingService(db(), new InfinitePayBillingProvider_1.PagarmeBillingProvider(apiBaseUrl(provider.handle, provider.environment)), {
+        providerId: 'pagarme',
+        handle: provider.handle,
+        redirectUrl: redirectUrl(),
+        webhookUrl: webhookUrl(),
+        graceDays: Number(env('BLU_BILLING_GRACE_DAYS', '5')),
+    });
+};
 const json = (res, status, body) => res.status(status).json(body);
 const requireAuth = async (req) => {
     const header = String(req.headers.authorization || '');
@@ -32,8 +63,12 @@ const requireAuth = async (req) => {
         throw new billingTypes_1.BillingDomainError('UnauthenticatedError', 'Faça login para continuar.');
     const decoded = await admin.auth().verifyIdToken(token);
     const membership = await db().collection('companyUsers').where('userId', '==', decoded.uid).limit(1).get();
-    const companyId = membership.empty ? `company-${decoded.uid}` : String(membership.docs[0].data().companyId);
-    return { uid: decoded.uid, email: decoded.email, name: decoded.name, companyId };
+    const membershipData = membership.empty ? {} : membership.docs[0].data();
+    const companyId = membership.empty ? `company-${decoded.uid}` : String(membershipData.companyId);
+    const userSnapshot = await db().collection('users').doc(decoded.uid).get().catch(() => null);
+    const userData = userSnapshot?.exists ? userSnapshot.data() || {} : {};
+    const billingCompanyId = String(userData.billingCompanyId || userData.primaryBillingCompanyId || companyId);
+    return { uid: decoded.uid, email: decoded.email, name: decoded.name, phone: String(membershipData.phone || ''), companyId, billingCompanyId };
 };
 const handleError = (res, error) => {
     if (error instanceof billingTypes_1.BillingDomainError)
@@ -48,15 +83,40 @@ exports.billingCheckout = functions.https.onRequest((req, res) => {
         if (req.method !== 'POST')
             return json(res, 405, { message: 'Método não permitido.' });
         try {
-            if (!asaasHandle())
-                throw billingTypes_1.billingErrors.providerUnavailable();
+            const provider = await pagarmeProvider();
+            const handle = provider.handle;
+            if (!handle)
+                throw new billingTypes_1.BillingDomainError('ProviderUnavailableError', 'Gateway Pagar.me sem handle configurado. Defina PAGARME_SECRET_KEY ou billingProviders/pagarme.handle no BluHQ.');
             const user = await requireAuth(req);
-            const planId = String(req.body?.planId || '');
+            let planId = String(req.body?.planId || '');
+            if (!planId) {
+                const subscriptionSnapshot = await db().collection('subscriptions').where('customerCompanyId', '==', user.companyId).limit(1).get();
+                planId = String(subscriptionSnapshot.docs[0]?.data()?.planId || '');
+            }
+            if (!planId) {
+                const companySnapshot = await db().collection('companies').doc(user.companyId).get();
+                const companyData = companySnapshot.exists ? companySnapshot.data() || {} : {};
+                const platformCustomerSnapshot = await db().collection('platformCustomers').doc(user.companyId).get();
+                const platformCustomerData = platformCustomerSnapshot.exists ? platformCustomerSnapshot.data() || {} : {};
+                planId = String(companyData?.subscription?.plan || platformCustomerData?.planId || '');
+            }
             const type = String(req.body?.billingOrderType || 'FIRST_SUBSCRIPTION');
+            const paymentMethod = String(req.body?.paymentMethod || 'credit_card');
+            const allowedPaymentMethods = ['credit_card', 'boleto', 'debit_card'];
             const allowedTypes = ['FIRST_SUBSCRIPTION', 'RENEWAL', 'UPGRADE', 'DOWNGRADE', 'REACTIVATION', 'EXTRA_CAPACITY', 'IMPLEMENTATION', 'MANUAL_CHARGE'];
-            if (!planId || !allowedTypes.includes(type))
-                throw billingTypes_1.billingErrors.invalidPlanChange();
-            const result = await billingService().createCheckout({ companyId: user.companyId, userId: user.uid, userEmail: user.email, userName: user.name, planId, type });
+            if (!planId || !allowedTypes.includes(type) || !allowedPaymentMethods.includes(paymentMethod))
+                throw billingTypes_1.billingErrors.invalidPlanChange('Nenhum plano válido foi encontrado para cobrança.');
+            const result = await (await billingService()).createCheckout({
+                companyId: user.companyId,
+                billingCompanyId: user.billingCompanyId,
+                userId: user.uid,
+                userEmail: user.email,
+                userName: user.name,
+                userPhone: user.phone,
+                planId,
+                type,
+                paymentMethod,
+            });
             return json(res, 200, result);
         }
         catch (error) {
@@ -72,7 +132,7 @@ exports.billingSummary = functions.https.onRequest((req, res) => {
             return json(res, 405, { message: 'Método não permitido.' });
         try {
             const user = await requireAuth(req);
-            return json(res, 200, await billingService().summary(user.companyId));
+            return json(res, 200, await (await billingService()).summary(user.companyId));
         }
         catch (error) {
             return handleError(res, error);
@@ -87,9 +147,119 @@ exports.billingPublicPlans = functions.https.onRequest((req, res) => {
             return json(res, 405, { message: 'Método não permitido.' });
         const snapshot = await db().collection('plans').where('active', '==', true).where('public', '==', true).get();
         const plans = snapshot.docs.length
-            ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
-            : billingTypes_1.DEFAULT_BILLING_PLANS;
-        return json(res, 200, { plans });
+            ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data(), paymentMethods: normalizePaymentMethods(doc.data()?.paymentMethods) }))
+            : [];
+        const merged = [...plans];
+        billingTypes_1.DEFAULT_BILLING_PLANS.forEach((plan) => {
+            if (!merged.some((item) => String(item.id) === plan.id || String(item.slug) === plan.slug)) {
+                merged.push({ ...plan, paymentMethods: normalizePaymentMethods(plan.paymentMethods) });
+            }
+        });
+        const sorted = merged.sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+        return json(res, 200, { plans: sorted });
+    });
+});
+exports.billingGatewayPublic = functions.https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        if (req.method === 'OPTIONS')
+            return res.status(204).send('');
+        if (req.method !== 'GET')
+            return json(res, 405, { message: 'Método não permitido.' });
+        const provider = await pagarmeProvider();
+        return json(res, 200, {
+            providerId: 'pagarme',
+            publicKey: provider.publicKey,
+            enabled: Boolean(provider.publicKey),
+            environment: provider.environment,
+        });
+    });
+});
+exports.billingAdminPlans = functions.https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        if (req.method === 'OPTIONS')
+            return res.status(204).send('');
+        const method = String(req.method || 'GET').toUpperCase();
+        if (!['GET', 'POST', 'PUT', 'PATCH'].includes(method))
+            return json(res, 405, { message: 'Método não permitido.' });
+        try {
+            const user = method === 'GET' ? null : await requireAuth(req);
+            const adminEmail = String(user?.email || '').toLowerCase();
+            if (method !== 'GET' && adminEmail !== 'admin@blutecnologias.com.br') {
+                throw new billingTypes_1.BillingDomainError('PermissionDenied', 'Apenas o administrador da Blu pode alterar os planos públicos.');
+            }
+            if (method === 'GET') {
+                const snapshot = await db().collection('plans').orderBy('displayOrder', 'asc').get();
+                const plans = snapshot.docs.length
+                    ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data(), paymentMethods: normalizePaymentMethods(doc.data()?.paymentMethods) }))
+                    : [];
+                const merged = [...plans];
+                billingTypes_1.DEFAULT_BILLING_PLANS.forEach((plan) => {
+                    if (!merged.some((item) => String(item.id) === plan.id || String(item.slug) === plan.slug)) {
+                        merged.push({ ...plan, paymentMethods: normalizePaymentMethods(plan.paymentMethods) });
+                    }
+                });
+                return json(res, 200, { plans: merged.sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)) });
+            }
+            const payload = (req.body || {});
+            const action = String(payload.action || payload.mode || 'save').toLowerCase();
+            const plan = payload.plan || payload.value || payload;
+            const id = String(plan?.id || payload.id || '').trim();
+            if (!id)
+                throw new billingTypes_1.BillingDomainError('InvalidArgument', 'Informe o identificador do plano.');
+            if (action === 'seed') {
+                const existing = await db().collection('plans').limit(1).get();
+                if (!existing.empty) {
+                    return json(res, 200, { seeded: false, plans: existing.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+                }
+                const batch = db().batch();
+                const now = new Date().toISOString();
+                billingTypes_1.DEFAULT_BILLING_PLANS.forEach((item) => {
+                    const reference = db().collection('plans').doc(String(item.id));
+                    batch.set(reference, { ...item, createdAt: now, updatedAt: now }, { merge: true });
+                });
+                await batch.commit();
+                return json(res, 200, { seeded: true, plans: billingTypes_1.DEFAULT_BILLING_PLANS });
+            }
+            const normalized = {
+                ...plan,
+                id,
+                slug: String(plan.slug || id),
+                name: String(plan.name || '').trim(),
+                description: String(plan.description || '').trim(),
+                priceInCents: Number(plan.priceInCents || 0),
+                billingInterval: String(plan.billingInterval || 'month'),
+                intervalCount: Number.isFinite(Number(plan.intervalCount)) ? Number(plan.intervalCount) : 1,
+                trialDays: Number(plan.trialDays || 0),
+                billingType: String(plan.billingType || 'prepaid'),
+                cycles: plan.cycles === null ? null : Number.isFinite(Number(plan.cycles)) ? Number(plan.cycles) : null,
+                startAt: plan.startAt || null,
+                paymentMethods: Array.isArray(plan.paymentMethods) ? plan.paymentMethods : ['credit_card', 'boleto', 'debit_card'],
+                installments: Array.isArray(plan.installments) ? plan.installments.map((item) => Number(item)).filter((item) => Number.isFinite(item) && item > 0).slice(0, 1) : [1],
+                limits: {
+                    companies: plan?.limits?.companies ?? null,
+                    activeContracts: plan?.limits?.activeContracts ?? null,
+                    storageBytes: plan?.limits?.storageBytes ?? null,
+                    users: plan?.limits?.users ?? null,
+                    aiCredits: plan?.limits?.aiCredits ?? null,
+                    savedSearches: plan?.limits?.savedSearches ?? null,
+                    activeAutomations: plan?.limits?.activeAutomations ?? null,
+                    customAlerts: plan?.limits?.customAlerts ?? null,
+                    apiRequests: plan?.limits?.apiRequests ?? null,
+                    certificates: plan?.limits?.certificates ?? null,
+                    bankAccounts: plan?.limits?.bankAccounts ?? null,
+                },
+                active: plan?.active !== false,
+                public: plan?.public !== false,
+                displayOrder: Number.isFinite(Number(plan.displayOrder)) ? Number(plan.displayOrder) : 0,
+                createdAt: String(plan.createdAt || new Date().toISOString()),
+                updatedAt: new Date().toISOString(),
+            };
+            await db().collection('plans').doc(id).set(normalized, { merge: true });
+            return json(res, 200, { saved: true, plan: normalized });
+        }
+        catch (error) {
+            return handleError(res, error);
+        }
     });
 });
 exports.billingPaymentCheck = functions.https.onRequest((req, res) => {
@@ -100,7 +270,7 @@ exports.billingPaymentCheck = functions.https.onRequest((req, res) => {
             return json(res, 405, { message: 'Método não permitido.' });
         try {
             await requireAuth(req);
-            const result = await billingService().verifyAndApplyPayment({
+            const result = await (await billingService()).verifyAndApplyPayment({
                 orderNsu: String(req.body?.order_nsu || req.body?.orderNsu || ''),
                 transactionNsu: String(req.body?.transaction_nsu || req.body?.transactionNsu || ''),
                 slug: String(req.body?.slug || req.body?.invoice_slug || ''),
@@ -119,8 +289,8 @@ exports.infinitePayWebhook = functions.https.onRequest((req, res) => {
             return json(res, 405, { message: 'Método não permitido.' });
         try {
             const payloadHash = crypto.createHash('sha256').update(JSON.stringify(req.body || {})).digest('hex');
-            const event = await new InfinitePayBillingProvider_1.InfinitePayBillingProvider(apiBaseUrl()).processWebhook(req.body, Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key, String(value)])));
-            const result = await billingService().recordWebhookEvent(event, payloadHash);
+            const event = await new InfinitePayBillingProvider_1.PagarmeBillingProvider(apiBaseUrl()).processWebhook(req.body, Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key, String(value)])));
+            const result = await (await billingService()).recordWebhookEvent(event, payloadHash);
             return json(res, 200, { accepted: true, ...result });
         }
         catch (error) {
@@ -130,9 +300,9 @@ exports.infinitePayWebhook = functions.https.onRequest((req, res) => {
         }
     });
 });
-exports.asaasWebhook = exports.infinitePayWebhook;
+exports.pagarmeWebhook = exports.infinitePayWebhook;
 exports.processBillingWebhookEvent = functions.firestore.document('billingWebhookEvents/{eventId}').onCreate(async (snapshot) => {
-    await billingService().processWebhookEvent(snapshot.id);
+    await (await billingService()).processWebhookEvent(snapshot.id);
 });
 exports.dailyBillingMaintenance = functions.pubsub.schedule('every 24 hours').onRun(async () => {
     const now = new Date();
@@ -145,7 +315,7 @@ exports.dailyBillingMaintenance = functions.pubsub.schedule('every 24 hours').on
         const graceEnds = String(data.gracePeriodEndsAt || '');
         if (nextBilling && nextBilling < today && ['TRIALING', 'ACTIVE', 'PAYMENT_PENDING'].includes(String(data.status))) {
             const grace = new Date(now);
-            grace.setDate(grace.getDate() + Number(env('BLU_BILLING_GRACE_DAYS', '7')));
+            grace.setDate(grace.getDate() + Number(env('BLU_BILLING_GRACE_DAYS', '5')));
             batch.update(doc.ref, { status: 'GRACE_PERIOD', gracePeriodEndsAt: grace.toISOString(), updatedAt: today });
             batch.set(db().collection('companies').doc(String(data.customerCompanyId)), { accessStatus: 'GRACE_PERIOD', updatedAt: today }, { merge: true });
         }

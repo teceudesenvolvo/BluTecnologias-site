@@ -1,12 +1,15 @@
 export type BillingCapability =
   | 'checkout_link'
-  | 'pix'
   | 'credit_card'
+  | 'debit_card'
   | 'installments'
   | 'webhook'
   | 'payment_check'
+  | 'subscription'
   | 'subscription_auto_renewal'
   | 'refund';
+
+export type CheckoutPaymentMethod = 'credit_card' | 'boleto' | 'debit_card';
 
 export type BillingOrderType =
   | 'FIRST_SUBSCRIPTION'
@@ -59,7 +62,13 @@ export type BillingPlan = {
   description?: string;
   priceInCents: number;
   billingInterval: 'month' | 'year' | 'custom';
+  intervalCount?: number;
   trialDays: number;
+  billingType?: 'prepaid' | 'postpaid' | 'exact_day';
+  cycles?: number | null;
+  startAt?: string | null;
+  paymentMethods?: CheckoutPaymentMethod[];
+  installments?: number[];
   limits: BillingPlanLimits;
   active: boolean;
   public: boolean;
@@ -74,7 +83,13 @@ export const DEFAULT_BILLING_PLANS: BillingPlan[] = [
     description: 'Plano de validação para testar a jornada de compra com cobrança simbólica de R$ 1,00.',
     priceInCents: 100,
     billingInterval: 'month',
+    intervalCount: 1,
     trialDays: 7,
+    billingType: 'prepaid',
+    cycles: null,
+    startAt: null,
+    paymentMethods: ['credit_card', 'boleto', 'debit_card'],
+    installments: [1],
     limits: {
       companies: 1,
       activeContracts: 1,
@@ -101,23 +116,64 @@ export type CreateCheckoutInput = {
   orderNsu: string;
   amountInCents: number;
   description: string;
+  paymentMethod: CheckoutPaymentMethod;
+  cardToken?: string;
   customer?: {
     name?: string;
     email?: string;
     phoneNumber?: string;
+    cpfCnpj?: string;
+    address?: {
+      street?: string;
+      number?: string;
+      zipCode?: string;
+      province?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+    };
   };
 };
 
+export type BillingCheckoutPaymentData = {
+  orderId: string;
+  orderNsu: string;
+  paymentMethod: CheckoutPaymentMethod;
+  status: string;
+  invoiceSlug?: string;
+  transactionNsu?: string;
+  receiptUrl?: string;
+  boleto?: {
+    url?: string;
+    pdf?: string;
+    line?: string;
+    barcode?: string;
+    dueAt?: string;
+  };
+  creditCard?: {
+    tokenized: boolean;
+    installments: number;
+  };
+  raw?: unknown;
+};
+
 export type CreateCheckoutResult = {
-  checkoutUrl: string;
+  orderId: string;
+  orderNsu: string;
+  amountInCents: number;
+  planName: string;
+  paymentMethod: CheckoutPaymentMethod;
+  orderStatus?: string;
+  requiresCardToken?: boolean;
+  paymentData?: BillingCheckoutPaymentData;
   raw: unknown;
 };
 
 export type CheckPaymentInput = {
   handle: string;
   orderNsu: string;
-  transactionNsu: string;
-  slug: string;
+  transactionNsu?: string;
+  slug?: string;
 };
 
 export type PaymentCheckResult = {
@@ -132,7 +188,7 @@ export type PaymentCheckResult = {
 };
 
 export type NormalizedWebhookEvent = {
-  provider: 'asaas';
+  provider: 'pagarme';
   eventKey: string;
   orderNsu: string;
   invoiceSlug: string;

@@ -18,6 +18,9 @@ const addMonths = (date, months) => {
 const iso = (date = new Date()) => date.toISOString();
 const orderNsu = () => `blu_ord_${crypto.randomBytes(12).toString('hex')}`;
 const clean = (value) => JSON.parse(JSON.stringify(value));
+const normalizeStatus = (value) => String(value || '').toUpperCase();
+const firstNonEmpty = (...values) => String(values.find((value) => String(value || '').trim()) || '').trim();
+const digitsOrEmpty = (...values) => String(values.find((value) => String(value || '').replace(/\D/g, '').trim()) || '').replace(/\D/g, '');
 class BillingService {
     db;
     provider;
@@ -42,24 +45,25 @@ class BillingService {
             throw billingTypes_1.billingErrors.planInactive();
         return plan;
     }
-    async getOrCreateSubscription(companyId, planId, userId) {
+    async getOrCreateSubscription(companyId, planId, userId, options = {}) {
         const existing = await this.db.collection('subscriptions').where('customerCompanyId', '==', companyId).limit(1).get();
         if (!existing.empty)
             return { id: existing.docs[0].id, ...existing.docs[0].data() };
         const now = new Date();
         const ref = this.db.collection('subscriptions').doc();
-        const trialDays = 7;
+        const trialDays = Math.max(0, Number(options.trialDays || 0));
+        const status = trialDays > 0 ? 'TRIALING' : 'PAYMENT_PENDING';
         const subscription = {
             id: ref.id,
             customerCompanyId: companyId,
             planId,
-            status: 'TRIALING',
+            status: status,
             provider: this.config.providerId,
-            trialStartedAt: iso(now),
-            trialEndsAt: iso(addDays(now, trialDays)),
+            trialStartedAt: trialDays > 0 ? iso(now) : null,
+            trialEndsAt: trialDays > 0 ? iso(addDays(now, trialDays)) : null,
             currentPeriodStartedAt: iso(now),
-            currentPeriodEndsAt: iso(addDays(now, trialDays)),
-            nextBillingDate: iso(addDays(now, trialDays)),
+            currentPeriodEndsAt: iso(addMonths(now, 1)),
+            nextBillingDate: iso(addMonths(now, 1)),
             gracePeriodEndsAt: null,
             canceledAt: null,
             cancelAtPeriodEnd: false,
@@ -70,17 +74,116 @@ class BillingService {
             createdBy: userId,
         };
         await ref.set(subscription);
-        await this.db.collection('companies').doc(companyId).set({ subscriptionId: ref.id, accessStatus: 'TRIALING', updatedAt: iso() }, { merge: true });
+        await this.db.collection('companies').doc(companyId).set({ subscriptionId: ref.id, accessStatus: status, updatedAt: iso() }, { merge: true });
         return subscription;
+    }
+    async loadBillingProfile(companyId, billingCompanyId, userId) {
+        const selectedBillingCompanyId = String(billingCompanyId || '').trim();
+        const [companySnapshot, platformCustomerSnapshot, selectedPlatformCustomerSnapshot, legalEntitiesSnapshot, userSnapshot] = await Promise.all([
+            this.db.collection('companies').doc(companyId).get(),
+            this.db.collection('platformCustomers').doc(companyId).get(),
+            selectedBillingCompanyId && selectedBillingCompanyId !== companyId
+                ? this.db.collection('platformCustomers').doc(selectedBillingCompanyId).get().catch(() => null)
+                : Promise.resolve(null),
+            this.db.collection('companies').doc(companyId).collection('settings').doc('legalEntities').get(),
+            userId
+                ? this.db.collection('users').doc(userId).get().catch(() => null)
+                : Promise.resolve(null),
+        ]);
+        const company = companySnapshot.exists ? companySnapshot.data() || {} : {};
+        const rootPlatformCustomer = platformCustomerSnapshot.exists ? platformCustomerSnapshot.data() || {} : {};
+        const selectedPlatformCustomer = selectedPlatformCustomerSnapshot?.exists ? selectedPlatformCustomerSnapshot.data() || {} : {};
+        const platformCustomer = { ...rootPlatformCustomer, ...selectedPlatformCustomer };
+        const userProfile = userSnapshot?.exists ? userSnapshot.data() || {} : {};
+        const legalEntities = legalEntitiesSnapshot.exists ? (legalEntitiesSnapshot.data()?.companies || []) : [];
+        const selectedCompanySnapshot = selectedBillingCompanyId
+            ? await this.db.collection('companies').doc(selectedBillingCompanyId).get().catch(() => null)
+            : null;
+        const selectedCompanyDoc = selectedCompanySnapshot?.exists ? selectedCompanySnapshot.data() || {} : null;
+        const selectedLegalEntity = selectedBillingCompanyId
+            ? legalEntities.find((item) => String(item?.id || '') === selectedBillingCompanyId)
+            : null;
+        return {
+            rootCompany: company,
+            platformCustomer,
+            userProfile,
+            billingCompany: selectedCompanyDoc || selectedLegalEntity || company,
+        };
     }
     async createCheckout(input) {
         const plan = await this.getPlan(input.planId);
         if (plan.slug === 'enterprise')
             throw billingTypes_1.billingErrors.invalidPlanChange('Plano Enterprise exige contratação assistida.');
-        const subscription = await this.getOrCreateSubscription(input.companyId, plan.id, input.userId);
+        const shouldTrial = input.type === 'FIRST_SUBSCRIPTION' && plan.slug !== 'test-1-real';
+        const subscription = await this.getOrCreateSubscription(input.companyId, plan.id, input.userId, { trialDays: shouldTrial ? 7 : 0 });
+        const { rootCompany, platformCustomer, userProfile, billingCompany } = await this.loadBillingProfile(input.companyId, input.billingCompanyId, input.userId);
+        const city = firstNonEmpty(billingCompany.municipio, billingCompany.city, rootCompany.municipio, rootCompany.city, platformCustomer.city, platformCustomer.municipio, platformCustomer.companyCity, userProfile.billingCity, userProfile.municipio, userProfile.companyCity);
+        const state = firstNonEmpty(billingCompany.uf, billingCompany.state, rootCompany.uf, rootCompany.state, platformCustomer.state, platformCustomer.uf, platformCustomer.companyState, userProfile.billingState, userProfile.uf, userProfile.companyState);
+        const companyAddress = {
+            street: firstNonEmpty(billingCompany.logradouro, billingCompany.street, rootCompany.logradouro, rootCompany.street, platformCustomer.street, platformCustomer.address, platformCustomer.logradouro, platformCustomer.companyStreet, userProfile.billingStreet, userProfile.logradouro, userProfile.companyStreet),
+            number: firstNonEmpty(billingCompany.numero, billingCompany.number, rootCompany.numero, rootCompany.number, platformCustomer.number, platformCustomer.addressNumber, platformCustomer.address_number, platformCustomer.companyNumber, userProfile.billingNumber, userProfile.numero, userProfile.companyNumber),
+            zipCode: digitsOrEmpty(billingCompany.cep, billingCompany.zipCode, billingCompany.zip_code, rootCompany.cep, rootCompany.zipCode, rootCompany.zip_code, platformCustomer.zipCode, platformCustomer.zip_code, platformCustomer.cep, platformCustomer.companyCep, userProfile.billingCep, userProfile.cep, userProfile.zipCode, userProfile.zip_code, userProfile.companyCep),
+            province: firstNonEmpty(billingCompany.bairro, billingCompany.neighborhood, rootCompany.bairro, rootCompany.neighborhood, platformCustomer.neighborhood, platformCustomer.bairro, platformCustomer.companyNeighborhood, userProfile.billingNeighborhood, userProfile.bairro, userProfile.neighborhood, userProfile.companyNeighborhood),
+            city,
+            state,
+            country: 'BR',
+        };
+        const companyCpfCnpj = digitsOrEmpty(billingCompany.document, billingCompany.cnpj, rootCompany.document, rootCompany.cnpj, platformCustomer.companyDocument, platformCustomer.document, userProfile.document, userProfile.cnpj, userProfile.cpf);
+        const companyPhone = digitsOrEmpty(billingCompany.telefoneCelular, billingCompany.phone, billingCompany.telefoneFixo, rootCompany.telefoneCelular, rootCompany.phone, rootCompany.telefoneFixo, platformCustomer.ownerPhone, platformCustomer.companyPhone, platformCustomer.companyMobile, userProfile.billingPhone, userProfile.phone, userProfile.phoneNumber, input.userPhone);
+        const customerName = firstNonEmpty(billingCompany.razaoSocial, billingCompany.tradeName, billingCompany.nomeFantasia, billingCompany.name, rootCompany.name, rootCompany.tradeName, rootCompany.nomeFantasia, platformCustomer.companyName, userProfile.displayName, input.userName, input.userEmail);
+        const addressValidation = {
+            CEP: companyAddress.zipCode.length === 8,
+            logradouro: Boolean(companyAddress.street),
+            número: Boolean(companyAddress.number),
+            bairro: Boolean(companyAddress.province),
+            município: Boolean(companyAddress.city),
+            UF: companyAddress.state.length === 2,
+        };
+        const missingAddressFields = Object.entries(addressValidation)
+            .filter(([, valid]) => !valid)
+            .map(([label]) => label);
+        if (missingAddressFields.length) {
+            throw billingTypes_1.billingErrors.invalidPlanChange(`Complete o endereço da empresa principal em Perfil antes de pagar: ${missingAddressFields.join(', ')}.`);
+        }
+        const baseAmountInCents = Number(plan.priceInCents || 0);
+        const discountPercent = Math.max(0, Number(rootCompany.billingDiscountPercent || 0));
+        const discountFixedInCents = Math.max(0, Number(rootCompany.billingDiscountCents || 0));
+        const percentageDiscountInCents = Math.round(baseAmountInCents * (discountPercent / 100));
+        const amountInCents = Math.max(0, baseAmountInCents - discountFixedInCents - percentageDiscountInCents);
+        const discountAppliedInCents = Math.max(0, baseAmountInCents - amountInCents);
+        const openOrderQuery = await this.db.collection('billingOrders')
+            .where('companyId', '==', input.companyId)
+            .where('planId', '==', plan.id)
+            .where('type', '==', input.type)
+            .limit(10)
+            .get();
+        const openOrders = openOrderQuery.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const latestOpenOrder = openOrders
+            .filter((order) => {
+            const status = String(order.status || '').toUpperCase();
+            const provider = String(order.provider || '').toLowerCase();
+            const paymentMethod = String(order.paymentMethod || '').toLowerCase();
+            return provider === this.config.providerId
+                && paymentMethod === String(input.paymentMethod || '').toLowerCase()
+                && !['PAID', 'CANCELED', 'REFUNDED'].includes(status)
+                && Boolean(String(order.orderNsu || '').trim());
+        })
+            .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+        if (latestOpenOrder?.paymentData) {
+            return {
+                orderId: String(latestOpenOrder.id),
+                orderNsu: String(latestOpenOrder.orderNsu || ''),
+                amountInCents: Number(latestOpenOrder.amountInCents || amountInCents),
+                planName: plan.name,
+                paymentMethod: String(latestOpenOrder.paymentMethod || input.paymentMethod),
+                orderStatus: String(latestOpenOrder.status || 'CHECKOUT_CREATED'),
+                paymentData: latestOpenOrder.paymentData || null,
+                raw: latestOpenOrder.providerResponse || latestOpenOrder,
+            };
+        }
         const now = iso();
-        const ref = this.db.collection('billingOrders').doc();
-        const nsu = orderNsu();
+        const ref = latestOpenOrder ? this.db.collection('billingOrders').doc(String(latestOpenOrder.id)) : this.db.collection('billingOrders').doc();
+        const nsu = String(latestOpenOrder?.orderNsu || orderNsu());
         const description = `${plan.name} Blu - ${plan.billingInterval === 'year' ? 'anual' : 'mensal'}`;
         await ref.set({
             id: ref.id,
@@ -90,34 +193,90 @@ class BillingService {
             planId: plan.id,
             type: input.type,
             status: 'CREATED',
-            amountInCents: Number(plan.priceInCents),
+            amountInCents,
+            baseAmountInCents,
+            discountAppliedInCents,
+            discountPercent,
+            discountFixedInCents,
             currency: 'BRL',
             description,
-            checkoutUrl: '',
             provider: this.config.providerId,
+            paymentMethod: input.paymentMethod,
             providerInvoiceSlug: '',
             providerTransactionNsu: '',
             captureMethod: '',
             installments: 1,
             receiptUrl: '',
+            paymentData: null,
             expiresAt: iso(addDays(new Date(), 3)),
             paidAt: null,
             createdAt: now,
             updatedAt: now,
             createdBy: input.userId,
-        });
+        }, { merge: true });
+        if (['credit_card', 'debit_card'].includes(input.paymentMethod) && !input.cardToken) {
+            await ref.update({ status: 'CHECKOUT_CREATED', updatedAt: iso(), providerResponse: { pendingCardToken: true } });
+            await this.audit(input.companyId, subscription.id, ref.id, '', 'checkoutCreated', 'USER', input.userId, null, { planId: plan.id, amountInCents, baseAmountInCents, discountAppliedInCents, paymentMethod: input.paymentMethod, pendingCardToken: true });
+            return { orderId: ref.id, orderNsu: nsu, amountInCents, planName: plan.name, paymentMethod: input.paymentMethod, orderStatus: 'AWAITING_CARD_TOKEN', requiresCardToken: true, raw: { pendingCardToken: true } };
+        }
         const checkout = await this.provider.createCheckout({
             handle: this.config.handle,
             redirectUrl: this.config.redirectUrl,
             webhookUrl: this.config.webhookUrl,
-            orderNsu: nsu,
-            amountInCents: Number(plan.priceInCents),
+            orderNsu: input.orderNsu || nsu,
+            amountInCents,
             description,
-            customer: { name: input.userName, email: input.userEmail },
+            paymentMethod: input.paymentMethod,
+            cardToken: input.cardToken,
+            customer: {
+                name: customerName,
+                email: String(billingCompany.email || billingCompany.companyEmail || rootCompany.email || rootCompany.companyEmail || platformCustomer.ownerEmail || userProfile.email || input.userEmail || '').trim(),
+                phoneNumber: companyPhone || String(input.userPhone || '').replace(/\D/g, ''),
+                cpfCnpj: companyCpfCnpj,
+                address: companyAddress,
+            },
         });
-        await ref.update({ checkoutUrl: checkout.checkoutUrl, status: 'CHECKOUT_CREATED', updatedAt: iso(), providerResponse: clean(checkout.raw) });
-        await this.audit(input.companyId, subscription.id, ref.id, '', 'checkoutCreated', 'USER', input.userId, null, { planId: plan.id, amountInCents: plan.priceInCents });
-        return { orderId: ref.id, orderNsu: nsu, checkoutUrl: checkout.checkoutUrl, amountInCents: plan.priceInCents, planName: plan.name };
+        await ref.update({
+            status: checkout.orderStatus || 'CHECKOUT_CREATED',
+            updatedAt: iso(),
+            providerResponse: clean(checkout.raw),
+            paymentData: clean(checkout.paymentData || null),
+            providerInvoiceSlug: String(checkout.paymentData?.invoiceSlug || ''),
+            providerTransactionNsu: String(checkout.paymentData?.transactionNsu || ''),
+            receiptUrl: String(checkout.paymentData?.receiptUrl || ''),
+            paymentMethod: checkout.paymentMethod || input.paymentMethod,
+        });
+        if (checkout.orderStatus === 'PAID') {
+            await this.applyPayment(ref, {
+                id: ref.id,
+                orderNsu: checkout.orderNsu,
+                companyId: input.companyId,
+                subscriptionId: subscription.id,
+                planId: plan.id,
+                amountInCents,
+                status: checkout.orderStatus || 'PAID',
+            }, {
+                success: true,
+                paid: true,
+                orderNsu: checkout.orderNsu,
+                amountInCents,
+                paidAmountInCents: amountInCents,
+                captureMethod: input.paymentMethod,
+                installments: 1,
+                raw: checkout.raw,
+            }, { transactionNsu: checkout.paymentData?.transactionNsu, slug: checkout.paymentData?.invoiceSlug, actorId: input.userId });
+        }
+        await this.audit(input.companyId, subscription.id, ref.id, '', 'checkoutCreated', 'USER', input.userId, null, { planId: plan.id, amountInCents, baseAmountInCents, discountAppliedInCents, paymentMethod: input.paymentMethod });
+        return {
+            orderId: ref.id,
+            orderNsu: checkout.orderNsu || input.orderNsu || nsu,
+            amountInCents,
+            planName: plan.name,
+            paymentMethod: checkout.paymentMethod || input.paymentMethod,
+            orderStatus: checkout.orderStatus,
+            paymentData: checkout.paymentData,
+            raw: checkout.raw,
+        };
     }
     async recordWebhookEvent(event, payloadHash) {
         const order = await this.db.collection('billingOrders').where('orderNsu', '==', event.orderNsu).limit(1).get();
@@ -173,7 +332,7 @@ class BillingService {
                 orderNsu: String(event.orderNsu),
                 transactionNsu: String(event.transactionNsu),
                 slug: String(event.invoiceSlug),
-                actorId: 'webhook:asaas',
+                actorId: 'webhook:pagarme',
             });
             await eventRef.update({ processingStatus: 'PROCESSED', processedAt: iso(), result });
         }
@@ -183,7 +342,7 @@ class BillingService {
         }
     }
     async applyPayment(orderRef, order, checked, input) {
-        const paymentId = `${this.config.providerId}_${input.transactionNsu}`;
+        const paymentId = `${this.config.providerId}_${input.transactionNsu || input.slug || orderRef.id}`;
         const paymentRef = this.db.collection('payments').doc(paymentId);
         await this.db.runTransaction(async (transaction) => {
             const [paymentSnapshot, orderSnapshot] = await Promise.all([transaction.get(paymentRef), transaction.get(orderRef)]);
@@ -202,8 +361,8 @@ class BillingService {
                 companyId: latestOrder.companyId,
                 subscriptionId: latestOrder.subscriptionId,
                 provider: this.config.providerId,
-                providerTransactionNsu: input.transactionNsu,
-                providerInvoiceSlug: input.slug,
+                providerTransactionNsu: String(input.transactionNsu || latestOrder.providerTransactionNsu || ''),
+                providerInvoiceSlug: String(input.slug || latestOrder.providerInvoiceSlug || ''),
                 expectedAmountInCents: latestOrder.amountInCents,
                 amountInCents: checked.amountInCents || latestOrder.amountInCents,
                 paidAmountInCents: checked.paidAmountInCents || checked.amountInCents || latestOrder.amountInCents,
@@ -217,8 +376,8 @@ class BillingService {
             });
             transaction.update(orderRef, {
                 status: 'PAID',
-                providerTransactionNsu: input.transactionNsu,
-                providerInvoiceSlug: input.slug,
+                providerTransactionNsu: String(input.transactionNsu || latestOrder.providerTransactionNsu || ''),
+                providerInvoiceSlug: String(input.slug || latestOrder.providerInvoiceSlug || ''),
                 captureMethod: checked.captureMethod || '',
                 installments: checked.installments || 1,
                 paidAt: iso(now),
@@ -256,10 +415,37 @@ class BillingService {
         });
     }
     async summary(companyId) {
-        const subscriptionQuery = await this.db.collection('subscriptions').where('customerCompanyId', '==', companyId).limit(1).get();
-        const subscription = subscriptionQuery.empty ? null : { id: subscriptionQuery.docs[0].id, ...subscriptionQuery.docs[0].data() };
-        const plan = subscription ? await this.getPlan(String(subscription.planId)).catch(() => null) : null;
-        const usage = subscription ? await new PlanEntitlementService_1.PlanEntitlementService(this.db).getUsageSummary(companyId, String(subscription.id)) : null;
+        const [subscriptionQuery, companySnapshot, platformCustomerSnapshot] = await Promise.all([
+            this.db.collection('subscriptions').where('customerCompanyId', '==', companyId).limit(1).get(),
+            this.db.collection('companies').doc(companyId).get(),
+            this.db.collection('platformCustomers').doc(companyId).get(),
+        ]);
+        const companyData = companySnapshot.exists ? companySnapshot.data() || {} : {};
+        const platformCustomerData = platformCustomerSnapshot.exists ? platformCustomerSnapshot.data() || {} : {};
+        const rawSubscription = subscriptionQuery.empty ? null : { id: subscriptionQuery.docs[0].id, ...subscriptionQuery.docs[0].data() };
+        const subscription = rawSubscription
+            ? { ...rawSubscription, status: normalizeStatus(rawSubscription.status) }
+            : (companySnapshot.exists || platformCustomerSnapshot.exists
+                ? {
+                    id: String(companyData.subscriptionId || platformCustomerData.subscriptionId || `sub-${companyId}`),
+                    customerCompanyId: companyId,
+                    planId: String(companyData.subscription?.plan || platformCustomerData.planId || ''),
+                    status: normalizeStatus(companyData.accessStatus || platformCustomerData.accessStatus || platformCustomerData.status),
+                    provider: this.config.providerId,
+                    trialStartedAt: platformCustomerData.trialStartedAt || null,
+                    trialEndsAt: platformCustomerData.trialEndsAt || null,
+                    currentPeriodStartedAt: platformCustomerData.trialStartedAt || null,
+                    currentPeriodEndsAt: platformCustomerData.trialEndsAt || null,
+                    nextBillingDate: platformCustomerData.trialEndsAt || null,
+                    gracePeriodEndsAt: null,
+                    canceledAt: null,
+                    cancelAtPeriodEnd: false,
+                    suspendedAt: null,
+                    lastPaymentId: null,
+                }
+                : null);
+        const plan = subscription?.planId ? await this.getPlan(String(subscription.planId)).catch(() => null) : null;
+        const usage = subscription?.id ? await new PlanEntitlementService_1.PlanEntitlementService(this.db).getUsageSummary(companyId, String(subscription.id)) : null;
         const orders = await this.db.collection('billingOrders').where('companyId', '==', companyId).limit(50).get();
         const payments = await this.db.collection('payments').where('companyId', '==', companyId).limit(50).get();
         return {

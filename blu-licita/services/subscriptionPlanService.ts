@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../services/firebase";
 
-export type PlanKey = "essential" | "professional" | "performance" | "enterprise";
+export type PlanKey = "essential" | "professional" | "performance" | "enterprise" | "test-1-real";
 
 export type PlanLimits = {
   companies: number | null;
@@ -125,6 +125,28 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       backup: "continuous",
       support: "enterprise",
       advancedAudit: true,
+    },
+  },
+  {
+    key: "test-1-real",
+    name: "Plano Teste Blu",
+    subtitle: "Validação da jornada com cobrança simbólica de R$ 1,00. Sem período grátis.",
+    limits: {
+      companies: 1,
+      activeContracts: 1,
+      users: 1,
+      storageGb: 1,
+      favoriteOpportunities: 50,
+      documents: 25,
+      historyEvents: 250,
+      digitalCertificates: 1,
+      bankAccounts: 1,
+      documentTemplates: 1,
+      api: "none",
+      webhooks: false,
+      backup: "daily",
+      support: "email",
+      advancedAudit: false,
     },
   },
 ];

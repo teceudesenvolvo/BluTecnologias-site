@@ -2,7 +2,8 @@ import React from "react";
 import { CheckCircle2, CreditCard, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useOptionalBluAuth } from "../../contexts/BluAuthContext";
-import { billingClient, type BillingPlanView, formatCents } from "../services/billingClient";
+import { billingClient, getBillingCheckoutProfileStatus, type BillingPlanView, formatCents } from "../services/billingClient";
+import { PaymentMethodModal, type BillingPaymentMethod } from "../components/PaymentMethodModal";
 
 const limitLabel = (key: string, value: number | null | undefined) => {
   if (value === null || value === undefined) return "Ilimitado";
@@ -16,6 +17,8 @@ export const PlansPage: React.FC = () => {
   const [checkoutLoading, setCheckoutLoading] = React.useState("");
   const [error, setError] = React.useState("");
   const [currentPlan, setCurrentPlan] = React.useState<BillingPlanView | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = React.useState(false);
+  const [selectedPlan, setSelectedPlan] = React.useState<BillingPlanView | null>(null);
   const authContext = useOptionalBluAuth();
   const navigate = useNavigate();
   const isLoggedIn = Boolean(authContext?.user);
@@ -26,16 +29,29 @@ export const PlansPage: React.FC = () => {
       isLoggedIn ? billingClient.summary().catch(() => null) : Promise.resolve(null),
     ])
       .then(([plansData, summary]) => {
-        setPlans(plansData.plans);
+        setPlans(
+          (plansData.plans || []).filter(
+            (plan) =>
+              plan.public !== false &&
+              plan.active !== false &&
+              plan.slug !== "test-1-real",
+          ),
+        );
         setCurrentPlan(summary?.plan || null);
       })
       .catch((reason) => setError(reason.message))
       .finally(() => setLoading(false));
   }, []);
 
-  const checkout = async (plan: BillingPlanView) => {
+  const checkout = async (plan: BillingPlanView, paymentMethod: BillingPaymentMethod) => {
     if (!isLoggedIn) {
       navigate("/admin/onboarding");
+      return;
+    }
+    const profile = await getBillingCheckoutProfileStatus();
+    if (!profile.isReady) {
+      navigate("/admin/perfil?tab=company", { replace: true, state: { section: "company", billingProfileMissing: profile.missingFields } });
+      alert(`Antes de pagar, complete os dados da empresa em Perfil: ${profile.missingFields.join(", ")}.`);
       return;
     }
     if (plan.slug === "enterprise") {
@@ -44,13 +60,34 @@ export const PlansPage: React.FC = () => {
     }
     setCheckoutLoading(plan.id);
     try {
-      const result = await billingClient.createCheckout(plan.id, "UPGRADE");
-      window.location.href = result.checkoutUrl;
+      navigate(`/admin/assinatura/checkout?planId=${encodeURIComponent(plan.id)}&method=${encodeURIComponent(paymentMethod)}&type=UPGRADE&amountInCents=${encodeURIComponent(String(plan.priceInCents))}&planName=${encodeURIComponent(plan.name)}`, {
+        state: {
+          planId: plan.id,
+          paymentMethod,
+          billingOrderType: "UPGRADE",
+          planName: plan.name,
+          amountInCents: plan.priceInCents,
+          source: "plans",
+        },
+      });
     } catch (reason: any) {
       alert(reason?.message || "Não foi possível abrir o checkout.");
     } finally {
       setCheckoutLoading("");
     }
+  };
+
+  const askPaymentMethod = (plan: BillingPlanView) => {
+    if (!isLoggedIn) {
+      navigate(`/admin/onboarding?plan=${encodeURIComponent(plan.id)}`);
+      return;
+    }
+    if (plan.slug === "enterprise") {
+      alert("Plano Enterprise exige contratação assistida pelo Blu HQ.");
+      return;
+    }
+    setSelectedPlan(plan);
+    setPaymentModalOpen(true);
   };
 
   if (loading) return <div className="grid min-h-[520px] place-items-center"><Loader2 className="animate-spin text-blue-600" /></div>;
@@ -63,7 +100,7 @@ export const PlansPage: React.FC = () => {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Todos os planos acessam as funcionalidades da Blu. O que muda é a capacidade operacional: empresas, usuários, contratos e armazenamento.</p>
         <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
           <span className="rounded-full bg-blue-50 px-3 py-2 text-blue-700">7 dias grátis</span>
-          <span className="rounded-full bg-emerald-50 px-3 py-2 text-emerald-700">Pix e cartão via Asaas</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-2 text-emerald-700">Cartão, débito pinless e boleto via Pagar.me</span>
           <span className="rounded-full bg-slate-100 px-3 py-2">Sem cartão salvo na Blu</span>
         </div>
       </header>
@@ -103,6 +140,13 @@ export const PlansPage: React.FC = () => {
                 <Sparkles className="text-blue-500" />
               </div>
               <p className="mt-7 text-4xl font-black">{formatCents(plan.priceInCents)}<span className="text-sm font-semibold text-slate-400">/{plan.billingInterval === "year" ? "ano" : "mês"}</span></p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[.16em] text-slate-500">
+                {(plan.paymentMethods?.length ? plan.paymentMethods : ["credit_card", "boleto", "debit_card"]).map((method) => (
+                  <span key={method} className="rounded-full bg-slate-100 px-2.5 py-1">
+                    {method === "credit_card" ? "Cartão de crédito" : method === "boleto" ? "Boleto" : "Débito pinless"}
+                  </span>
+                ))}
+              </div>
               <div className="mt-6 space-y-3 text-sm">
                 {[
                   ["companies", "Empresas/CNPJs"],
@@ -111,14 +155,34 @@ export const PlansPage: React.FC = () => {
                   ["storageBytes", "Armazenamento"],
                 ].map(([key, label]) => <p key={key} className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-600" /> <b>{limitLabel(key, plan.limits?.[key])}</b> {label}</p>)}
               </div>
-              <button onClick={() => checkout(plan)} disabled={checkoutLoading === plan.id} className="mt-7 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 disabled:opacity-60">
+              <button onClick={() => askPaymentMethod(plan)} disabled={checkoutLoading === plan.id} className="mt-7 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 disabled:opacity-60">
                 {checkoutLoading === plan.id ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />}
-                {plan.slug === "enterprise" ? "Falar com Blu" : isLoggedIn ? "Fazer upgrade" : "Começar teste grátis"}
+                {plan.slug === 'enterprise' ? 'Falar com Blu' : plan.slug === 'test-1-real' ? 'Gerar pagamento de teste' : isLoggedIn ? 'Fazer upgrade' : 'Começar teste grátis'}
               </button>
+              {plan.slug === 'test-1-real' && (
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  O teste de R$ 1,00 usa o mesmo checkout do Pagar.me para validar a jornada de pagamento dentro da Blu.
+                </p>
+              )}
             </div>
           </article>
         ))}
       </section>
+
+      <PaymentMethodModal
+        open={paymentModalOpen}
+        title={`Escolha a forma de pagamento${selectedPlan ? ` · ${selectedPlan.name}` : ''}`}
+        description="Antes de abrir o checkout, escolha como deseja pagar. A Blu abrirá o fluxo correto já com o meio selecionado, sem Pix."
+        confirmLabel={checkoutLoading ? "Abrindo checkout..." : "Continuar para o checkout"}
+        loading={Boolean(checkoutLoading)}
+        defaultValue="credit_card"
+        onClose={() => setPaymentModalOpen(false)}
+        onConfirm={async (paymentMethod) => {
+          if (!selectedPlan) return;
+          setPaymentModalOpen(false);
+          await checkout(selectedPlan, paymentMethod);
+        }}
+      />
     </div>
   );
 };

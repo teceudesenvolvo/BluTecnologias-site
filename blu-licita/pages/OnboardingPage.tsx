@@ -1,38 +1,90 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Building2, Check, CheckCircle2, Loader2, PartyPopper, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Banknote, Building2, Check, CheckCircle2, CreditCard, Loader2, PartyPopper, ReceiptText, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
-import { subscriptionPlans, type PlanKey } from '../services/subscriptionPlanService';
+import { billingClient, formatCents, type BillingPlanView } from '../billing/services/billingClient';
+import { lookupCnpjData } from '../../services/cnpjLookup';
+import { lookupCepData } from '../../services/cepLookup';
 
 const goals = ['Encontrar oportunidades melhores', 'Analisar editais com IA', 'Organizar documentos', 'Controlar contratos', 'Cobrar órgãos públicos', 'Acompanhar fluxo de caixa'];
-const planPrices: Record<PlanKey, string> = { essential: 'R$ 197/mês', professional: 'R$ 497/mês', performance: 'R$ 997/mês', enterprise: 'Sob consulta' };
 
-const Field = ({ label, value, onChange, placeholder, type = 'text', required = true }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; type?: string; required?: boolean }) => (
+const onlyDigits = (value: string) => value.replace(/\D/g, '');
+const maskCnpj = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 14);
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+};
+
+const Field = ({ label, value, onChange, placeholder, type = 'text', required = true, onBlur }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; type?: string; required?: boolean; onBlur?: (value: string) => void }) => (
   <label className="text-sm font-semibold text-slate-700">
     {label}
-    <input value={value} onChange={(event) => onChange(event.target.value)} type={type} required={required} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
+    <input value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onBlur?.(event.target.value)} type={type} required={required} placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
   </label>
 );
 
 export const OnboardingPage: React.FC = () => {
   const [params] = useSearchParams();
   const [step, setStep] = useState(1);
-  const [plan, setPlan] = useState<PlanKey>('professional');
+  const [plan, setPlan] = useState('');
+  const [publicPlans, setPublicPlans] = useState<BillingPlanView[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [companyLookupLoading, setCompanyLookupLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'boleto' | 'debit_card'>('credit_card');
   const [userForm, setUserForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
-  const [companyForm, setCompanyForm] = useState({ legalName: '', tradeName: '', document: '', segment: '', city: '', state: '' });
+  const [companyForm, setCompanyForm] = useState({
+    legalName: '',
+    tradeName: '',
+    document: '',
+    segment: '',
+    city: '',
+    state: '',
+    email: '',
+    phone: '',
+    cep: '',
+    street: '',
+    number: '',
+    neighborhood: '',
+    complement: '',
+  });
   const { createTrialAccount } = useBluAuth();
   const navigate = useNavigate();
   const partnerCode = params.get('ref') || '';
-  const selectablePlans = useMemo(() => subscriptionPlans.filter((item) => item.key !== 'enterprise'), []);
-  const currentPlan = useMemo(() => selectablePlans.find((item) => item.key === plan) || selectablePlans[1], [plan, selectablePlans]);
+  const preferredPlan = params.get('plano') || params.get('plan') || '';
+  const selectablePlans = useMemo(() => publicPlans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise'), [publicPlans]);
+  const currentPlan = useMemo(() => selectablePlans.find((item) => item.id === plan) || selectablePlans[0] || null, [plan, selectablePlans]);
+  const isBillingTestPlan = plan === 'test-1-real';
   const progress = step * 25;
+
+  React.useEffect(() => {
+    billingClient.publicPlans()
+      .then(({ plans }) => {
+        const normalizedPlans = plans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise');
+        setPublicPlans(normalizedPlans);
+        setPlan((current) => {
+          if (current && normalizedPlans.some((item) => item.id === current || item.slug === current)) return current;
+          const preferred = normalizedPlans.find((item) => item.id === preferredPlan || item.slug === preferredPlan);
+          return preferred?.id || normalizedPlans[0]?.id || '';
+        });
+      })
+      .catch(() => {
+        setPublicPlans([]);
+      })
+      .finally(() => setPlansLoading(false));
+  }, [preferredPlan]);
 
   const next = () => {
     setError('');
+    if (step === 1 && !plan) {
+      setError('Selecione um plano para continuar.');
+      return;
+    }
     if (step === 2 && (!userForm.name || !userForm.email || userForm.password.length < 6 || userForm.password !== userForm.confirmPassword)) {
       setError(userForm.password !== userForm.confirmPassword ? 'As senhas não conferem.' : 'Informe nome, e-mail e uma senha com no mínimo 6 caracteres.');
       return;
@@ -41,15 +93,92 @@ export const OnboardingPage: React.FC = () => {
       setError('Informe pelo menos a razão social e o CNPJ da empresa.');
       return;
     }
+    if (step === 3 && isBillingTestPlan) {
+      const requiredBillingFields = [
+        companyForm.phone,
+        companyForm.email,
+        companyForm.cep,
+        companyForm.street,
+        companyForm.number,
+        companyForm.neighborhood,
+        companyForm.city,
+        companyForm.state,
+      ];
+      if (requiredBillingFields.some((value) => !String(value || '').trim())) {
+        setError('Para o plano de teste com pagamento, preencha também telefone, e-mail, endereço, CEP e número da empresa.');
+        return;
+      }
+    }
     setStep((value) => Math.min(4, value + 1));
   };
   const back = () => setStep((value) => Math.max(1, value - 1));
+
+  const lookupCompanyByDocument = async (rawDocument: string) => {
+    const cnpj = onlyDigits(rawDocument);
+    if (cnpj.length !== 14) return;
+    setCompanyLookupLoading(true);
+    try {
+      const data = await lookupCnpjData(cnpj);
+      setCompanyForm((current) => ({
+        ...current,
+        document: data.cnpj,
+        legalName: data.razaoSocial || current.legalName,
+        tradeName: data.fantasyName || current.tradeName,
+        email: data.email || current.email,
+        phone: data.phone || current.phone,
+        city: data.city || current.city,
+        state: data.state || current.state,
+        cep: data.cep || current.cep,
+        street: data.address ? String(data.address).split(',')[0] || current.street : current.street,
+        complement: data.complement || current.complement,
+      }));
+    } catch (reason: any) {
+      setError(reason?.message || 'Não foi possível consultar o CNPJ informado.');
+    } finally {
+      setCompanyLookupLoading(false);
+    }
+  };
+
+  const lookupCompanyByCep = async (rawCep: string) => {
+    const cep = onlyDigits(rawCep);
+    if (cep.length !== 8) return;
+    setCompanyLookupLoading(true);
+    try {
+      const data = await lookupCepData(cep);
+      setCompanyForm((current) => ({
+        ...current,
+        cep: data.cep,
+        street: data.street || current.street,
+        neighborhood: data.neighborhood || current.neighborhood,
+        city: data.city || current.city,
+        state: data.state || current.state,
+        complement: data.complement || current.complement,
+      }));
+    } catch (reason: any) {
+      setError(reason?.message || 'Não foi possível consultar o CEP informado.');
+    } finally {
+      setCompanyLookupLoading(false);
+    }
+  };
 
   const finish = async () => {
     setLoading(true);
     setError('');
     try {
       await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals, partnerCode });
+      if (plan === 'test-1-real') {
+        navigate('/admin/assinatura/checkout', {
+          state: {
+            planId: plan,
+            paymentMethod,
+            billingOrderType: 'FIRST_SUBSCRIPTION',
+            planName: selectablePlans.find((item) => item.id === plan)?.name || 'Plano teste Blu',
+            amountInCents: selectablePlans.find((item) => item.id === plan)?.priceInCents || 100,
+            source: 'onboarding',
+          },
+        });
+        return;
+      }
       navigate('/admin/dashboard');
     } catch (reason: any) {
       setError(reason?.message || 'Não foi possível criar sua conta. Verifique os dados e tente novamente.');
@@ -92,18 +221,28 @@ export const OnboardingPage: React.FC = () => {
             {step === 1 && (
               <>
                 <StepTitle icon={<Sparkles />} title="Escolha seu plano para o teste" description="Todos os planos possuem as funcionalidades da Blu. O que muda é a capacidade operacional." />
-                <div className="mt-7 grid gap-4 md:grid-cols-2">
+                {plansLoading ? (
+                  <div className="mt-7 grid min-h-[200px] place-items-center rounded-3xl border border-slate-200 bg-slate-50">
+                    <Loader2 className="animate-spin text-blue-600" size={20} />
+                  </div>
+                ) : (
+                  <div className="mt-7 grid gap-4 md:grid-cols-2">
                   {selectablePlans.map((item) => (
-                    <button key={item.key} type="button" onClick={() => setPlan(item.key)} className={`rounded-3xl border p-5 text-left transition ${plan === item.key ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
+                    <button key={item.id} type="button" onClick={() => setPlan(item.id)} className={`rounded-3xl border p-5 text-left transition ${plan === item.id ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <div><h3 className="text-xl font-black">{item.name.replace('Plano ', '')}</h3><p className="mt-1 text-sm text-slate-500">{item.subtitle}</p></div>
-                        {plan === item.key && <Check className="text-blue-600" />}
+                        <div>
+                          <h3 className="text-xl font-black">{item.name.replace('Plano ', '')}</h3>
+                          <p className="mt-1 text-sm text-slate-500">{item.description || 'Capacidade configurável para empresas que vendem ao governo.'}</p>
+                        </div>
+                        {plan === item.id && <Check className="text-blue-600" />}
                       </div>
-                      <p className="mt-5 text-2xl font-black">{planPrices[item.key]}</p>
+                      <p className="mt-5 text-2xl font-black">{formatCents(item.priceInCents)}</p>
                       <p className="mt-4 text-xs font-bold text-slate-500">{item.limits.companies ?? '∞'} empresa(s) · {item.limits.users ?? '∞'} usuário(s) · {item.limits.activeContracts ?? '∞'} contratos</p>
+                      {item.slug === 'test-1-real' && <p className="mt-3 text-xs font-bold text-amber-600">Plano de cobrança de teste — não inclui 7 dias grátis.</p>}
                     </button>
                   ))}
                 </div>
+                )}
               </>
             )}
 
@@ -125,12 +264,31 @@ export const OnboardingPage: React.FC = () => {
               <>
                 <StepTitle icon={<Building2 />} title="Cadastre a primeira empresa" description="Essa será a empresa principal do ambiente. Depois você poderá adicionar outras conforme o plano." />
                 <div className="mt-7 grid gap-5 md:grid-cols-2">
-                  <Field label="CNPJ" value={companyForm.document} onChange={(value) => setCompanyForm({ ...companyForm, document: value })} placeholder="00.000.000/0001-00" />
+                  <label className="text-sm font-semibold text-slate-700">
+                    CNPJ
+                    <input
+                      value={companyForm.document}
+                      onChange={(event) => setCompanyForm({ ...companyForm, document: maskCnpj(event.target.value) })}
+                      onBlur={(event) => lookupCompanyByDocument(event.target.value)}
+                      placeholder="00.000.000/0001-00"
+                      inputMode="numeric"
+                      maxLength={18}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-normal outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+                    />
+                      {companyLookupLoading && <span className="mt-2 block text-xs font-semibold text-blue-600">Buscando dados da empresa…</span>}
+                  </label>
                   <Field label="Razão social" value={companyForm.legalName} onChange={(value) => setCompanyForm({ ...companyForm, legalName: value })} placeholder="Distribuidora Nordeste Ltda." />
                   <Field label="Nome fantasia" value={companyForm.tradeName} onChange={(value) => setCompanyForm({ ...companyForm, tradeName: value })} placeholder="Distribuidora Nordeste" required={false} />
                   <Field label="Segmento" value={companyForm.segment} onChange={(value) => setCompanyForm({ ...companyForm, segment: value })} placeholder="Produtos, serviços, tecnologia..." required={false} />
                   <Field label="Cidade" value={companyForm.city} onChange={(value) => setCompanyForm({ ...companyForm, city: value })} placeholder="Fortaleza" required={false} />
                   <Field label="Estado" value={companyForm.state} onChange={(value) => setCompanyForm({ ...companyForm, state: value.toUpperCase() })} placeholder="CE" required={false} />
+                  <Field label="E-mail da empresa" value={companyForm.email} onChange={(value) => setCompanyForm({ ...companyForm, email: value })} placeholder="financeiro@empresa.com.br" required={false} />
+                  <Field label="Telefone da empresa" value={companyForm.phone} onChange={(value) => setCompanyForm({ ...companyForm, phone: value })} placeholder="(85) 99999-9999" required={false} />
+                  <Field label="CEP" value={companyForm.cep} onChange={(value) => setCompanyForm({ ...companyForm, cep: value })} onBlur={(value) => lookupCompanyByCep(value)} placeholder="60000-000" required={false} />
+                  <Field label="Logradouro" value={companyForm.street} onChange={(value) => setCompanyForm({ ...companyForm, street: value })} placeholder="Rua ..." required={false} />
+                  <Field label="Número" value={companyForm.number} onChange={(value) => setCompanyForm({ ...companyForm, number: value })} placeholder="123" required={false} />
+                  <Field label="Bairro" value={companyForm.neighborhood} onChange={(value) => setCompanyForm({ ...companyForm, neighborhood: value })} placeholder="Centro" required={false} />
+                  <Field label="Complemento" value={companyForm.complement} onChange={(value) => setCompanyForm({ ...companyForm, complement: value })} placeholder="Sala 2" required={false} />
                 </div>
                 <div className="mt-7">
                   <p className="text-sm font-semibold text-slate-700">O que você quer melhorar primeiro?</p>
@@ -150,11 +308,38 @@ export const OnboardingPage: React.FC = () => {
                 <h1 className="mt-6 text-3xl font-black tracking-tight">Seu teste está pronto</h1>
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-500">Vamos criar sua conta, liberar 7 dias gratuitos e abrir o painel executivo da Blu. Você poderá fechar o plano pela página Assinatura quando quiser.</p>
                 <div className="mx-auto mt-8 max-w-xl rounded-3xl bg-slate-50 p-5 text-left">
-                  <Summary label="Plano" value={currentPlan.name} />
+                  <Summary label="Plano" value={currentPlan?.name || '—'} />
                   <Summary label="Usuário" value={userForm.name || userForm.email} />
                   <Summary label="Empresa" value={companyForm.tradeName || companyForm.legalName} />
-                  <Summary label="Teste" value="7 dias grátis" tone="text-emerald-600" />
+                  <Summary label={isBillingTestPlan ? "Validação de pagamento" : "Teste"} value={isBillingTestPlan ? "Cobrança simbólica de R$ 1,00" : "7 dias grátis"} tone={isBillingTestPlan ? "text-amber-600" : "text-emerald-600"} />
                 </div>
+                {isBillingTestPlan && (
+                  <div className="mx-auto mt-6 max-w-xl">
+                    <p className="text-sm font-semibold text-slate-700">Como você quer pagar a cobrança de teste?</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                      {[
+                        ['boleto', 'Boleto', ReceiptText],
+                        ['credit_card', 'Cartão de crédito', CreditCard],
+                        ['debit_card', 'Cartão de débito', Banknote],
+                      ].map(([value, label, Icon]) => {
+                        const active = paymentMethod === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setPaymentMethod(value as typeof paymentMethod)}
+                            className={`rounded-2xl border p-4 text-left transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                          >
+                            <Icon size={18} />
+                            <p className="mt-3 text-sm font-black">{label}</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">{value === 'boleto' ? 'Geração de boleto para pagar depois.' : value === 'debit_card' ? 'Pagamento no débito pinless, sem parcelamento.' : 'Pagamento no cartão de crédito.'}</p>
+                            {active && <p className="mt-3 text-xs font-black uppercase tracking-[.18em] text-blue-600">Selecionado</p>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -164,7 +349,7 @@ export const OnboardingPage: React.FC = () => {
             </div>
           </div>
 
-          <p className="mt-5 text-center text-xs text-slate-400">Ao continuar, você concorda com os termos da Blu. O pagamento será feito somente pelo checkout seguro quando você decidir contratar.</p>
+          <p className="mt-5 text-center text-xs text-slate-400">Ao continuar, você concorda com os termos da Blu. O pagamento será feito dentro da Blu, pelo checkout seguro, quando você decidir contratar — ou pela cobrança de teste, caso selecione esse plano.</p>
         </section>
       </main>
     </div>

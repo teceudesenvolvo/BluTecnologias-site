@@ -1,131 +1,306 @@
 import * as https from 'https';
 import {
-  billingErrors,
   BillingCapability,
+  BillingCheckoutPaymentData,
   BillingProvider,
   CheckPaymentInput,
   CreateCheckoutInput,
   CreateCheckoutResult,
   NormalizedWebhookEvent,
   PaymentCheckResult,
+  billingErrors,
 } from '../domain/billingTypes';
 
-const jsonPost = (url: string, payload: Record<string, unknown>, timeoutMs = 12000) => new Promise<unknown>((resolve, reject) => {
-  const body = JSON.stringify(payload);
-  const target = new URL(url);
-  const request = https.request({
-    hostname: target.hostname,
-    path: `${target.pathname}${target.search}`,
-    method: 'POST',
-    timeout: timeoutMs,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Content-Length': Buffer.byteLength(body),
-      'User-Agent': 'Blu-Billing-Asaas/1.0',
-    },
-  }, (response) => {
-    const chunks: Buffer[] = [];
-    response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    response.on('end', () => {
-      const text = Buffer.concat(chunks).toString('utf8');
-      let parsed: unknown = {};
-      try {
-        parsed = text ? JSON.parse(text) : {};
-      } catch {
-        parsed = { raw: text };
-      }
-      if ((response.statusCode || 500) >= 400) reject(billingErrors.checkoutCreation(`Asaas retornou HTTP ${response.statusCode}.`));
-      else resolve(parsed);
+type RequestOptions = {
+  timeoutMs?: number;
+  secretKey?: string;
+};
+
+const base64Auth = (secretKey = '') => Buffer.from(`${secretKey.trim()}:`).toString('base64');
+
+const jsonRequest = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: Record<string, unknown>, options: RequestOptions = {}) =>
+  new Promise<unknown>((resolve, reject) => {
+    const target = new URL(url);
+    const body = payload ? JSON.stringify(payload) : '';
+    const request = https.request({
+      hostname: target.hostname,
+      path: `${target.pathname}${target.search}`,
+      method,
+      timeout: options.timeoutMs ?? 12000,
+      headers: {
+        Accept: 'application/json',
+        ...(method !== 'GET' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}),
+        ...(options.secretKey ? { Authorization: `Basic ${base64Auth(options.secretKey)}` } : {}),
+        'User-Agent': 'Blu-Billing-Pagarme/2.0',
+      },
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let parsed: unknown = {};
+        try {
+          parsed = text ? JSON.parse(text) : {};
+        } catch {
+          parsed = { raw: text };
+        }
+        if ((response.statusCode || 500) >= 400) {
+          const message = typeof parsed === 'object' && parsed && 'message' in (parsed as Record<string, unknown>)
+            ? String((parsed as Record<string, unknown>).message || '')
+            : '';
+          const errors = typeof parsed === 'object' && parsed && 'errors' in (parsed as Record<string, unknown>)
+            ? JSON.stringify((parsed as Record<string, unknown>).errors || parsed || {})
+            : '';
+          const suffix = [message, errors].filter(Boolean).join(' · ');
+          const envHint = String(url).includes('sdx-api.pagar.me')
+            ? 'Verifique se a chave é de teste e se o base URL está em sdx-api.pagar.me/core/v5.'
+            : 'Verifique se a chave é de produção e se o base URL está em api.pagar.me/core/v5.';
+          reject(billingErrors.checkoutCreation(`Pagar.me retornou HTTP ${response.statusCode}${suffix ? `: ${suffix}` : ''}. ${envHint}`.trim()));
+          return;
+        }
+        resolve(parsed);
+      });
     });
+    request.on('timeout', () => {
+      request.destroy();
+      reject(billingErrors.providerUnavailable());
+    });
+    request.on('error', () => reject(billingErrors.providerUnavailable()));
+    if (body) request.write(body);
+    request.end();
   });
-  request.on('timeout', () => {
-    request.destroy();
-    reject(billingErrors.providerUnavailable());
-  });
-  request.on('error', () => reject(billingErrors.providerUnavailable()));
-  request.write(body);
-  request.end();
-});
 
 const stringField = (value: unknown) => typeof value === 'string' ? value.trim() : '';
-const intField = (value: unknown) => Number.isSafeInteger(Number(value)) ? Number(value) : 0;
+const intField = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const onlyDigits = (value: unknown) => String(value || '').replace(/\D/g, '');
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
 
-export class AsaasBillingProvider implements BillingProvider {
+const normalizeCustomer = (input: CreateCheckoutInput) => {
+  if (!input.customer) return null;
+  const document = onlyDigits(input.customer.cpfCnpj);
+  const phone = onlyDigits(input.customer.phoneNumber);
+  const type = document.length === 11 ? 'individual' : 'company';
+  const customerAddress = input.customer.address || {};
+  const address = {
+    street: stringField(customerAddress.street),
+    number: stringField(customerAddress.number),
+    neighborhood: stringField(customerAddress.province),
+    zip_code: onlyDigits(customerAddress.zipCode),
+    city: stringField(customerAddress.city),
+    state: stringField(customerAddress.state),
+    country: String(customerAddress.country || 'BR').trim() || 'BR',
+  };
+  return {
+    name: stringField(input.customer.name || input.orderNsu),
+    email: stringField(input.customer.email),
+    document,
+    type,
+    phones: phone
+      ? {
+          mobile_phone: {
+            country_code: '55',
+            area_code: phone.slice(0, 2),
+            number: phone.slice(2),
+          },
+        }
+      : undefined,
+    address,
+  };
+};
+
+const buildPayment = (input: CreateCheckoutInput) => {
+  if (input.paymentMethod === 'boleto') {
+    return {
+      payment_method: 'boleto',
+      boleto: {
+        due_at: addDays(new Date(), 3).toISOString(),
+        instructions: 'Pagamento do plano Blu.',
+        type: 'BDP',
+      },
+      amount: input.amountInCents,
+    };
+  }
+  if (input.paymentMethod === 'debit_card') {
+    return {
+      payment_method: 'debit_card',
+      debit_card: {
+        card_token: input.cardToken,
+        operation_type: 'auth_and_capture',
+        statement_descriptor: 'BLU TEC',
+      },
+      amount: input.amountInCents,
+    };
+  }
+  return {
+    payment_method: 'credit_card',
+    credit_card: {
+      installments: 1,
+      operation_type: 'auth_and_capture',
+      card_token: input.cardToken,
+      statement_descriptor: 'BLU TEC',
+    },
+    amount: input.amountInCents,
+  };
+};
+
+const normalizePaymentData = (raw: unknown, input: CreateCheckoutInput): BillingCheckoutPaymentData => {
+  const data = (raw || {}) as Record<string, any>;
+  const orderId = stringField(data.id || data.order?.id);
+  const orderNsu = stringField(data.code || data.order?.code || input.orderNsu);
+  const payments = Array.isArray(data.payments) ? data.payments : Array.isArray(data.charges) ? data.charges : [];
+  const firstPayment = (payments[0] || {}) as Record<string, any>;
+  const lastTransaction = (firstPayment.last_transaction || firstPayment.transactions?.[0] || firstPayment.transaction || {}) as Record<string, any>;
+  const status = stringField(data.status || firstPayment.status || lastTransaction.status || 'pending');
+  const paymentMethod = String(firstPayment.payment_method || firstPayment.paymentMethod || input.paymentMethod).toLowerCase() as CreateCheckoutInput['paymentMethod'];
+  const paymentData: BillingCheckoutPaymentData = {
+    orderId,
+    orderNsu,
+    paymentMethod,
+    status,
+    transactionNsu: stringField(lastTransaction.id || lastTransaction.transaction_id || firstPayment.id || ''),
+    receiptUrl: stringField(lastTransaction.url || lastTransaction.receipt_url || firstPayment.url || ''),
+    raw,
+  };
+
+  if (paymentMethod === 'boleto') {
+    paymentData.boleto = {
+      url: stringField(lastTransaction.url || firstPayment.url),
+      pdf: stringField(lastTransaction.pdf || firstPayment.pdf),
+      line: stringField(lastTransaction.line || firstPayment.line),
+      barcode: stringField(lastTransaction.barcode || firstPayment.barcode),
+      dueAt: stringField(lastTransaction.due_at || firstPayment.due_at),
+    };
+  }
+
+  if (paymentMethod === 'credit_card') {
+    paymentData.creditCard = {
+      tokenized: Boolean(input.cardToken),
+      installments: intField(firstPayment.installments) || 1,
+    };
+  }
+
+  return paymentData;
+};
+
+export class PagarmeBillingProvider implements BillingProvider {
   constructor(private readonly apiBaseUrl: string) {}
 
   supports(capability: BillingCapability): boolean {
-    return ['checkout_link', 'pix', 'credit_card', 'installments', 'webhook', 'payment_check'].includes(capability);
+    return ['checkout_link', 'credit_card', 'debit_card', 'installments', 'webhook', 'payment_check', 'subscription_auto_renewal', 'subscription'].includes(capability);
   }
 
   async createCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
     const payload: Record<string, unknown> = {
-      handle: input.handle,
-      redirect_url: input.redirectUrl,
-      webhook_url: input.webhookUrl,
-      order_nsu: input.orderNsu,
+      code: input.orderNsu,
+      closed: true,
       items: [{
+        amount: input.amountInCents,
+        code: input.orderNsu,
+        description: input.description.slice(0, 256),
         quantity: 1,
-        price: input.amountInCents,
-        description: input.description,
       }],
+      customer: normalizeCustomer(input),
+      payments: [buildPayment(input)],
+      metadata: {
+        blu_order_nsu: input.orderNsu,
+        blu_payment_method: input.paymentMethod,
+      },
     };
-    if (input.customer) {
-      payload.customer = {
-        name: input.customer.name || undefined,
-        email: input.customer.email || undefined,
-        phone_number: input.customer.phoneNumber || undefined,
+
+    if (input.paymentMethod === 'credit_card' && !input.cardToken) {
+      return {
+        orderId: '',
+        orderNsu: input.orderNsu,
+        amountInCents: input.amountInCents,
+        planName: input.description,
+        paymentMethod: input.paymentMethod,
+        orderStatus: 'AWAITING_CARD_TOKEN',
+        requiresCardToken: true,
+        paymentData: {
+          orderId: '',
+          orderNsu: input.orderNsu,
+          paymentMethod: input.paymentMethod,
+          status: 'AWAITING_CARD_TOKEN',
+          creditCard: { tokenized: false, installments: 1 },
+          raw: payload,
+        },
+        raw: payload,
       };
     }
-    const raw = await jsonPost(`${this.apiBaseUrl}/links`, payload);
-    const checkoutUrl = stringField((raw as {url?: unknown}).url);
-    if (!checkoutUrl) throw billingErrors.checkoutCreation('O gateway Asaas não retornou a URL do checkout.');
-    return { checkoutUrl, raw };
+
+    const raw = await jsonRequest('POST', `${this.apiBaseUrl}/orders`, payload, { secretKey: input.handle });
+    const paymentData = normalizePaymentData(raw, input);
+    return {
+      orderId: paymentData.orderId,
+      orderNsu: paymentData.orderNsu,
+      amountInCents: input.amountInCents,
+      planName: input.description,
+      paymentMethod: paymentData.paymentMethod,
+      orderStatus: paymentData.status,
+      paymentData,
+      raw,
+    };
   }
 
   async checkPayment(input: CheckPaymentInput): Promise<PaymentCheckResult> {
-    const raw = await jsonPost(`${this.apiBaseUrl}/payment_check`, {
-      handle: input.handle,
-      order_nsu: input.orderNsu,
-      transaction_nsu: input.transactionNsu,
-      slug: input.slug,
-    });
-    const data = raw as Record<string, unknown>;
+    const raw = await jsonRequest('GET', `${this.apiBaseUrl}/orders?code=${encodeURIComponent(input.orderNsu)}&size=30&page=1`, undefined, { secretKey: input.handle });
+    const data = (raw || {}) as Record<string, any>;
+    const orders = Array.isArray(data.data) ? data.data as Record<string, unknown>[] : Array.isArray(data.items) ? data.items as Record<string, unknown>[] : Array.isArray(data.orders) ? data.orders as Record<string, unknown>[] : [];
+    const matching = orders.find((order) => {
+      const code = stringField(order.code || order.order_code || order.orderCode);
+      const status = stringField(order.status).toLowerCase();
+      return code === input.orderNsu && ['paid', 'pending', 'failed', 'canceled'].includes(status);
+    }) || orders[0] || null;
+    const matchedOrder = matching as Record<string, any> | null;
+    const payments = Array.isArray(matchedOrder?.payments) ? matchedOrder?.payments as any[] : Array.isArray(matchedOrder?.charges) ? matchedOrder?.charges as any[] : [];
+    const firstPayment = payments[0] || {};
+    const firstTransaction = firstPayment.last_transaction || firstPayment.transactions?.[0] || firstPayment.transaction || {};
+    const status = String(matchedOrder?.status || firstPayment.status || firstTransaction.status || '').toLowerCase();
+    const amount = intField(matchedOrder?.amount || firstPayment.amount || firstTransaction.amount);
+    const paidAmount = intField(matchedOrder?.paid_amount || firstPayment.paid_amount || firstTransaction.amount || matchedOrder?.amount);
     return {
-      success: data.success === true,
-      paid: data.paid === true,
-      orderNsu: stringField(data.order_nsu) || input.orderNsu,
-      amountInCents: intField(data.amount),
-      paidAmountInCents: intField(data.paid_amount),
-      captureMethod: stringField(data.capture_method),
-      installments: intField(data.installments) || 1,
+      success: Boolean(matching),
+      paid: status === 'paid',
+      orderNsu: stringField(matchedOrder?.code) || input.orderNsu,
+      amountInCents: amount || undefined,
+      paidAmountInCents: paidAmount || undefined,
+      captureMethod: String(firstPayment?.payment_method || firstPayment?.method || firstTransaction?.payment_method || '').trim(),
+      installments: intField(firstPayment?.installments) || 1,
       raw,
     };
   }
 
   async processWebhook(payload: unknown, _headers: Record<string, string> = {}): Promise<NormalizedWebhookEvent> {
-    const data = (payload || {}) as Record<string, unknown>;
-    const orderNsu = stringField(data.order_nsu);
-    const invoiceSlug = stringField(data.invoice_slug);
-    const transactionNsu = stringField(data.transaction_nsu);
-    const amountInCents = intField(data.amount);
-    if (!orderNsu || !invoiceSlug || !transactionNsu || amountInCents <= 0) {
-      throw new Error('Payload inválido do Asaas.');
+    const data = (payload || {}) as any;
+    const orderNsu = stringField(data.order_code || data.order_nsu || data.code || data.order?.code || data.payment?.order?.code);
+    const invoiceSlug = stringField(data.payment_link_id || data.link_id || data.link?.id || data.link?.short_id || data.payment?.id || '');
+    const transactionNsu = stringField(data.transaction_id || data.charge_id || data.id || data.last_transaction?.id || data.last_transaction?.transaction_id || data.payment?.last_transaction?.id || '');
+    const amountInCents = intField(data.amount || data.order?.amount || data.charge?.amount || data.payment?.amount);
+    const paidAmountInCents = intField(data.paid_amount || data.charge?.paid_amount || data.last_transaction?.amount || data.payment?.paid_amount);
+    const captureMethod = stringField(data.payment_method || data.charge?.payment_method || data.last_transaction?.payment_method || data.payment?.payment_method);
+    const installments = intField(data.installments || data.charge?.installments || data.payment?.installments) || 1;
+    const receiptUrl = stringField(data.receipt_url || data.charge?.receipt_url || data.last_transaction?.receipt_url || data.payment?.last_transaction?.url);
+    if (!orderNsu || amountInCents <= 0) {
+      throw new Error('Payload inválido do Pagar.me.');
     }
     return {
-      provider: 'asaas',
-      eventKey: `asaas:${transactionNsu || `${orderNsu}:${invoiceSlug}`}`,
+      provider: 'pagarme',
+      eventKey: `pagarme:${transactionNsu || `${orderNsu}:${invoiceSlug || amountInCents}`}`,
       orderNsu,
       invoiceSlug,
       transactionNsu,
       amountInCents,
-      paidAmountInCents: intField(data.paid_amount),
-      captureMethod: stringField(data.capture_method),
-      installments: intField(data.installments) || 1,
-      receiptUrl: stringField(data.receipt_url),
+      paidAmountInCents,
+      captureMethod,
+      installments,
+      receiptUrl,
       raw: payload,
     };
   }
 }
 
-export { AsaasBillingProvider as InfinitePayBillingProvider };
+export { PagarmeBillingProvider as InfinitePayBillingProvider };
