@@ -122,9 +122,10 @@ const firestoreSummary = async (): Promise<BillingSummary> => {
     ? { ...rawSubscription, status: normalizedStatus((rawSubscription as any).status) }
     : null;
   const fallbackPlanId = String(
-    (subscription as any)?.planId ||
     (platformCustomerData as any)?.planId ||
+    (companyData as any)?.planId ||
     (companyData as any)?.subscription?.plan ||
+    (subscription as any)?.planId ||
     "",
   );
 
@@ -136,7 +137,7 @@ const firestoreSummary = async (): Promise<BillingSummary> => {
     ? await getDoc(doc(db, "subscriptionUsage", String(subscription.id))).then((snapshot) => snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() }) : null).catch(() => null)
     : null;
 
-  const normalizedSubscription = subscription || (
+  const normalizedSubscription = subscription ? { ...subscription, planId: fallbackPlanId || (subscription as any).planId } : (
     companyData || platformCustomerData
       ? {
           id: String((platformCustomerData as any)?.subscriptionId || (companyData as any)?.subscriptionId || `sub-${companyId}`),

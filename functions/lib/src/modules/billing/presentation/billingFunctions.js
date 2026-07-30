@@ -311,8 +311,28 @@ exports.dailyBillingMaintenance = functions.pubsub.schedule('every 24 hours').on
     const today = now.toISOString();
     const subscriptions = await db().collection('subscriptions').where('status', 'in', ['TRIALING', 'ACTIVE', 'PAST_DUE', 'GRACE_PERIOD', 'PAYMENT_PENDING']).get();
     const batch = db().batch();
-    subscriptions.docs.forEach((doc) => {
+    for (const doc of subscriptions.docs) {
         const data = doc.data();
+        const platformCustomerSnapshot = await db().collection('platformCustomers').doc(String(data.customerCompanyId)).get();
+        const effectivePlanId = String(platformCustomerSnapshot.data()?.planId || data.planId || '');
+        const planSnapshot = effectivePlanId ? await db().collection('plans').doc(effectivePlanId).get() : null;
+        const planPriceInCents = planSnapshot?.exists ? Number(planSnapshot.data()?.priceInCents || 0) : null;
+        if (planPriceInCents !== null && planPriceInCents <= 0) {
+            batch.set(doc.ref, {
+                planId: effectivePlanId,
+                status: 'ACTIVE',
+                trialStartedAt: null,
+                trialEndsAt: null,
+                currentPeriodEndsAt: null,
+                nextBillingDate: null,
+                gracePeriodEndsAt: null,
+                suspendedAt: null,
+                updatedAt: today,
+            }, { merge: true });
+            batch.set(db().collection('companies').doc(String(data.customerCompanyId)), { accessStatus: 'ACTIVE', updatedAt: today }, { merge: true });
+            batch.set(db().collection('platformCustomers').doc(String(data.customerCompanyId)), { accessStatus: 'ACTIVE', status: 'ACTIVE', updatedAt: today }, { merge: true });
+            continue;
+        }
         const nextBilling = String(data.nextBillingDate || data.trialEndsAt || '');
         const graceEnds = String(data.gracePeriodEndsAt || '');
         if (nextBilling && nextBilling < today && ['TRIALING', 'ACTIVE', 'PAYMENT_PENDING'].includes(String(data.status))) {
@@ -325,7 +345,7 @@ exports.dailyBillingMaintenance = functions.pubsub.schedule('every 24 hours').on
             batch.update(doc.ref, { status: 'SUSPENDED', suspendedAt: today, updatedAt: today });
             batch.set(db().collection('companies').doc(String(data.customerCompanyId)), { accessStatus: 'SUSPENDED', updatedAt: today }, { merge: true });
         }
-    });
+    }
     await batch.commit();
 });
 //# sourceMappingURL=billingFunctions.js.map

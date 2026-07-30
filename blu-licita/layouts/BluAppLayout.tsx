@@ -161,7 +161,8 @@ export const BluAppLayout: React.FC = () => {
   const title = [...nav, ...platformAdminNav].find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
   const subscriptionStatus = normalizeBillingStatus(billing?.subscription?.status || billing?.subscription?.accessStatus || '');
-  const billingRestricted = ['PAYMENT_PENDING', 'SUSPENDED'].includes(subscriptionStatus) && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos') && !location.pathname.startsWith('/admin/assinatura/checkout') && !location.pathname.startsWith('/admin/assinatura/retorno');
+  const isFreeBillingPlan = Boolean(billing?.plan) && Number(billing?.plan?.priceInCents || 0) <= 0;
+  const billingRestricted = !isFreeBillingPlan && ['PAYMENT_PENDING', 'SUSPENDED'].includes(subscriptionStatus) && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos') && !location.pathname.startsWith('/admin/assinatura/checkout') && !location.pathname.startsWith('/admin/assinatura/retorno');
   const searchableItems = React.useMemo(() => {
     const navItems = visibleNav.map((item) => ({ label: item.label, to: item.to, description: 'Abrir página do sistema', keywords: item.label }));
     const featureItems = quickFeatures.filter((item) => canAccessPath(item.to) && (isBluPlatformStaff || !item.to.startsWith('/admin/hq')) && visibleNav.some((navItem) => item.to.startsWith(navItem.to) || navItem.to.startsWith(item.to)));
@@ -307,7 +308,7 @@ export const BluAppLayout: React.FC = () => {
           </div>
         </header>
         <main className="p-4 md:p-7">
-          {['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {!isFreeBillingPlan&&['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
             {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Regularize o plano para continuar usando a Blu.'}
             <button onClick={()=>navigate('/admin/assinatura')} className="ml-3 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">Atualizar pagamento</button>
           </div>}

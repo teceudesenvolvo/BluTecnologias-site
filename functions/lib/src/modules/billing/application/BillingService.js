@@ -477,7 +477,15 @@ class BillingService {
                     lastPaymentId: null,
                 }
                 : null);
-        const plan = subscription?.planId ? await this.getPlan(String(subscription.planId)).catch(() => null) : null;
+        const effectivePlanId = String(platformCustomerData.planId ||
+            companyData.planId ||
+            companyData.subscription?.plan ||
+            subscription?.planId ||
+            '');
+        const plan = effectivePlanId ? await this.getPlan(effectivePlanId).catch(() => null) : null;
+        if (subscription && effectivePlanId && subscription.planId !== effectivePlanId) {
+            subscription.planId = effectivePlanId;
+        }
         const subscriptionStatus = normalizeStatus(subscription?.status || companyData.accessStatus || platformCustomerData.accessStatus || platformCustomerData.status);
         const isFreePlan = Number(plan?.priceInCents || 0) <= 0;
         if (subscription && plan && isFreePlan && ['PAYMENT_PENDING', 'PAST_DUE', 'GRACE_PERIOD', 'SUSPENDED', 'EXPIRED'].includes(subscriptionStatus)) {
@@ -497,6 +505,7 @@ class BillingService {
             const batch = this.db.batch();
             if (rawSubscription?.id) {
                 batch.set(this.db.collection('subscriptions').doc(String(rawSubscription.id)), {
+                    planId: effectivePlanId,
                     status: 'ACTIVE',
                     trialStartedAt: null,
                     trialEndsAt: null,

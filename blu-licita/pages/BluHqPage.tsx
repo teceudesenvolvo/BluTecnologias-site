@@ -270,6 +270,7 @@ export const BluHqPage: React.FC = () => {
         uf: tenantForm.state,
         billingDiscountPercent: Number(tenantForm.billingDiscountPercent || 0),
         billingDiscountCents: Number(tenantForm.billingDiscountCents || 0),
+        planId: tenantForm.planId,
         accessStatus: normalizedStatus,
         updatedAt: now,
       });
