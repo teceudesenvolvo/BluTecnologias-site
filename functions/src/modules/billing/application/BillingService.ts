@@ -601,6 +601,57 @@ export class BillingService {
             : null
         );
     const plan = subscription?.planId ? await this.getPlan(String((subscription as {planId?: string}).planId)).catch(() => null) : null;
+    const subscriptionStatus = normalizeStatus(subscription?.status || companyData.accessStatus || platformCustomerData.accessStatus || platformCustomerData.status);
+    const isFreePlan = Number(plan?.priceInCents || 0) <= 0;
+    if (subscription && plan && isFreePlan && ['PAYMENT_PENDING', 'PAST_DUE', 'GRACE_PERIOD', 'SUSPENDED', 'EXPIRED'].includes(subscriptionStatus)) {
+      const nowIso = iso();
+      const activeSubscription = {
+        ...subscription,
+        status: 'ACTIVE' as SubscriptionStatus,
+        trialStartedAt: null,
+        trialEndsAt: null,
+        currentPeriodStartedAt: subscription.currentPeriodStartedAt || nowIso,
+        currentPeriodEndsAt: null,
+        nextBillingDate: null,
+        gracePeriodEndsAt: null,
+        suspendedAt: null,
+        updatedAt: nowIso,
+      };
+      const batch = this.db.batch();
+      if (rawSubscription?.id) {
+        batch.set(this.db.collection('subscriptions').doc(String(rawSubscription.id)), {
+          status: 'ACTIVE',
+          trialStartedAt: null,
+          trialEndsAt: null,
+          currentPeriodStartedAt: subscription.currentPeriodStartedAt || nowIso,
+          currentPeriodEndsAt: null,
+          nextBillingDate: null,
+          gracePeriodEndsAt: null,
+          suspendedAt: null,
+          updatedAt: nowIso,
+        }, { merge: true });
+      }
+      batch.set(this.db.collection('companies').doc(companyId), {
+        accessStatus: 'ACTIVE',
+        updatedAt: nowIso,
+      }, { merge: true });
+      batch.set(this.db.collection('platformCustomers').doc(companyId), {
+        accessStatus: 'ACTIVE',
+        status: 'ACTIVE',
+        updatedAt: nowIso,
+      }, { merge: true });
+      await batch.commit();
+      return {
+        subscription: activeSubscription,
+        plan,
+        usage: activeSubscription?.id ? await new PlanEntitlementService(this.db).getUsageSummary(companyId, String(activeSubscription.id)) : null,
+        orders: (await this.db.collection('billingOrders').where('companyId', '==', companyId).limit(50).get()).docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        payments: (await this.db.collection('payments').where('companyId', '==', companyId).limit(50).get()).docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        remaining: null,
+        graceDays: this.config.graceDays,
+        serverTime: nowIso,
+      };
+    }
     const usage = subscription?.id ? await new PlanEntitlementService(this.db).getUsageSummary(companyId, String((subscription as {id?: string}).id)) : null;
     const orders = await this.db.collection('billingOrders').where('companyId', '==', companyId).limit(50).get();
     const payments = await this.db.collection('payments').where('companyId', '==', companyId).limit(50).get();

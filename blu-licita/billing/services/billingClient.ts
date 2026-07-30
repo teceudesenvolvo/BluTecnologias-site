@@ -159,13 +159,29 @@ const firestoreSummary = async (): Promise<BillingSummary> => {
       : null
   );
 
+  const effectiveStatus = normalizedSubscription?.status || normalizedSubscription?.accessStatus || '';
+  const isFreePlan = Number(plan?.priceInCents || 0) <= 0;
+  const unlockedSubscription = normalizedSubscription && isFreePlan && ['PAYMENT_PENDING', 'PAST_DUE', 'GRACE_PERIOD', 'SUSPENDED', 'EXPIRED'].includes(String(effectiveStatus).toUpperCase())
+    ? {
+        ...normalizedSubscription,
+        status: 'ACTIVE',
+        accessStatus: 'ACTIVE',
+        trialStartedAt: null,
+        trialEndsAt: null,
+        currentPeriodEndsAt: null,
+        nextBillingDate: null,
+        gracePeriodEndsAt: null,
+        suspendedAt: null,
+      }
+    : normalizedSubscription;
+
   const [ordersSnapshot, paymentsSnapshot] = await Promise.all([
     getDocs(query(collection(db, "billingOrders"), where("companyId", "==", companyId), limit(50))),
     getDocs(query(collection(db, "payments"), where("companyId", "==", companyId), limit(50))),
   ]);
 
   return {
-    subscription: normalizedSubscription,
+    subscription: unlockedSubscription,
     plan,
     usage,
     orders: ordersSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort(byDateDesc),
