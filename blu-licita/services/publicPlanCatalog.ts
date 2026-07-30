@@ -140,11 +140,19 @@ const waitForAuthUser = async (timeoutMs = 4000) => new Promise<typeof auth.curr
   });
 });
 
+const apiBaseUrl = () =>
+  (import.meta.env.VITE_BLU_API_BASE_URL as string | undefined || 'https://us-central1-blutecnologias-site.cloudfunctions.net').replace(/\/$/, '');
+
+const apiPath = (path: string) => {
+  if (path === '/api/billing/admin/plans') return '/billingAdminPlans';
+  return path;
+};
+
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
   const currentUser = await waitForAuthUser();
   if (!currentUser) throw new Error('Faça login para continuar.');
   const token = await currentUser.getIdToken();
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBaseUrl()}${apiPath(path)}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

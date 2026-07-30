@@ -161,11 +161,13 @@ export const billingPublicPlans = functions.https.onRequest((req, res) => {
       ? snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data(), paymentMethods: normalizePaymentMethods(doc.data()?.paymentMethods) }))
       : [];
     const merged = [...plans];
-    DEFAULT_BILLING_PLANS.forEach((plan) => {
-      if (!merged.some((item: any) => String(item.id) === plan.id || String(item.slug) === plan.slug)) {
-        merged.push({ ...plan, paymentMethods: normalizePaymentMethods(plan.paymentMethods) });
-      }
-    });
+    DEFAULT_BILLING_PLANS
+      .filter((plan) => plan.slug !== 'test-1-real' && plan.slug !== 'enterprise' && plan.public !== false && plan.active !== false)
+      .forEach((plan) => {
+        if (!merged.some((item: any) => String(item.id) === plan.id || String(item.slug) === plan.slug)) {
+          merged.push({ ...plan, paymentMethods: normalizePaymentMethods(plan.paymentMethods) });
+        }
+      });
     const sorted = merged.sort((a: any, b: any) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
     return json(res, 200, { plans: sorted });
   });

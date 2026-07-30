@@ -94,8 +94,13 @@ const firestorePublicPlans = async (): Promise<{ plans: BillingPlanView[] }> => 
         paymentMethods: normalizePaymentMethods(data.paymentMethods),
       } as BillingPlanView;
     })
+    .filter((item) => item.slug !== "test-1-real" && item.slug !== "enterprise")
     .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
-  return { plans: plans.length ? plans : defaultPublicPlans() as BillingPlanView[] };
+  return {
+    plans: plans.length
+      ? plans
+      : (defaultPublicPlans().filter((item) => item.slug !== "test-1-real" && item.slug !== "enterprise") as BillingPlanView[]),
+  };
 };
 
 const firestoreSummary = async (): Promise<BillingSummary> => {

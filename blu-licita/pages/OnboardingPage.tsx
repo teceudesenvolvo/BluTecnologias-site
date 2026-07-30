@@ -57,7 +57,10 @@ export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const partnerCode = params.get('ref') || '';
   const preferredPlan = params.get('plano') || params.get('plan') || '';
-  const selectablePlans = useMemo(() => publicPlans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise'), [publicPlans]);
+  const selectablePlans = useMemo(
+    () => publicPlans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise' && item.slug !== 'test-1-real'),
+    [publicPlans],
+  );
   const currentPlan = useMemo(() => selectablePlans.find((item) => item.id === plan) || selectablePlans[0] || null, [plan, selectablePlans]);
   const isBillingTestPlan = plan === 'test-1-real';
   const progress = step * 25;
