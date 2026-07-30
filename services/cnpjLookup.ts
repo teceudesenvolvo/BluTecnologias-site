@@ -9,6 +9,11 @@ export interface CnpjLookupResult {
   cep?: string;
   complement?: string;
   fantasyName?: string;
+  porte?: string;
+  naturezaJuridica?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
 }
 
 const cleanDocument = (value: string) => value.replace(/\D/g, '');
@@ -37,6 +42,11 @@ const normalizeBrasilApi = (data: any, cnpj: string): CnpjLookupResult => ({
   address: buildAddress(data?.logradouro, data?.numero, data?.bairro),
   cep: data?.cep || '',
   complement: data?.complemento || '',
+  porte: data?.porte || data?.porte_empresa || '',
+  naturezaJuridica: data?.natureza_juridica || '',
+  street: data?.logradouro || '',
+  number: data?.numero || '',
+  neighborhood: data?.bairro || '',
 });
 
 const normalizeReceitaWs = (data: any, cnpj: string): CnpjLookupResult => ({
@@ -50,6 +60,11 @@ const normalizeReceitaWs = (data: any, cnpj: string): CnpjLookupResult => ({
   address: buildAddress(data?.logradouro, data?.numero, data?.bairro),
   cep: data?.cep || '',
   complement: data?.complemento || '',
+  porte: data?.porte || '',
+  naturezaJuridica: data?.natureza_juridica || '',
+  street: data?.logradouro || '',
+  number: data?.numero || '',
+  neighborhood: data?.bairro || '',
 });
 
 export const lookupCnpjData = async (cnpjInput: string): Promise<CnpjLookupResult> => {

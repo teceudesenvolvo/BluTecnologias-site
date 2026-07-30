@@ -26,6 +26,40 @@ const statusTone = (status: string): 'blue' | 'emerald' | 'rose' | 'amber' => {
   return 'blue';
 };
 
+const tenantAccessStatusOptions = [
+  { value: 'ACTIVE', label: 'Ativo' },
+  { value: 'TRIALING', label: 'Teste grátis' },
+  { value: 'PAYMENT_PENDING', label: 'Pagamento pendente' },
+  { value: 'PAST_DUE', label: 'Em atraso' },
+  { value: 'GRACE_PERIOD', label: 'Tolerância' },
+  { value: 'SUSPENDED', label: 'Bloqueado' },
+  { value: 'CANCELED', label: 'Cancelado' },
+  { value: 'EXPIRED', label: 'Expirado' },
+] as const;
+
+const formatPlanLimitValue = (key: string, value: number | null | undefined) => {
+  if (value == null) return 'Ilimitado';
+  if (key === 'storageBytes') {
+    if (value >= 1024 * 1024 * 1024) return `${Math.round(value / (1024 * 1024 * 1024))} GB`;
+    if (value >= 1024 * 1024) return `${Math.round(value / (1024 * 1024))} MB`;
+  }
+  return String(value);
+};
+
+const planLimitLabels: Record<string, string> = {
+  companies: 'Empresas',
+  activeContracts: 'Contratos ativos',
+  storageBytes: 'Armazenamento',
+  users: 'Usuários',
+  aiCredits: 'Créditos de IA',
+  savedSearches: 'Buscas salvas',
+  activeAutomations: 'Automações',
+  customAlerts: 'Alertas',
+  apiRequests: 'Requisições API',
+  certificates: 'Certificados',
+  bankAccounts: 'Contas bancárias',
+};
+
 const emptyPlan = (): PublicPlanDoc => ({
   id: `plan-${Date.now()}`,
   name: 'Novo plano',
@@ -121,6 +155,18 @@ export const BluHqPage: React.FC = () => {
     billingDiscountCents: '0',
   });
   const [showGatewaySecrets, setShowGatewaySecrets] = React.useState(false);
+
+  const planOptions = React.useMemo(
+    () => publicPlans
+      .filter((plan) => plan.active)
+      .sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)),
+    [publicPlans],
+  );
+
+  const selectedPlanDoc = React.useMemo(
+    () => planOptions.find((plan) => plan.id === tenantForm.planId) || publicPlans.find((plan) => plan.id === tenantForm.planId) || null,
+    [planOptions, publicPlans, tenantForm.planId],
+  );
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -293,6 +339,8 @@ export const BluHqPage: React.FC = () => {
           companyName: tenantForm.displayName,
           companyLegalName: tenantForm.legalName,
           companyTradeName: tenantForm.fantasyName || tenantForm.displayName,
+          companySize: tenantForm.companySize,
+          companyLegalNature: tenantForm.companyLegalNature,
           ownerName: tenantForm.owner,
           ownerEmail: tenantForm.companyEmail,
           ownerPhone: tenantForm.companyMobile || tenantForm.companyPhone,
@@ -310,6 +358,8 @@ export const BluHqPage: React.FC = () => {
         companyName: tenantForm.displayName,
         companyLegalName: tenantForm.legalName,
         companyTradeName: tenantForm.fantasyName || tenantForm.displayName,
+        companySize: tenantForm.companySize,
+        companyLegalNature: tenantForm.companyLegalNature,
         ownerName: tenantForm.owner,
         ownerEmail: tenantForm.companyEmail,
         ownerPhone: tenantForm.companyMobile || tenantForm.companyPhone,
@@ -1067,8 +1117,6 @@ export const BluHqPage: React.FC = () => {
               <Field label="E-mail" value={tenantForm.companyEmail} onChange={(value) => setTenantForm((current) => ({ ...current, companyEmail: value }))} />
               <Field label="Telefone" value={tenantForm.companyPhone} onChange={(value) => setTenantForm((current) => ({ ...current, companyPhone: value }))} />
               <Field label="Celular" value={tenantForm.companyMobile} onChange={(value) => setTenantForm((current) => ({ ...current, companyMobile: value }))} />
-              <Field label="Plano ID" value={tenantForm.planId} onChange={(value) => setTenantForm((current) => ({ ...current, planId: value }))} />
-              <Field label="Status de acesso" value={tenantForm.status} onChange={(value) => setTenantForm((current) => ({ ...current, status: value }))} />
               <Field label="CEP" value={tenantForm.zipCode} onChange={(value) => setTenantForm((current) => ({ ...current, zipCode: value }))} />
               <Field label="Logradouro" value={tenantForm.street} onChange={(value) => setTenantForm((current) => ({ ...current, street: value }))} />
               <Field label="Número" value={tenantForm.number} onChange={(value) => setTenantForm((current) => ({ ...current, number: value }))} />
@@ -1076,6 +1124,61 @@ export const BluHqPage: React.FC = () => {
               <Field label="Bairro" value={tenantForm.neighborhood} onChange={(value) => setTenantForm((current) => ({ ...current, neighborhood: value }))} />
               <Field label="Município" value={tenantForm.city} onChange={(value) => setTenantForm((current) => ({ ...current, city: value }))} />
               <Field label="UF" value={tenantForm.state} onChange={(value) => setTenantForm((current) => ({ ...current, state: value }))} />
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+              <h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Gestão da assinatura</h3>
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-black uppercase tracking-[.16em] text-slate-400">Plano</span>
+                    <select
+                      value={tenantForm.planId}
+                      onChange={(event) => setTenantForm((current) => ({ ...current, planId: event.target.value }))}
+                      className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
+                    >
+                      <option value="">Sem plano</option>
+                      {planOptions.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name} · {formatCurrency(plan.priceInCents || 0)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-black uppercase tracking-[.16em] text-slate-400">Status de acesso</span>
+                    <select
+                      value={tenantForm.status}
+                      onChange={(event) => setTenantForm((current) => ({ ...current, status: event.target.value }))}
+                      className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
+                    >
+                      <option value="">Não informado</option>
+                      {tenantAccessStatusOptions.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <InfoChip label="ID do plano" value={tenantForm.planId || 'Sem plano'} />
+                  <InfoChip label="Assinatura" value={selectedTenant.subscriptionId || '—'} />
+                  <InfoChip label="Status atual" value={tenantForm.status || 'Não informado'} />
+                  <InfoChip label="Plano exibido" value={selectedPlanDoc?.name || selectedTenant.plan || '—'} />
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                  <p className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Limites contratados</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {Object.entries(selectedPlanDoc?.limits || selectedTenant.planLimits || {}).map(([key, value]) => (
+                      <div key={key} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+                        <p className="text-[11px] font-black uppercase tracking-[.16em] text-slate-400">{planLimitLabels[key] || key}</p>
+                        <p className="mt-1 font-bold text-slate-800 dark:text-slate-100">{formatPlanLimitValue(key, value as number | null | undefined)}</p>
+                      </div>
+                    ))}
+                    {!Object.keys(selectedPlanDoc?.limits || selectedTenant.planLimits || {}).length && (
+                      <EmptyState title="Sem limites vinculados" description="Selecione um plano para visualizar as capacidades deste cliente." compact />
+                    )}
+                  </div>
+                </div>
+              </div>
             </section>
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.05]">
               <h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Cadastro completo do Perfil</h3>
@@ -1111,6 +1214,9 @@ export const BluHqPage: React.FC = () => {
                 <InfoChip label="Fim do teste" value={selectedTenant.trialEndsAt ? new Date(selectedTenant.trialEndsAt).toLocaleDateString('pt-BR') : '—'} />
                 <InfoChip label="Ciclo atual" value={selectedTenant.currentPeriodEndsAt ? new Date(selectedTenant.currentPeriodEndsAt).toLocaleDateString('pt-BR') : '—'} />
                 <InfoChip label="Plano atual" value={selectedTenant.plan || '—'} />
+                <InfoChip label="Access status" value={selectedTenant.accessStatus || '—'} />
+                <InfoChip label="Limite de usuários" value={formatPlanLimitValue('users', (selectedPlanDoc?.limits?.users ?? selectedTenant.planLimits?.users) as number | null | undefined)} />
+                <InfoChip label="Limite de contratos" value={formatPlanLimitValue('activeContracts', (selectedPlanDoc?.limits?.activeContracts ?? selectedTenant.planLimits?.activeContracts) as number | null | undefined)} />
               </div>
             </section>
             <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">

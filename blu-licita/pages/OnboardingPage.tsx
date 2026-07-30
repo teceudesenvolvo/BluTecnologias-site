@@ -46,6 +46,8 @@ export const OnboardingPage: React.FC = () => {
     tradeName: '',
     document: '',
     segment: '',
+    companySize: '',
+    companyLegalNature: '',
     city: '',
     state: '',
     email: '',
@@ -134,12 +136,16 @@ export const OnboardingPage: React.FC = () => {
         document: data.cnpj,
         legalName: data.razaoSocial || current.legalName,
         tradeName: data.fantasyName || current.tradeName,
+        companySize: data.porte || current.companySize,
+        companyLegalNature: data.naturezaJuridica || current.companyLegalNature,
         email: data.email || current.email,
         phone: data.phone || current.phone,
         city: data.city || current.city,
         state: data.state || current.state,
         cep: data.cep || current.cep,
-        street: data.address ? String(data.address).split(',')[0] || current.street : current.street,
+        street: data.street || (data.address ? String(data.address).split(',')[0] || current.street : current.street),
+        number: data.number || current.number,
+        neighborhood: data.neighborhood || current.neighborhood,
         complement: data.complement || current.complement,
       }));
     } catch (reason: any) {
@@ -290,6 +296,8 @@ export const OnboardingPage: React.FC = () => {
                   <Field label="Razão social" value={companyForm.legalName} onChange={(value) => setCompanyForm({ ...companyForm, legalName: value })} placeholder="Distribuidora Nordeste Ltda." />
                   <Field label="Nome fantasia" value={companyForm.tradeName} onChange={(value) => setCompanyForm({ ...companyForm, tradeName: value })} placeholder="Distribuidora Nordeste" required={false} />
                   <Field label="Segmento" value={companyForm.segment} onChange={(value) => setCompanyForm({ ...companyForm, segment: value })} placeholder="Produtos, serviços, tecnologia..." required={false} />
+                  <Field label="Porte" value={companyForm.companySize} onChange={(value) => setCompanyForm({ ...companyForm, companySize: value })} placeholder="ME, EPP, LTDA..." required={false} />
+                  <Field label="Natureza jurídica" value={companyForm.companyLegalNature} onChange={(value) => setCompanyForm({ ...companyForm, companyLegalNature: value })} placeholder="Sociedade Empresária Limitada" required={false} />
                   <Field label="Cidade" value={companyForm.city} onChange={(value) => setCompanyForm({ ...companyForm, city: value })} placeholder="Fortaleza" required={false} />
                   <Field label="Estado" value={companyForm.state} onChange={(value) => setCompanyForm({ ...companyForm, state: value.toUpperCase() })} placeholder="CE" required={false} />
                   <Field label="E-mail da empresa" value={companyForm.email} onChange={(value) => setCompanyForm({ ...companyForm, email: value })} placeholder="financeiro@empresa.com.br" required={false} />
@@ -321,6 +329,8 @@ export const OnboardingPage: React.FC = () => {
                   <Summary label="Plano" value={currentPlan?.name || '—'} />
                   <Summary label="Usuário" value={userForm.name || userForm.email} />
                   <Summary label="Empresa" value={companyForm.tradeName || companyForm.legalName} />
+                  <Summary label="Porte" value={companyForm.companySize || 'Não informado'} />
+                  <Summary label="Natureza jurídica" value={companyForm.companyLegalNature || 'Não informada'} />
                   <Summary
                     label={isFreePlan ? "Acesso" : isBillingTestPlan ? "Validação de pagamento" : "Teste"}
                     value={isFreePlan ? "Liberado sem cobrança" : isBillingTestPlan ? "Cobrança simbólica de R$ 1,00" : "7 dias grátis"}
