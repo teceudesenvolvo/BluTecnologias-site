@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { blogService } from '../services/firebase';
 import { BlogPost } from '../types';
 import { Calendar, User, Loader2 } from 'lucide-react';
+import { SeoHead } from '../components/SeoHead';
 
 export const Blog: React.FC = () => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -26,6 +27,32 @@ export const Blog: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 pt-32 pb-20 px-6">
+      <SeoHead
+        title="Novidades e conteúdos sobre licitações, gestão e tecnologia pública"
+        description="Acompanhe as novidades da Blu sobre licitações, gestão empresarial, contratos públicos, tecnologia e inteligência aplicada ao setor público."
+        url="/blog"
+        image={posts[0]?.imagem_capa}
+        keywords={[
+          'licitações',
+          'gestão pública',
+          'contratos públicos',
+          'tecnologia para governo',
+          'inbound marketing',
+          'blog blu',
+          'software para licitações',
+        ]}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Blog',
+          name: 'Novidades Blu',
+          description: 'Conteúdos da Blu sobre licitações, contratos públicos, gestão e tecnologia.',
+          url: `${window.location.origin}/#/blog`,
+          publisher: {
+            '@type': 'Organization',
+            name: 'Blu Tecnologias',
+          },
+        }}
+      />
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">

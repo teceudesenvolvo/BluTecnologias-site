@@ -4,6 +4,7 @@ import { blogService } from '../services/firebase';
 import { BlogPost as BlogPostType } from '../types';
 import { Calendar, User, ArrowLeft, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScrollReveal } from '../components/ScrollReveal';
+import { SeoHead } from '../components/SeoHead';
 
 export const BlogPost: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +44,9 @@ export const BlogPost: React.FC = () => {
   }
 
   const images = (post as any).images || [post.imagem_capa];
+  const plainTextContent = String(post.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const seoDescription = plainTextContent.slice(0, 180) || `Leia a novidade "${post.title}" na Blu Tecnologias.`;
+  const authorName = (post as any).author || 'Equipe Blu';
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -54,6 +58,42 @@ export const BlogPost: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white pt-32 pb-20 px-6 font-sans text-slate-900">
+      <SeoHead
+        title={post.title}
+        description={seoDescription}
+        url={`/blog/${post.id}`}
+        image={post.imagem_capa}
+        type="article"
+        author={authorName}
+        publishedTime={post.date}
+        modifiedTime={post.date}
+        keywords={[
+          post.category,
+          'licitações',
+          'gestão pública',
+          'contratos públicos',
+          'Blu Tecnologias',
+          authorName,
+        ].filter(Boolean)}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: post.title,
+          description: seoDescription,
+          image: images.filter(Boolean).map((item: string) => new URL(item, window.location.origin).toString()),
+          author: {
+            '@type': 'Person',
+            name: authorName,
+          },
+          publisher: {
+            '@type': 'Organization',
+            name: 'Blu Tecnologias',
+          },
+          datePublished: post.date,
+          dateModified: post.date,
+          mainEntityOfPage: `${window.location.origin}/#/blog/${post.id}`,
+        }}
+      />
       <article className="max-w-4xl mx-auto">
         <ScrollReveal>
           <Link to="/blog" className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-8 transition-colors font-medium">
