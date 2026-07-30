@@ -1,4 +1,4 @@
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDocs, orderBy, query, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db, onAuthStateChanged } from '../../services/firebase';
 import { subscriptionPlans } from './subscriptionPlanService';
 
@@ -35,6 +35,9 @@ export type PublicPlanDoc = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+const isCustomPlanVisible = (plan: Partial<PublicPlanDoc>) =>
+  plan.active !== false && plan.public !== false && plan.slug !== 'enterprise' && plan.slug !== 'test-1-real';
 
 const toBytes = (gb: number | null | undefined) => (gb === null || gb === undefined ? null : gb * 1024 * 1024 * 1024);
 const normalizeMethods = (methods: unknown): PublicPlanDoc['paymentMethods'] =>
@@ -96,6 +99,8 @@ export const defaultPublicPlans = (): PublicPlanDoc[] => subscriptionPlans
   .filter((item) => item.key !== 'enterprise')
   .map((item, index) => toPublicPlanDoc(item, index));
 
+export const defaultVisiblePublicPlans = (): PublicPlanDoc[] => defaultPublicPlans().filter(isCustomPlanVisible);
+
 export const loadAllPublicPlans = async (): Promise<PublicPlanDoc[]> => {
   const snapshot = await getDocs(query(collection(db, 'plans'), orderBy('displayOrder', 'asc')));
   const plans = snapshot.docs.map((item) => {
@@ -120,8 +125,8 @@ export const loadVisiblePublicPlans = async (): Promise<PublicPlanDoc[]> => {
         paymentMethods: normalizeMethods(data.paymentMethods),
       } as PublicPlanDoc;
     })
-    .filter((item) => item.active !== false && item.public !== false);
-  return plans.length ? plans : defaultPublicPlans();
+    .filter(isCustomPlanVisible);
+  return plans.length ? plans : defaultVisiblePublicPlans();
 };
 
 const waitForAuthUser = async (timeoutMs = 4000) => new Promise<typeof auth.currentUser | null>((resolve) => {
@@ -176,17 +181,34 @@ export const savePublicPlan = async (plan: PublicPlanDoc) => {
       createdAt: plan.createdAt || new Date().toISOString(),
     },
   };
-  await request('/api/billing/admin/plans', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  try {
+    await request('/api/billing/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    await setDoc(doc(db, 'plans', plan.id), payload.plan, { merge: true });
+  }
 };
 
 export const seedDefaultPublicPlans = async () => {
-  const result = await request<{ seeded: boolean }>('/api/billing/admin/plans', {
-    method: 'POST',
-    body: JSON.stringify({ action: 'seed' }),
-  });
-  if (result.seeded) return true;
-  return false;
+  try {
+    const result = await request<{ seeded: boolean }>('/api/billing/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'seed' }),
+    });
+    return Boolean(result.seeded);
+  } catch {
+    const batch = writeBatch(db);
+    const now = new Date().toISOString();
+    defaultPublicPlans().forEach((plan) => {
+      batch.set(doc(db, 'plans', plan.id), {
+        ...plan,
+        createdAt: plan.createdAt || now,
+        updatedAt: now,
+      }, { merge: true });
+    });
+    await batch.commit();
+    return true;
+  }
 };

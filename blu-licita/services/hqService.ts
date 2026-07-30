@@ -230,6 +230,12 @@ const healthFromStatus = (status?: string) => {
   return 'Sem histórico';
 };
 
+const isDeletedRecord = (value: Record<string, any> | null | undefined) => {
+  if (!value) return false;
+  const normalizedStatus = String(value.status || value.accessStatus || '').toUpperCase();
+  return Boolean(value.deletedAt || value.deletedBy || normalizedStatus === 'DELETED');
+};
+
 export const hqService = {
   async overview(): Promise<HqOverview> {
     const email = currentAdminEmail();
@@ -250,10 +256,12 @@ export const hqService = {
       asList<HqPartner>('partners').catch(() => []),
     ]);
 
+    const activeMemberships = memberships.filter((membership) => !isDeletedRecord(membership) && String(membership.status || '').toLowerCase() !== 'inactive');
+    const activePlatformCustomers = platformCustomers.filter((customer) => !isDeletedRecord(customer as any));
     const plansById = new Map(plans.map((plan) => [plan.id, plan]));
     const subscriptionsByCompany = new Map(subscriptions.map((subscription) => [subscription.customerCompanyId, subscription]));
     const ownersByCompany = new Map<string, string>();
-    memberships.forEach((membership) => {
+    activeMemberships.forEach((membership) => {
       if (!membership.companyId || ownersByCompany.has(membership.companyId)) return;
       ownersByCompany.set(membership.companyId, membership.name || membership.email || 'Responsável não informado');
     });
@@ -268,19 +276,31 @@ export const hqService = {
     const downgrades = orders.filter((order) => String(order.type || '').toUpperCase() === 'DOWNGRADE').length;
     const leads = clients.filter((client) => client.status === 'lead').length;
 
-    const platformCustomersByCompany = new Map(platformCustomers.map((customer) => [customer.companyId || customer.id, customer]));
-    const companyIds = new Set<string>([...companies.map((item) => item.id), ...memberships.map((item) => String(item.companyId || '')), ...platformCustomers.map((item) => String(item.companyId || item.id || ''))].filter(Boolean));
+    const platformCustomersByCompany = new Map(activePlatformCustomers.map((customer) => [customer.companyId || customer.id, customer]));
+    const companyIds = new Set<string>([
+      ...subscriptions.map((item) => String(item.customerCompanyId || '')),
+      ...activeMemberships.map((item) => String(item.companyId || '')),
+      ...activePlatformCustomers.map((item) => String(item.companyId || item.id || '')),
+    ].filter(Boolean));
     const tenants = [...companyIds]
       .map((company) => {
         const platformCustomer = platformCustomersByCompany.get(company);
-        const companyDoc = companies.find((item) => item.id === company) || platformCustomer?.company;
+        const companyDocRaw = companies.find((item) => item.id === company) || null;
+        const companyDoc = {
+          ...(platformCustomer?.company || {}),
+          ...(companyDocRaw || {}),
+        } as Record<string, any>;
         const subscription = subscriptionsByCompany.get(company);
         const plan = subscription?.planId ? plansById.get(subscription.planId) : undefined;
-        const companyMembers = memberships.filter((item) => String(item.companyId || '') === company);
+        const companyMembers = activeMemberships.filter((item) => String(item.companyId || '') === company);
         const ownerMember = companyMembers.find((item) => String(item.role || '').toLowerCase().includes('propriet')) || companyMembers[0];
         const mrr = subscription?.status === 'ACTIVE' || subscription?.status === 'TRIALING'
           ? Number(plan?.priceInCents || 0)
           : 0;
+        const hasLiveSource = Boolean(platformCustomer || companyMembers.length || subscription);
+        if (!hasLiveSource || isDeletedRecord(companyDocRaw as any) || isDeletedRecord(platformCustomer as any)) {
+          return null;
+        }
         return {
           id: company,
           company: companyDoc?.nomeFantasia || companyDoc?.razaoSocial || companyDoc?.tradeName || companyDoc?.name || companyDoc?.legalName || companyDoc?.document || platformCustomer?.companyName || platformCustomer?.companyTradeName || platformCustomer?.companyLegalName || company,
@@ -326,6 +346,7 @@ export const hqService = {
           accessStatus: (companyDoc as any)?.accessStatus || platformCustomer?.accessStatus,
         };
       })
+      .filter((item): item is HqCustomerRow => Boolean(item))
       .sort((a, b) => a.company.localeCompare(b.company));
     const incompleteCustomers = tenants
       .filter((item) => !item.companyDocument || !item.subscriptionId || !item.companyEmail || !item.owner || item.owner === 'Responsável não informado')
@@ -351,7 +372,7 @@ export const hqService = {
         };
       });
 
-    const members = memberships
+    const members = activeMemberships
       .map((membership) => ({
         id: membership.id,
         companyId: String(membership.companyId || ''),

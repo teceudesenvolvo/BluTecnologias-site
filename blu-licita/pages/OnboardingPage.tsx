@@ -6,6 +6,7 @@ import { useBluAuth } from '../contexts/BluAuthContext';
 import { billingClient, formatCents, type BillingPlanView } from '../billing/services/billingClient';
 import { lookupCnpjData } from '../../services/cnpjLookup';
 import { lookupCepData } from '../../services/cepLookup';
+import { defaultVisiblePublicPlans } from '../services/publicPlanCatalog';
 
 const goals = ['Encontrar oportunidades melhores', 'Analisar editais com IA', 'Organizar documentos', 'Controlar contratos', 'Cobrar órgãos públicos', 'Acompanhar fluxo de caixa'];
 
@@ -18,6 +19,8 @@ const maskCnpj = (value: string) => {
     .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
     .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
 };
+
+const isVisibleSignupPlan = (item: BillingPlanView) => item.public !== false && item.active !== false && item.slug !== 'enterprise' && item.slug !== 'test-1-real';
 
 const Field = ({ label, value, onChange, placeholder, type = 'text', required = true, onBlur }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; type?: string; required?: boolean; onBlur?: (value: string) => void }) => (
   <label className="text-sm font-semibold text-slate-700">
@@ -57,10 +60,7 @@ export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const partnerCode = params.get('ref') || '';
   const preferredPlan = params.get('plano') || params.get('plan') || '';
-  const selectablePlans = useMemo(
-    () => publicPlans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise' && item.slug !== 'test-1-real'),
-    [publicPlans],
-  );
+  const selectablePlans = useMemo(() => publicPlans.filter(isVisibleSignupPlan), [publicPlans]);
   const currentPlan = useMemo(() => selectablePlans.find((item) => item.id === plan) || selectablePlans[0] || null, [plan, selectablePlans]);
   const isBillingTestPlan = plan === 'test-1-real';
   const isFreePlan = Number(currentPlan?.priceInCents || 0) <= 0;
@@ -69,7 +69,7 @@ export const OnboardingPage: React.FC = () => {
   React.useEffect(() => {
     billingClient.publicPlans()
       .then(({ plans }) => {
-        const normalizedPlans = plans.filter((item) => item.public !== false && item.active !== false && item.slug !== 'enterprise');
+        const normalizedPlans = plans.filter(isVisibleSignupPlan);
         setPublicPlans(normalizedPlans);
         setPlan((current) => {
           if (current && normalizedPlans.some((item) => item.id === current || item.slug === current)) return current;
@@ -78,7 +78,13 @@ export const OnboardingPage: React.FC = () => {
         });
       })
       .catch(() => {
-        setPublicPlans([]);
+        const fallbackPlans = defaultVisiblePublicPlans() as BillingPlanView[];
+        setPublicPlans(fallbackPlans);
+        setPlan((current) => {
+          if (current && fallbackPlans.some((item) => item.id === current || item.slug === current)) return current;
+          const preferred = fallbackPlans.find((item) => item.id === preferredPlan || item.slug === preferredPlan);
+          return preferred?.id || fallbackPlans[0]?.id || '';
+        });
       })
       .finally(() => setPlansLoading(false));
   }, [preferredPlan]);

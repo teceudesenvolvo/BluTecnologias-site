@@ -114,7 +114,10 @@ export const Profile: React.FC = () => {
         setDisplayName(currentUser.displayName || '');
         getDoc(doc(db, 'users', currentUser.uid))
           .then((snapshot) => {
-            if (!snapshot.exists()) return;
+            if (!snapshot.exists()) {
+              loadCompanyData(currentUser);
+              return;
+            }
             const data = snapshot.data() as Record<string, any>;
             const savedBillingCompanyId = String(data.billingCompanyId || data.primaryBillingCompanyId || '');
             setDisplayName(String(data.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || ''));
