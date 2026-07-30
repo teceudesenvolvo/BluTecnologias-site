@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUpRight, Building2, CheckCircle2, CreditCard, DollarSign, Edit3, Headphones, Loader2, Megaphone, Plus, RefreshCw, Save, Search, Trash2, Users, X } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { hqService, type HqCustomerRow, type HqOverview } from '../services/hqService';
 import { platformTeamService, type PlatformTeamMember } from '../services/platformTeamService';
@@ -243,7 +243,11 @@ export const BluHqPage: React.FC = () => {
     if (!selectedTenant) return;
     setSavingTenant(true);
     try {
-      await updateDoc(doc(db, 'companies', selectedTenant.id), {
+      const now = new Date().toISOString();
+      const normalizedStatus = String(tenantForm.status || '').trim();
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'companies', selectedTenant.id), {
         name: tenantForm.displayName,
         tradeName: tenantForm.displayName,
         razaoSocial: tenantForm.legalName,
@@ -266,16 +270,52 @@ export const BluHqPage: React.FC = () => {
         uf: tenantForm.state,
         billingDiscountPercent: Number(tenantForm.billingDiscountPercent || 0),
         billingDiscountCents: Number(tenantForm.billingDiscountCents || 0),
-        accessStatus: tenantForm.status,
-        updatedAt: new Date().toISOString(),
+        accessStatus: normalizedStatus,
+        updatedAt: now,
       });
+
       if (selectedTenant.subscriptionId) {
-        await updateDoc(doc(db, 'subscriptions', selectedTenant.subscriptionId), {
+        batch.update(doc(db, 'subscriptions', selectedTenant.subscriptionId), {
           planId: tenantForm.planId,
-          status: tenantForm.status || selectedTenant.status,
-          updatedAt: new Date().toISOString(),
+          status: normalizedStatus || selectedTenant.status,
+          updatedAt: now,
         });
       }
+
+      const platformCustomersByCompany = await getDocs(query(collection(db, 'platformCustomers'), where('companyId', '==', selectedTenant.id))).catch(() => null);
+      platformCustomersByCompany?.docs.forEach((item) => {
+        batch.update(item.ref, {
+          planId: tenantForm.planId,
+          accessStatus: normalizedStatus,
+          status: normalizedStatus || item.data()?.status || '',
+          companyDocument: tenantForm.companyDocument,
+          companyName: tenantForm.displayName,
+          companyLegalName: tenantForm.legalName,
+          companyTradeName: tenantForm.fantasyName || tenantForm.displayName,
+          ownerName: tenantForm.owner,
+          ownerEmail: tenantForm.companyEmail,
+          ownerPhone: tenantForm.companyMobile || tenantForm.companyPhone,
+          updatedAt: now,
+        });
+      });
+
+      const platformCustomerRef = doc(db, 'platformCustomers', selectedTenant.id);
+      batch.set(platformCustomerRef, {
+        companyId: selectedTenant.id,
+        planId: tenantForm.planId,
+        accessStatus: normalizedStatus,
+        status: normalizedStatus,
+        companyDocument: tenantForm.companyDocument,
+        companyName: tenantForm.displayName,
+        companyLegalName: tenantForm.legalName,
+        companyTradeName: tenantForm.fantasyName || tenantForm.displayName,
+        ownerName: tenantForm.owner,
+        ownerEmail: tenantForm.companyEmail,
+        ownerPhone: tenantForm.companyMobile || tenantForm.companyPhone,
+        updatedAt: now,
+      }, { merge: true });
+
+      await batch.commit();
       await load();
       setSelectedTenantId('');
     } finally {

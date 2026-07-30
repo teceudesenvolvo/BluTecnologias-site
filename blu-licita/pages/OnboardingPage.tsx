@@ -63,6 +63,7 @@ export const OnboardingPage: React.FC = () => {
   );
   const currentPlan = useMemo(() => selectablePlans.find((item) => item.id === plan) || selectablePlans[0] || null, [plan, selectablePlans]);
   const isBillingTestPlan = plan === 'test-1-real';
+  const isFreePlan = Number(currentPlan?.priceInCents || 0) <= 0;
   const progress = step * 25;
 
   React.useEffect(() => {
@@ -169,7 +170,7 @@ export const OnboardingPage: React.FC = () => {
     setError('');
     try {
       await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals, partnerCode });
-      if (plan === 'test-1-real') {
+      if (!isFreePlan && plan === 'test-1-real') {
         navigate('/admin/assinatura/checkout', {
           state: {
             planId: plan,
@@ -314,9 +315,13 @@ export const OnboardingPage: React.FC = () => {
                   <Summary label="Plano" value={currentPlan?.name || '—'} />
                   <Summary label="Usuário" value={userForm.name || userForm.email} />
                   <Summary label="Empresa" value={companyForm.tradeName || companyForm.legalName} />
-                  <Summary label={isBillingTestPlan ? "Validação de pagamento" : "Teste"} value={isBillingTestPlan ? "Cobrança simbólica de R$ 1,00" : "7 dias grátis"} tone={isBillingTestPlan ? "text-amber-600" : "text-emerald-600"} />
+                  <Summary
+                    label={isFreePlan ? "Acesso" : isBillingTestPlan ? "Validação de pagamento" : "Teste"}
+                    value={isFreePlan ? "Liberado sem cobrança" : isBillingTestPlan ? "Cobrança simbólica de R$ 1,00" : "7 dias grátis"}
+                    tone={isFreePlan ? "text-blue-600" : isBillingTestPlan ? "text-amber-600" : "text-emerald-600"}
+                  />
                 </div>
-                {isBillingTestPlan && (
+                {!isFreePlan && isBillingTestPlan && (
                   <div className="mx-auto mt-6 max-w-xl">
                     <p className="text-sm font-semibold text-slate-700">Como você quer pagar a cobrança de teste?</p>
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">

@@ -54,17 +54,17 @@ export class BillingService {
     }
     const plan = { id: snapshot.id, ...snapshot.data() } as BillingPlan;
     if (!plan.active) throw billingErrors.planInactive();
-    if (!Number.isSafeInteger(Number(plan.priceInCents)) || Number(plan.priceInCents) <= 0) throw billingErrors.planInactive();
+    if (!Number.isSafeInteger(Number(plan.priceInCents)) || Number(plan.priceInCents) < 0) throw billingErrors.planInactive();
     return plan;
   }
 
-  async getOrCreateSubscription(companyId: string, planId: string, userId: string, options: { trialDays?: number } = {}) {
+  async getOrCreateSubscription(companyId: string, planId: string, userId: string, options: { trialDays?: number; freeAccess?: boolean } = {}) {
     const existing = await this.db.collection('subscriptions').where('customerCompanyId', '==', companyId).limit(1).get();
     if (!existing.empty) return { id: existing.docs[0].id, ...existing.docs[0].data() };
     const now = new Date();
     const ref = this.db.collection('subscriptions').doc();
     const trialDays = Math.max(0, Number(options.trialDays || 0));
-    const status = trialDays > 0 ? 'TRIALING' : 'PAYMENT_PENDING';
+    const status = options.freeAccess ? 'ACTIVE' : trialDays > 0 ? 'TRIALING' : 'PAYMENT_PENDING';
     const subscription = {
       id: ref.id,
       customerCompanyId: companyId,
@@ -74,8 +74,8 @@ export class BillingService {
       trialStartedAt: trialDays > 0 ? iso(now) : null,
       trialEndsAt: trialDays > 0 ? iso(addDays(now, trialDays)) : null,
       currentPeriodStartedAt: iso(now),
-      currentPeriodEndsAt: iso(addMonths(now, 1)),
-      nextBillingDate: iso(addMonths(now, 1)),
+      currentPeriodEndsAt: options.freeAccess ? null : iso(addMonths(now, 1)),
+      nextBillingDate: options.freeAccess ? null : iso(addMonths(now, 1)),
       gracePeriodEndsAt: null,
       canceledAt: null,
       cancelAtPeriodEnd: false,
@@ -128,7 +128,8 @@ export class BillingService {
     const plan = await this.getPlan(input.planId);
     if (plan.slug === 'enterprise') throw billingErrors.invalidPlanChange('Plano Enterprise exige contratação assistida.');
     const shouldTrial = input.type === 'FIRST_SUBSCRIPTION' && plan.slug !== 'test-1-real';
-    const subscription = await this.getOrCreateSubscription(input.companyId, plan.id, input.userId, { trialDays: shouldTrial ? 7 : 0 });
+    const isFreePlan = Number(plan.priceInCents || 0) <= 0;
+    const subscription = await this.getOrCreateSubscription(input.companyId, plan.id, input.userId, { trialDays: isFreePlan ? 0 : shouldTrial ? 7 : 0, freeAccess: isFreePlan });
     const { rootCompany, platformCustomer, userProfile, billingCompany } = await this.loadBillingProfile(input.companyId, input.billingCompanyId, input.userId);
     const city = firstNonEmpty(
       billingCompany.municipio,
@@ -340,6 +341,38 @@ export class BillingService {
       updatedAt: now,
       createdBy: input.userId,
     }, { merge: true });
+    if (amountInCents <= 0) {
+      await ref.update({
+        status: 'PAID',
+        updatedAt: iso(),
+        providerResponse: { freeAccess: true },
+        paymentData: null,
+      });
+      await this.db.collection('subscriptions').doc(String(subscription.id)).set({
+        planId: plan.id,
+        status: 'ACTIVE',
+        currentPeriodStartedAt: now,
+        currentPeriodEndsAt: null,
+        nextBillingDate: null,
+        updatedAt: now,
+      }, { merge: true });
+      await this.db.collection('companies').doc(String(input.companyId)).set({
+        subscriptionId: subscription.id,
+        accessStatus: 'ACTIVE',
+        updatedAt: now,
+      }, { merge: true });
+      await this.audit(input.companyId, subscription.id, ref.id, '', 'checkoutCreated', 'USER', input.userId, null, { planId: plan.id, amountInCents: 0, baseAmountInCents, discountAppliedInCents, paymentMethod: input.paymentMethod, freeAccess: true });
+      return {
+        orderId: ref.id,
+        orderNsu: nsu,
+        amountInCents: 0,
+        planName: plan.name,
+        paymentMethod: input.paymentMethod,
+        orderStatus: 'PAID',
+        paymentData: null,
+        raw: { freeAccess: true },
+      };
+    }
     if (['credit_card', 'debit_card'].includes(input.paymentMethod) && !input.cardToken) {
       await ref.update({ status: 'CHECKOUT_CREATED', updatedAt: iso(), providerResponse: { pendingCardToken: true } });
       await this.audit(input.companyId, subscription.id, ref.id, '', 'checkoutCreated', 'USER', input.userId, null, { planId: plan.id, amountInCents, baseAmountInCents, discountAppliedInCents, paymentMethod: input.paymentMethod, pendingCardToken: true });

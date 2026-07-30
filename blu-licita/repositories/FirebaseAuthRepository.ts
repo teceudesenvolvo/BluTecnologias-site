@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'f
 import { db, ensureNoDuplicateRecord } from '../../services/firebase';
 import type { BluUser } from '../types';
 import type { AuthRepository, PartnerSignupInput, TrialSignupInput } from './AuthRepository';
+import { defaultPublicPlans } from '../services/publicPlanCatalog';
 
 const toBluUser = async (user: User): Promise<BluUser> => {
   const memberships = await getDocs(query(collection(db, 'companyUsers'), where('userId', '==', user.uid), limit(1)));
@@ -56,9 +57,14 @@ export class FirebaseAuthRepository implements AuthRepository {
     }, { scope: 'global' });
     const credential = await createUserWithEmailAndPassword(auth, input.user.email, input.user.password);
     const now = new Date();
-    const trialDays = input.plan === 'test-1-real' ? 0 : 7;
+    const configuredPlan = await getDoc(doc(db, 'plans', input.plan)).catch(() => null);
+    const fallbackPlan = defaultPublicPlans().find((item) => item.id === input.plan || item.slug === input.plan) || null;
+    const planData = configuredPlan?.exists() ? configuredPlan.data() as Record<string, any> : fallbackPlan;
+    const planPriceInCents = Number(planData?.priceInCents || 0);
+    const isFreePlan = planPriceInCents <= 0;
+    const trialDays = isFreePlan ? 0 : input.plan === 'test-1-real' ? 0 : Number(planData?.trialDays ?? 7);
     const trialEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-    const subscriptionStatus = input.plan === 'test-1-real' ? 'PAYMENT_PENDING' : 'TRIALING';
+    const subscriptionStatus = isFreePlan ? 'ACTIVE' : input.plan === 'test-1-real' ? 'PAYMENT_PENDING' : trialDays > 0 ? 'TRIALING' : 'PAYMENT_PENDING';
     const displayName = input.user.name.trim() || input.user.email.split('@')[0];
     const companyId = `company-${credential.user.uid}`;
     const subscriptionId = `sub-${companyId}`;
@@ -122,7 +128,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       },
       subscriptionId,
       planId: input.plan,
-      status: input.plan === 'test-1-real' ? 'payment_pending' : 'trial',
+      status: isFreePlan ? 'active' : input.plan === 'test-1-real' ? 'payment_pending' : trialDays > 0 ? 'trial' : 'payment_pending',
       source: 'trial-signup',
       trialDays,
       trialStartedAt: now.toISOString(),
@@ -154,11 +160,11 @@ export class FirebaseAuthRepository implements AuthRepository {
       planId: input.plan,
       status: subscriptionStatus,
       provider: 'pagarme',
-      trialStartedAt: now.toISOString(),
-      trialEndsAt: trialEndsAt.toISOString(),
+      trialStartedAt: trialDays > 0 ? now.toISOString() : null,
+      trialEndsAt: trialDays > 0 ? trialEndsAt.toISOString() : null,
       currentPeriodStartedAt: now.toISOString(),
-      currentPeriodEndsAt: trialEndsAt.toISOString(),
-      nextBillingDate: trialEndsAt.toISOString(),
+      currentPeriodEndsAt: isFreePlan ? null : trialDays > 0 ? trialEndsAt.toISOString() : null,
+      nextBillingDate: isFreePlan ? null : trialDays > 0 ? trialEndsAt.toISOString() : null,
       gracePeriodEndsAt: null,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -169,7 +175,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       setDoc(doc(db, 'companyUsers', membershipPayload.id), membershipPayload, { merge: true }),
       setDoc(doc(db, 'subscriptions', subscriptionId), subscriptionPayload, { merge: true }),
       setDoc(doc(db, 'platformCustomers', companyId), platformCustomerPayload, { merge: true }),
-      setDoc(doc(db, 'companies', companyId, 'settings', 'subscription'), { plan: input.plan, status: 'trial', updatedAt: now.toISOString(), updatedBy: credential.user.uid }, { merge: true }),
+      setDoc(doc(db, 'companies', companyId, 'settings', 'subscription'), { plan: input.plan, status: isFreePlan ? 'active' : trialDays > 0 ? 'trial' : 'payment_pending', updatedAt: now.toISOString(), updatedBy: credential.user.uid }, { merge: true }),
     ]).catch(() => undefined);
 
     return {
