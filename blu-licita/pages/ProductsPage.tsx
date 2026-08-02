@@ -1,7 +1,9 @@
 import React from "react";
 import { AlertTriangle, Download, Loader2, Package2, Plus, RotateCcw, Save, Search, Trash2, Warehouse, X } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { createCompanyDoc, deleteCompanyDoc, listCompanyDocs, updateCompanyDoc } from "../services/firestoreCompany";
+import { db, type Company } from "../../services/firebase";
 
 type Product = {
   id: string;
@@ -41,6 +43,14 @@ const money = (value: number) =>
 const formatDateTime = (value?: string) =>
   value ? new Date(value).toLocaleString("pt-BR") : "—";
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const defaultForm = (): ProductFormValue => ({
   type: "product",
   name: "",
@@ -71,6 +81,7 @@ const defaultForm = (): ProductFormValue => ({
 export const ProductsPage: React.FC = () => {
   const { user } = useBluAuth();
   const [items, setItems] = React.useState<Product[]>([]);
+  const [company, setCompany] = React.useState<Company | null>(null);
   const [query, setQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [open, setOpen] = React.useState(false);
@@ -84,6 +95,7 @@ export const ProductsPage: React.FC = () => {
   const [stockActiveFilter, setStockActiveFilter] = React.useState<"all" | "active" | "inactive">("all");
   const [stockMinQuantityFilter, setStockMinQuantityFilter] = React.useState("");
   const [stockMaxQuantityFilter, setStockMaxQuantityFilter] = React.useState("");
+  const [exportOpen, setExportOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -98,6 +110,17 @@ export const ProductsPage: React.FC = () => {
   React.useEffect(() => {
     load();
   }, [load]);
+
+  React.useEffect(() => {
+    const loadCompany = async () => {
+      if (!user?.companyId) return;
+      const snapshot = await getDoc(doc(db, "companies", user.companyId)).catch(() => null);
+      if (snapshot?.exists()) {
+        setCompany({ id: snapshot.id, ...(snapshot.data() as Omit<Company, "id">) });
+      }
+    };
+    void loadCompany();
+  }, [user?.companyId]);
 
   const visible = items.filter((item) =>
     `${item.type} ${item.name} ${item.sku} ${item.category}`.toLowerCase().includes(query.toLowerCase()),
@@ -145,8 +168,8 @@ export const ProductsPage: React.FC = () => {
     setStockMaxQuantityFilter("");
   };
 
-  const exportStock = () => {
-    const rows = filteredStockProducts.map((item) => {
+  const buildStockRows = () =>
+    filteredStockProducts.map((item) => {
       const quantity = item.stockQuantity || 0;
       const minimum = item.minStock || 0;
       const low = quantity <= minimum;
@@ -167,6 +190,8 @@ export const ProductsPage: React.FC = () => {
       };
     });
 
+  const exportStockCsv = () => {
+    const rows = buildStockRows();
     const header = Object.keys(rows[0] || {
       produto: "",
       sku: "",
@@ -192,14 +217,176 @@ export const ProductsPage: React.FC = () => {
     ].join("\n");
 
     const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `estoque-blu-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `estoque-blu-${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const exportStockXls = () => {
+    const rows = buildStockRows();
+    const header = Object.keys(rows[0] || {
+      produto: "",
+      sku: "",
+      categoria: "",
+      unidade: "",
+      ativo: "",
+      saldo: "",
+      estoque_minimo: "",
+      status_estoque: "",
+      localizacao: "",
+      custo_unitario: "",
+      valor_total_estoque: "",
+      ultima_atualizacao: "",
+      observacoes: "",
+    });
+    const xls = [
+      header.join("\t"),
+      ...rows.map((row) => header.map((key) => String((row as Record<string, string>)[key] || "")).join("\t")),
+    ].join("\n");
+
+    const blob = new Blob([`\uFEFF${xls}`], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    downloadBlob(blob, `estoque-blu-${new Date().toISOString().slice(0, 10)}.xls`);
+  };
+
+  const exportStock = (format: "csv" | "xls" | "pdf") => {
+    if (format === "pdf") {
+      exportStockPdf();
+      return;
+    }
+    if (format === "xls") {
+      exportStockXls();
+      return;
+    }
+    exportStockCsv();
+  };
+
+  const exportStockPdf = () => {
+    const companyName = company?.razaoSocial || company?.nomeFantasia || user?.companyName || "Minha empresa";
+    const companyContact = [company?.email, company?.telefoneCelular || company?.telefoneFixo].filter(Boolean).join(" • ");
+    const companyAddress = [
+      [company?.logradouro, company?.numero].filter(Boolean).join(", "),
+      company?.bairro,
+      [company?.municipio, company?.uf].filter(Boolean).join(" / "),
+      company?.cep,
+    ]
+      .filter(Boolean)
+      .join(" • ");
+    const printedAt = new Date().toLocaleString("pt-BR");
+    const rowsHtml = filteredStockProducts
+      .map((item) => {
+        const quantity = item.stockQuantity || 0;
+        const minimum = item.minStock || 0;
+        const totalValue = (item.costCents || 0) * quantity;
+        const status = quantity <= 0 ? "Sem estoque" : quantity <= minimum ? "Abaixo do mínimo" : "Saudável";
+        return `
+          <tr>
+            <td>${escapeHtml(item.name)}</td>
+            <td>${escapeHtml(item.sku || "—")}</td>
+            <td>${escapeHtml(item.category || "—")}</td>
+            <td>${escapeHtml(item.stockLocation || "—")}</td>
+            <td class="right">${quantity}</td>
+            <td class="right">${minimum}</td>
+            <td>${status}</td>
+            <td class="right">${money(item.costCents || 0)}</td>
+            <td class="right">${money(totalValue)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Relatório de estoque</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, Arial, sans-serif; background: #f8fafc; color: #0f172a; }
+      .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 20mm 16mm; }
+      .header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; }
+      .brand { display: flex; gap: 14px; align-items: flex-start; }
+      .brand img { width: 72px; height: 72px; object-fit: contain; border-radius: 18px; border: 1px solid #e2e8f0; padding: 6px; background: #fff; }
+      .eyebrow { margin: 0 0 6px; color: #2563eb; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: 28px; line-height: 1.1; }
+      .company-line { margin-top: 6px; color: #475569; font-size: 12px; line-height: 1.5; }
+      .meta-box { min-width: 180px; padding: 12px 14px; border: 1px solid #dbeafe; border-radius: 18px; background: #f8fbff; }
+      .meta-label { display: block; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+      .meta-value { display: block; margin-top: 8px; font-size: 14px; font-weight: 700; }
+      .meta-line { margin-top: 6px; color: #64748b; font-size: 11px; line-height: 1.4; }
+      .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 20px; }
+      .summary-card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px; background: #f8fafc; }
+      .summary-card span { display: block; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+      .summary-card strong { display: block; margin-top: 8px; font-size: 20px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th { background: #eff6ff; color: #334155; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; text-align: left; padding: 10px 8px; }
+      td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; font-size: 12px; vertical-align: top; }
+      .right { text-align: right; }
+      .empty { margin-top: 20px; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 32px 20px; text-align: center; color: #64748b; }
+      .footer { margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 10px; }
+      @media print {
+        body { background: #fff; }
+        .page { width: auto; min-height: auto; margin: 0; padding: 16mm 14mm; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div class="brand">
+          ${company?.logoUrl ? `<img src="${escapeHtml(company.logoUrl)}" alt="Logomarca da empresa" />` : ""}
+          <div>
+            <p class="eyebrow">Gestão de estoque</p>
+            <h1>Relatório de estoque</h1>
+            <div class="company-line">${escapeHtml(companyName)}</div>
+            ${companyContact ? `<div class="company-line">${escapeHtml(companyContact)}</div>` : ""}
+            ${companyAddress ? `<div class="company-line">${escapeHtml(companyAddress)}</div>` : ""}
+          </div>
+        </div>
+        <div class="meta-box">
+          <span class="meta-label">Emitido em</span>
+          <span class="meta-value">${escapeHtml(printedAt)}</span>
+          <div class="meta-line">Exportação baseada nos filtros ativos da tela de estoque.</div>
+        </div>
+      </header>
+      <section class="summary-grid">
+        <div class="summary-card"><span>Produtos filtrados</span><strong>${filteredStockProducts.length}</strong></div>
+        <div class="summary-card"><span>Unidades totais</span><strong>${totalStockUnits}</strong></div>
+        <div class="summary-card"><span>Valor em estoque</span><strong>${money(stockValueCents)}</strong></div>
+        <div class="summary-card"><span>Abaixo do mínimo</span><strong>${lowStockItems.length}</strong></div>
+      </section>
+      ${
+        filteredStockProducts.length
+          ? `<table>
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>SKU</th>
+                  <th>Categoria</th>
+                  <th>Localização</th>
+                  <th>Saldo</th>
+                  <th>Mínimo</th>
+                  <th>Status</th>
+                  <th>Custo unitário</th>
+                  <th>Valor total</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>`
+          : `<div class="empty">Nenhum item encontrado para os filtros atuais.</div>`
+      }
+      <footer class="footer">Sistema de Gestão Blu Tecnologias</footer>
+    </main>
+  </body>
+</html>`;
+
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=1280,height=900");
+    if (!popup) {
+      alert("Não foi possível abrir a visualização do PDF.");
+      return;
+    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => popup.print(), 450);
   };
 
   const saveItem = async (value: ProductFormValue) => {
@@ -381,7 +568,7 @@ export const ProductsPage: React.FC = () => {
                     <RotateCcw size={15} />
                     Limpar filtros
                   </button>
-                  <button onClick={exportStock} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white">
+                  <button onClick={() => setExportOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white">
                     <Download size={15} />
                     Exportar estoque
                   </button>
@@ -521,6 +708,16 @@ export const ProductsPage: React.FC = () => {
           saving={savingStock}
           close={() => setStockItem(null)}
           save={saveStock}
+        />
+      )}
+
+      {exportOpen && (
+        <ExportFormatModal
+          close={() => setExportOpen(false)}
+          exportFile={(format) => {
+            exportStock(format);
+            setExportOpen(false);
+          }}
         />
       )}
     </div>
@@ -779,4 +976,54 @@ const SelectField = ({
       ))}
     </select>
   </label>
+);
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const ExportFormatModal = ({
+  close,
+  exportFile,
+}: {
+  close: () => void;
+  exportFile: (format: "pdf" | "xls" | "csv") => void;
+}) => (
+  <div className="fixed inset-0 z-[140] grid place-items-center bg-slate-950/55 p-4">
+    <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Exportação</p>
+          <h2 className="mt-2 text-xl font-bold">Escolha o formato</h2>
+        </div>
+        <button onClick={close}>
+          <X />
+        </button>
+      </div>
+      <p className="mt-2 text-sm text-slate-500">
+        O relatório será gerado com os filtros ativos da tela de estoque.
+      </p>
+      <div className="mt-5 grid gap-3">
+        <button onClick={() => exportFile("pdf")} className="rounded-xl border px-4 py-3 text-left text-sm font-bold hover:bg-slate-50">
+          PDF
+          <span className="mt-1 block text-xs font-normal text-slate-500">Visual com cabeçalho da empresa, data e rodapé da Blu.</span>
+        </button>
+        <button onClick={() => exportFile("xls")} className="rounded-xl border px-4 py-3 text-left text-sm font-bold hover:bg-slate-50">
+          XLS
+          <span className="mt-1 block text-xs font-normal text-slate-500">Ideal para abrir rapidamente no Excel.</span>
+        </button>
+        <button onClick={() => exportFile("csv")} className="rounded-xl border px-4 py-3 text-left text-sm font-bold hover:bg-slate-50">
+          CSV
+          <span className="mt-1 block text-xs font-normal text-slate-500">Formato leve para integrações e planilhas.</span>
+        </button>
+      </div>
+    </section>
+  </div>
 );
