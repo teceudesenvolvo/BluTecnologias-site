@@ -414,6 +414,12 @@ export interface Certificate {
   expiryDate: string;
   fileUrl?: string;
   userId?: string;
+  type?: string;
+  company?: string;
+  companyName?: string;
+  legalEntityId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FinancialSettings {

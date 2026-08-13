@@ -56,34 +56,53 @@ const quickFeatures = [
   { label: 'Migração de dados', to: '/admin/migracao', description: 'Migrar dados do Firebase para o backend Blu', keywords: 'migração migracao firebase backend banco dados render postgres' },
 ];
 
+const normalizeCertificateText = (value?: string) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+const inferCertificateType = (item: Certificate) => {
+  const extended = item as Certificate & { type?: string };
+  const explicit = normalizeCertificateText(extended.type);
+  if (explicit) return explicit;
+  const name = normalizeCertificateText(item.name);
+  if (name.includes('fgts')) return 'cnd fgts';
+  if (name.includes('federal')) return 'cnd federal';
+  if (name.includes('estadual')) return 'cnd estadual';
+  if (name.includes('municipal')) return 'cnd municipal';
+  if (name.includes('trabalhista')) return 'cnd trabalhista';
+  if (name.includes('falencia')) return 'cnd falencia';
+  if (name.includes('alvara')) return 'alvara';
+  if (name.includes('contrato social')) return 'contrato social';
+  if (name.includes('cnpj')) return 'cnpj';
+  return name;
+};
+
+const inferCertificateCompany = (item: Certificate) => {
+  const name = normalizeCertificateText(item.name);
+  const type = inferCertificateType(item);
+  const nameReference = name
+    .replace(type, '')
+    .replace(/\b(certidao|negativa|positiva|cnd|debitos|debito|tributos|tributaria|fiscal|regularidade|validade|pdf)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Os documentos legados nem sempre têm company/legalEntityId. O sufixo do
+  // nome (ex.: "Lavoro") é a referência comum entre a versão antiga e a nova.
+  if (nameReference) return nameReference;
+  return normalizeCertificateText(item.company || item.companyName);
+};
+
 const certificateReference = (item: Certificate) => {
-  const extended = item as Certificate & { type?: string; company?: string };
-  const normalize = (value?: string) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const company = normalize(extended.company);
-  const type = normalize(extended.type);
-  const name = normalize(item.name);
-  return company ? `${company}|${type || name}` : name;
+  const type = inferCertificateType(item);
+  const company = inferCertificateCompany(item);
+  return `${company || normalizeCertificateText(item.legalEntityId) || 'sem-empresa'}|${type}`;
 };
 
-const latestCertificateVersions = (items: Certificate[]) => {
-  const latest = new Map<string, Certificate>();
-  items.forEach((item) => {
-    const reference = certificateReference(item);
-    const current = latest.get(reference);
-    if (!current) { latest.set(reference, item); return; }
-    const itemIssue = item.issueDate || '';
-    const currentIssue = current.issueDate || '';
-    if (itemIssue > currentIssue || (itemIssue === currentIssue && (item.expiryDate || '') > (current.expiryDate || ''))) latest.set(reference, item);
-  });
-  return [...latest.values()];
-};
-
-const isCertificateValid = (item: Certificate, referenceToday = new Date()) => {
-  if (!item.expiryDate) return true;
-  const today = new Date(referenceToday);
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(`${item.expiryDate}T12:00:00`);
-  return Number.isFinite(expiry.getTime()) && expiry.getTime() >= today.getTime();
+const certificateDateTime = (value: unknown) => {
+  if (!value) return 0;
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  const raw = String(value).slice(0, 10);
+  const parsed = new Date(`${raw}T12:00:00`).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const certificateAlertItems = (items: Certificate[]) => {
@@ -101,28 +120,24 @@ const certificateAlertItems = (items: Certificate[]) => {
   return [...grouped.values()]
     .map((bucket) => {
       const sorted = [...bucket].sort((a, b) => {
-        const aIssue = a.issueDate || '';
-        const bIssue = b.issueDate || '';
-        if (aIssue !== bIssue) return aIssue > bIssue ? -1 : 1;
-        const aExpiry = a.expiryDate || '';
-        const bExpiry = b.expiryDate || '';
-        if (aExpiry !== bExpiry) return aExpiry > bExpiry ? -1 : 1;
-        const aUpdated = (a as Certificate & { updatedAt?: string }).updatedAt || '';
-        const bUpdated = (b as Certificate & { updatedAt?: string }).updatedAt || '';
-        return aUpdated > bUpdated ? -1 : aUpdated < bUpdated ? 1 : 0;
+        const issueDifference = certificateDateTime(b.issueDate) - certificateDateTime(a.issueDate);
+        if (issueDifference) return issueDifference;
+        const createdDifference = certificateDateTime(b.createdAt) - certificateDateTime(a.createdAt);
+        if (createdDifference) return createdDifference;
+        const updatedDifference = certificateDateTime(b.updatedAt) - certificateDateTime(a.updatedAt);
+        if (updatedDifference) return updatedDifference;
+        return certificateDateTime(b.expiryDate) - certificateDateTime(a.expiryDate);
       });
       const latest = sorted[0];
-      return { bucket, latest };
+      return latest;
     })
-    .filter(({ bucket, latest }) => {
+    .filter((latest) => {
       if (!latest?.expiryDate) return false;
-      if (bucket.some((item) => item !== latest && isCertificateValid(item, today))) return false;
       const expiry = new Date(`${latest.expiryDate}T12:00:00`);
       if (!Number.isFinite(expiry.getTime())) return false;
       const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
       return days <= 7;
-    })
-    .map(({ latest }) => latest);
+    });
 };
 
 export const BluAppLayout: React.FC = () => {
@@ -203,7 +218,7 @@ export const BluAppLayout: React.FC = () => {
   );
 
   useEffect(()=>{if(!user||!firebaseUid)return;const today=new Date().toISOString().slice(0,10);Promise.all([integrationOpportunityService.listModalities(),interestSettingsService.get(user.companyId)]).then(async([modalities,keywords])=>{const auction=modalities.find((item)=>item.nome.toLowerCase().includes('pregão')&&item.nome.toLowerCase().includes('eletr'));if(!auction)return;const result=await integrationOpportunityService.list('pncp',{startDate:today,endDate:today,modalityCode:auction.id,pageSize:50});setTodayOpportunities(result.data.filter((item)=>item.publicationDate?.slice(0,10)===today&&(keywords.length===0||interestSettingsService.matches(item.object,keywords))).slice(0,20))}).catch(()=>setTodayOpportunities([]))},[user,firebaseUid]);
-  useEffect(()=>{if(!user||!firebaseUid)return;certificateService.getAll().then(items=>{setCertificateAlerts(certificateAlertItems(latestCertificateVersions(items)))}).catch(()=>setCertificateAlerts([]))},[user,firebaseUid]);
+  useEffect(()=>{if(!user||!firebaseUid)return;certificateService.getAll().then(items=>{setCertificateAlerts(certificateAlertItems(items))}).catch(()=>setCertificateAlerts([]))},[user,firebaseUid]);
   useEffect(()=>{if(!user)return;accessControlService.get(user.companyId).then((settings)=>setAccessRoles(settings.roles)).catch(()=>setAccessRoles(defaultAccessRoles))},[user]);
   useEffect(()=>{if(!user||!firebaseUid)return;billingClient.summary().then(setBilling).catch(()=>setBilling(null))},[user,firebaseUid]);
   useEffect(()=>{const read=()=>{setAuthDisplayName(auth.currentUser?.displayName||'');setFirebaseUid(auth.currentUser?.uid||'')};read();const unsubscribe=onAuthStateChanged(auth,()=>read());window.addEventListener('blu:profile-updated',read);return()=>{unsubscribe();window.removeEventListener('blu:profile-updated',read)}},[]);
