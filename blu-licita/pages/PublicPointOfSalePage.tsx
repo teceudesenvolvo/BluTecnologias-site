@@ -1,5 +1,5 @@
 import React from "react";
-import { Building2, CheckCircle2, Loader2, Mail, Minus, Plus, Printer, ReceiptText, Search, ShoppingCart, Trash2, UserPlus, X } from "lucide-react";
+import { Building2, CheckCircle2, Loader2, Mail, Minus, Plus, Printer, ReceiptText, ScanLine, Search, ShoppingCart, Trash2, UserPlus, X } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useBluAuth } from "../contexts/BluAuthContext";
@@ -25,7 +25,11 @@ export const PublicPointOfSalePage: React.FC = () => {
   const [company, setCompany] = React.useState<Company | null>(null);
   const [cart, setCart] = React.useState<CartItem[]>([]);
   const [query, setQuery] = React.useState("");
+  const [scanBarcode, setScanBarcode] = React.useState("");
+  const [scanQuantity, setScanQuantity] = React.useState(1);
   const [clientId, setClientId] = React.useState("");
+  const [clientQuery, setClientQuery] = React.useState("");
+  const [clientResultsOpen, setClientResultsOpen] = React.useState(false);
   const [contractId, setContractId] = React.useState("");
   const [issueDate, setIssueDate] = React.useState(today());
   const [dueDate, setDueDate] = React.useState(today());
@@ -45,6 +49,7 @@ export const PublicPointOfSalePage: React.FC = () => {
   const [clientForm, setClientForm] = React.useState(emptyClient());
   const [clientSaving, setClientSaving] = React.useState(false);
   const [clientLookup, setClientLookup] = React.useState(false);
+  const barcodeInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const load = React.useCallback(async () => {
     if (!user?.companyId) return;
@@ -64,6 +69,14 @@ export const PublicPointOfSalePage: React.FC = () => {
 
   React.useEffect(() => { void load(); }, [load]);
   const selectedClient = clients.find((item) => item.id === clientId);
+  const normalizedClientQuery = clientQuery.trim().toLocaleLowerCase("pt-BR");
+  const clientQueryDigits = clientQuery.replace(/\D/g, "");
+  const filteredClients = clients.filter((client) => {
+    if (!normalizedClientQuery) return true;
+    const document = String(client.cnpj || client.organizationCnpj || "").replace(/\D/g, "");
+    const text = `${client.razaoSocial || ""} ${client.name || ""} ${client.email || ""}`.toLocaleLowerCase("pt-BR");
+    return text.includes(normalizedClientQuery) || Boolean(clientQueryDigits && document.includes(clientQueryDigits));
+  }).slice(0, 30);
   const selectedContract = selectedClient?.contracts?.find((item) => item.id === contractId);
   const filtered = products.filter((item) => `${item.name} ${item.barcode || ""} ${item.sku || ""}`.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
   const subtotal = cart.reduce((sum, item) => sum + Math.round(item.salePriceCents * item.quantityMilli / 1000), 0);
@@ -74,6 +87,35 @@ export const PublicPointOfSalePage: React.FC = () => {
     const found = current.find((item) => item.id === product.id);
     return found ? current.map((item) => item.id === product.id ? { ...item, quantityMilli: item.quantityMilli + 1000 } : item) : [...current, { ...product, quantityMilli: 1000 }];
   });
+  const addQuantity = (product: Product, amount: number) => setCart((current) => {
+    const quantityMilli = Math.max(1, Math.trunc(amount || 1)) * 1000;
+    const found = current.find((item) => item.id === product.id);
+    return found ? current.map((item) => item.id === product.id ? { ...item, quantityMilli: item.quantityMilli + quantityMilli } : item) : [...current, { ...product, quantityMilli }];
+  });
+  const scanProduct = () => {
+    const code = scanBarcode.replace(/\s/g, "").trim();
+    if (!code) return;
+    if (scanQuantity <= 0) { setMessage("Informe uma quantidade maior que zero antes de ler o código de barras."); setScanBarcode(""); window.requestAnimationFrame(() => barcodeInputRef.current?.focus()); return; }
+    const product = products.find((item) => String(item.barcode || "").replace(/\s/g, "") === code || String(item.sku || "").replace(/\s/g, "") === code);
+    if (!product) setMessage(`Nenhum produto encontrado para o código ${code}.`);
+    else { addQuantity(product, scanQuantity); setMessage(`${scanQuantity}x ${product.name} adicionado à sacola.`); setScanQuantity(1); }
+    setScanBarcode("");
+    window.requestAnimationFrame(() => barcodeInputRef.current?.focus());
+  };
+  React.useEffect(() => {
+    const code = scanBarcode.replace(/\s/g, "").trim();
+    if (!code) return;
+    const timer = window.setTimeout(() => {
+      const hasMatch = products.some((item) => String(item.barcode || "").replace(/\s/g, "") === code || String(item.sku || "").replace(/\s/g, "") === code);
+      if (hasMatch) scanProduct();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [products, scanBarcode]);
+  React.useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [message]);
   const quantity = (id: string, amount: number) => setCart((current) => current.map((item) => item.id === id ? { ...item, quantityMilli: Math.max(1000, item.quantityMilli + amount) } : item));
 
   const lookupDocument = async () => {
@@ -117,29 +159,32 @@ export const PublicPointOfSalePage: React.FC = () => {
       const response = await callable({ clientId, contractId, contractName: selectedContract?.title || "", issueDate, dueDate, discountCents, paymentMethod, cardType: paymentMethod === "card" ? cardType : null, installments: paymentMethod === "card" && cardType === "credit" ? installments : 1, paid, fiscalRequested, sendEmail, notes, issuerName: (company as Company & { razaoSocial?: string })?.razaoSocial || "", idempotencyKey, items: cart.map((item) => ({ productId: item.id, quantityMilli: item.quantityMilli, unitPriceCents: item.salePriceCents })) });
       const saleSnap = await getDoc(doc(db, "pointOfSaleSales", response.data.id));
       const saved = { id: saleSnap.id, ...saleSnap.data() } as Sale;
-      setLastSale(saved); setCart([]); setDiscountCents(0); setNotes(""); setMessage(sendEmail ? "Venda concluída e e-mail colocado na fila de envio." : "Venda concluída com sucesso."); await load();
+      setLastSale(saved); setCart([]); setDiscountCents(0); setNotes(""); setMessage(sendEmail ? "Venda concluída e e-mail colocado na fila de envio." : "Venda concluída com sucesso."); window.dispatchEvent(new Event("blu:stock-updated")); await load();
     } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : "Não foi possível concluir a venda."); }
     finally { setSaving(false); }
   };
 
   if (loading) return <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="animate-spin text-sky-500" /></div>;
-  return <div className="mx-auto max-w-[1800px] space-y-2 xl:h-[calc(100vh-112px)] xl:overflow-hidden">
-    {message && <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-100">{message}</div>}
+  return <div className="relative mx-auto max-w-[1800px] space-y-2 xl:h-[calc(100vh-112px)] xl:overflow-hidden">
+    {message && <div className="pointer-events-none fixed inset-x-4 top-24 z-[90] flex justify-center xl:left-[max(1rem,theme(space.72))] xl:right-6 xl:justify-start"><div className="max-w-3xl rounded-xl border border-sky-200 bg-sky-50/95 px-4 py-3 text-sm font-semibold text-sky-800 shadow-2xl backdrop-blur-xl dark:border-sky-400/20 dark:bg-sky-400/15 dark:text-sky-100">{message}</div></div>}
     <div className="grid gap-3 xl:h-full xl:grid-cols-[minmax(360px,1.15fr)_minmax(300px,.75fr)_minmax(360px,.85fr)]">
-      <section className="flex min-h-0 flex-col rounded-3xl border border-white/70 bg-white/70 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/[.07] xl:overflow-hidden">
+      <section className="flex min-h-0 flex-col rounded-3xl border border-white/70 bg-white/70 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/[.07] xl:h-full xl:overflow-hidden">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-black text-slate-950 dark:text-white"><ShoppingCart className="h-5 w-5 text-sky-500"/>Produtos a adicionar</h2>
+        <div className="mb-2 grid grid-cols-[92px_minmax(0,1fr)] gap-2"><label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Quantidade<input type="number" min="1" max="999" step="1" value={scanQuantity} onChange={(e) => setScanQuantity(Math.max(1, Math.min(999, Math.trunc(Number(e.target.value) || 1))))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-center text-sm font-black outline-none focus:border-sky-400 dark:border-white/10 dark:bg-black/20 dark:text-white"/></label><label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Leitor de código de barras<div className="relative"><ScanLine className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-sky-500"/><input ref={barcodeInputRef} value={scanBarcode} onChange={(e) => setScanBarcode(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); scanProduct(); } }} placeholder="Leia ou digite o código para adicionar automaticamente" autoComplete="off" inputMode="numeric" className="mt-1 w-full rounded-xl border border-sky-200 bg-sky-50/70 py-3 pl-10 pr-3 text-sm font-semibold outline-none focus:border-sky-500 dark:border-sky-400/20 dark:bg-sky-400/[.07] dark:text-white"/></div></label></div>
         <div className="relative"><Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome, SKU ou código de barras" className="w-full rounded-2xl border border-slate-200 bg-white/80 py-3 pl-12 pr-4 outline-none focus:border-sky-400 dark:border-white/10 dark:bg-black/20 dark:text-white"/></div>
-        <div className="mt-3 grid min-h-0 flex-1 gap-2 overflow-auto pr-1 sm:grid-cols-2">{filtered.map((product) => <button key={product.id} onClick={() => add(product)} className="min-h-28 rounded-2xl border border-slate-200 bg-white/60 p-3 text-left transition hover:-translate-y-0.5 hover:border-sky-300 dark:border-white/10 dark:bg-white/[.05]"><div className="flex justify-between"><span className="rounded-lg bg-sky-50 p-1.5 text-sky-600 dark:bg-sky-400/10"><ShoppingCart className="h-4 w-4"/></span><b className="text-sm text-slate-950 dark:text-white">{money(product.salePriceCents)}</b></div><h3 className="mt-2 line-clamp-2 text-sm font-bold text-slate-900 dark:text-white">{product.name}</h3><p className="mt-1 text-[11px] text-slate-500">{product.barcode || product.sku || "Sem código"} · Est. {product.type === "service" ? "N/A" : product.stockQuantity || 0}</p></button>)}</div>
+        <div className="mt-3 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{filtered.map((product) => <button key={product.id} onClick={() => add(product)} className="min-h-28 rounded-2xl border border-slate-200 bg-white/60 p-3 text-left transition hover:-translate-y-0.5 hover:border-sky-300 dark:border-white/10 dark:bg-white/[.05]"><div className="flex justify-between"><span className="rounded-lg bg-sky-50 p-1.5 text-sky-600 dark:bg-sky-400/10"><ShoppingCart className="h-4 w-4"/></span><b className="text-sm text-slate-950 dark:text-white">{money(product.salePriceCents)}</b></div><h3 className="mt-2 line-clamp-2 text-sm font-bold text-slate-900 dark:text-white">{product.name}</h3><p className="mt-1 text-[11px] text-slate-500">{product.barcode || product.sku || "Sem código"} · Est. {product.type === "service" ? "N/A" : product.stockQuantity || 0}</p></button>)}</div>
       </section>
-      <section className="flex min-h-0 flex-col rounded-3xl border border-white/70 bg-white/75 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/[.07]">
+      <section className="flex min-h-0 flex-col rounded-3xl border border-white/70 bg-white/75 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/[.07] xl:h-full xl:overflow-hidden">
         <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-black text-slate-950 dark:text-white">Produtos na sacola</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-black text-sky-700 dark:bg-sky-400/10 dark:text-sky-200">{cart.length}</span></div>
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto">{cart.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-2 dark:bg-white/[.06]"><div className="min-w-0 flex-1"><b className="block truncate text-sm dark:text-white">{item.name}</b><span className="text-xs text-slate-500">{money(Math.round(item.salePriceCents * item.quantityMilli / 1000))}</span></div><button onClick={() => quantity(item.id, -1000)} className="rounded-lg p-1 hover:bg-slate-200 dark:hover:bg-white/10"><Minus className="h-4 w-4"/></button><span className="w-5 text-center text-sm font-bold dark:text-white">{item.quantityMilli / 1000}</span><button onClick={() => quantity(item.id, 1000)} className="rounded-lg p-1 hover:bg-slate-200 dark:hover:bg-white/10"><Plus className="h-4 w-4"/></button><button onClick={() => setCart((current) => current.filter((row) => row.id !== item.id))} className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-400/10"><Trash2 className="h-4 w-4"/></button></div>)}</div>
-        {!cart.length && <div className="flex min-h-48 flex-1 items-center justify-center rounded-2xl border border-dashed p-6 text-center text-sm text-slate-400">Adicione produtos ou serviços à venda.</div>}
-        <div className="mt-3 border-t pt-4 dark:border-white/10"><div className="flex justify-between text-sm text-slate-500"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="flex justify-between text-sm text-slate-500"><span>Tributos estimados</span><span>{money(taxTotal)}</span></div><div className="mt-2 flex justify-between text-2xl font-black dark:text-white"><span>Total</span><span>{money(total)}</span></div></div>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {!!cart.length && <div className="h-full space-y-1.5 overflow-y-auto pr-1">{cart.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 p-2 dark:bg-white/[.06]"><div className="min-w-0 flex-1"><b className="block truncate text-sm dark:text-white">{item.name}</b><span className="text-xs text-slate-500">{money(Math.round(item.salePriceCents * item.quantityMilli / 1000))}</span></div><button onClick={() => quantity(item.id, -1000)} className="rounded-lg p-1 hover:bg-slate-200 dark:hover:bg-white/10"><Minus className="h-4 w-4"/></button><span className="w-5 text-center text-sm font-bold dark:text-white">{item.quantityMilli / 1000}</span><button onClick={() => quantity(item.id, 1000)} className="rounded-lg p-1 hover:bg-slate-200 dark:hover:bg-white/10"><Plus className="h-4 w-4"/></button><button onClick={() => setCart((current) => current.filter((row) => row.id !== item.id))} className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-400/10"><Trash2 className="h-4 w-4"/></button></div>)}</div>}
+          {!cart.length && <div className="flex h-full min-h-48 items-center justify-center rounded-2xl border border-dashed p-6 text-center text-sm text-slate-400">Adicione produtos ou serviços à venda.</div>}
+        </div>
+        <div className="mt-3 border-t pt-4 dark:border-white/10 xl:sticky xl:bottom-0 xl:bg-white/75 xl:pb-1 xl:backdrop-blur-2xl dark:xl:bg-slate-900 dark:xl:backdrop-blur-none"><div className="flex justify-between text-sm text-slate-500"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="flex justify-between text-sm text-slate-500"><span>Tributos estimados</span><span>{money(taxTotal)}</span></div><div className="mt-2 flex justify-between text-2xl font-black dark:text-white"><span>Total</span><span>{money(total)}</span></div></div>
       </section>
       <aside className="space-y-2 overflow-auto rounded-3xl border border-white/70 bg-white/75 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/[.07]">
         <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 text-lg font-black text-slate-950 dark:text-white"><Building2 className="text-sky-500"/>Fechamento</h2><div className="flex gap-1">{lastSale && <><button title="Imprimir cupom" onClick={() => printReceipt(lastSale)} className="rounded-xl border p-2 text-slate-600 dark:border-white/15 dark:text-white"><Printer className="h-4 w-4"/></button><button title="Prévia fiscal" onClick={() => printReceipt(lastSale, true)} className="rounded-xl border p-2 text-slate-600 dark:border-white/15 dark:text-white"><ReceiptText className="h-4 w-4"/></button></>}<button onClick={() => setClientModal(true)} className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 dark:bg-sky-400/10 dark:text-sky-200"><UserPlus className="mr-1 inline h-4 w-4"/>Novo cliente</button></div></div>
-        <select value={clientId} onChange={(e) => { setClientId(e.target.value); setContractId(""); }} className="w-full rounded-xl border p-2.5 dark:border-white/10 dark:bg-slate-900 dark:text-white"><option value="">Selecione o órgão/cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.razaoSocial || client.name}</option>)}</select>
+        <div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400"/><input value={clientQuery} onFocus={() => setClientResultsOpen(true)} onChange={(e) => { setClientQuery(e.target.value); setClientResultsOpen(true); if (clientId) { setClientId(""); setContractId(""); } }} placeholder="Buscar cliente por nome, CPF ou CNPJ" className="w-full rounded-xl border py-2.5 pl-10 pr-9 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"/>{clientQuery && <button type="button" title="Limpar cliente" onClick={() => { setClientQuery(""); setClientId(""); setContractId(""); setClientResultsOpen(true); }} className="absolute right-2 top-2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-4 w-4"/></button>}{clientResultsOpen && !clientId && <div className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-white/10 dark:bg-slate-900">{filteredClients.map((client) => { const document = String(client.cnpj || client.organizationCnpj || ""); return <button type="button" key={client.id} onClick={() => { setClientId(client.id); setContractId(""); setClientQuery(client.razaoSocial || client.name || document); setClientResultsOpen(false); }} className="block w-full rounded-lg px-3 py-2 text-left hover:bg-sky-50 dark:hover:bg-white/[.06]"><b className="block truncate text-sm text-slate-900 dark:text-white">{client.razaoSocial || client.name}</b><span className="text-xs text-slate-500">{document || "Documento não informado"}</span></button>})}{!filteredClients.length && <p className="px-3 py-5 text-center text-sm text-slate-400">Nenhum cliente encontrado.</p>}{clients.length > 30 && !normalizedClientQuery && <p className="border-t px-3 py-2 text-center text-[11px] text-slate-400 dark:border-white/10">Digite nome, CPF ou CNPJ para refinar a busca.</p>}</div>}</div>
         <select value={contractId} onChange={(e) => setContractId(e.target.value)} disabled={!selectedClient?.contracts?.length} className="w-full rounded-xl border p-3 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900 dark:text-white"><option value="">Sem contrato vinculado</option>{selectedClient?.contracts?.map((contract) => <option key={contract.id} value={contract.id}>{contract.title}</option>)}</select>
         <div className="grid grid-cols-2 gap-3"><label className="text-xs font-bold text-slate-500">EMISSÃO<input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:border-white/10 dark:bg-slate-900 dark:text-white"/></label><label className="text-xs font-bold text-slate-500">VENCIMENTO<input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:border-white/10 dark:bg-slate-900 dark:text-white"/></label></div>
         <div className="grid grid-cols-2 gap-3"><select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-xl border p-3 dark:border-white/10 dark:bg-slate-900 dark:text-white"><option value="invoice">Faturado</option><option value="bank_order">Ordem bancária</option><option value="pix">PIX</option><option value="transfer">Transferência</option><option value="card">Cartão</option></select><input type="number" min="0" step="0.01" value={(discountCents / 100).toFixed(2)} onChange={(e) => setDiscountCents(Math.round(Number(e.target.value || 0) * 100))} placeholder="Desconto" className="rounded-xl border p-3 dark:border-white/10 dark:bg-slate-900 dark:text-white"/></div>

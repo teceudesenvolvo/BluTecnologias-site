@@ -273,6 +273,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
         <span className="text-sm font-black tracking-tight">Blu</span>
       </Link>
       <div className="hidden items-center gap-7 text-sm font-bold text-slate-600 md:flex dark:text-slate-300">
+        <Link to="/products" className="hover:text-blue-600">Soluções</Link>
         <button onClick={() => scrollToSection('problema')} className="hover:text-blue-600">Produto</button>
         <button onClick={() => scrollToSection('ia')} className="hover:text-blue-600">IA</button>
         <Link to="/parceria" className="hover:text-blue-600">Parceria</Link>
@@ -294,6 +295,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
         <div className="grid gap-2 text-sm font-bold">
           <Link to="/admin/onboarding" className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-white">Experimentar gratuitamente</Link>
           <Link to="/admin/login" className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-blue-700 dark:border-blue-300/20 dark:bg-blue-500/10 dark:text-blue-200">Entrar no sistema</Link>
+          <Link to="/products" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Soluções para órgãos públicos</Link>
           <Link to="/parceria" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Programa de parceria</Link>
           <Link to="/contact" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Agendar demonstração</Link>
         </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, Download, FileUp, Loader2, Package2, Plus, RotateCcw, Save, Search, Trash2, Warehouse, X } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -83,12 +84,13 @@ const defaultForm = (): ProductFormValue => ({
 
 export const ProductsPage: React.FC = () => {
   const { user } = useBluAuth();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = React.useState<Product[]>([]);
   const [company, setCompany] = React.useState<Company | null>(null);
   const [query, setQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [open, setOpen] = React.useState(false);
-  const [tab, setTab] = React.useState<PageTab>("catalog");
+  const [tab, setTab] = React.useState<PageTab>(() => searchParams.get("aba") === "estoque" ? "stock" : "catalog");
   const [editingItem, setEditingItem] = React.useState<Product | null>(null);
   const [stockItem, setStockItem] = React.useState<Product | null>(null);
   const [savingStock, setSavingStock] = React.useState(false);
