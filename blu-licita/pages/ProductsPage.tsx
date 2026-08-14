@@ -1,14 +1,16 @@
 import React from "react";
 import { AlertTriangle, Download, Loader2, Package2, Plus, RotateCcw, Save, Search, Trash2, Warehouse, X } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { createCompanyDoc, deleteCompanyDoc, listCompanyDocs, updateCompanyDoc } from "../services/firestoreCompany";
-import { db, type Company } from "../../services/firebase";
+import { db, functions, type Company } from "../../services/firebase";
 
 type Product = {
   id: string;
   type: "product" | "service";
   name: string;
+  barcode?: string;
   sku?: string;
   category: string;
   unit: string;
@@ -54,6 +56,7 @@ const escapeHtml = (value: string) =>
 const defaultForm = (): ProductFormValue => ({
   type: "product",
   name: "",
+  barcode: "",
   sku: "",
   category: "",
   unit: "un",
@@ -123,7 +126,7 @@ export const ProductsPage: React.FC = () => {
   }, [user?.companyId]);
 
   const visible = items.filter((item) =>
-    `${item.type} ${item.name} ${item.sku} ${item.category}`.toLowerCase().includes(query.toLowerCase()),
+    `${item.type} ${item.name} ${item.barcode} ${item.sku} ${item.category}`.toLowerCase().includes(query.toLowerCase()),
   );
 
   const stockProducts = visible.filter((item) => (item.type || "product") === "product");
@@ -391,6 +394,12 @@ export const ProductsPage: React.FC = () => {
 
   const saveItem = async (value: ProductFormValue) => {
     if (!user) return;
+    const barcode = String(value.barcode || "").replace(/\D/g, "");
+    if (barcode && items.some((item) => item.id !== editingItem?.id && String(item.barcode || "").replace(/\D/g, "") === barcode)) {
+      alert("Já existe um produto cadastrado com este código de barras.");
+      return;
+    }
+    value = { ...value, barcode };
     if (editingItem) {
       await updateCompanyDoc("products", editingItem.id, user.id, value);
     } else {
@@ -501,7 +510,7 @@ export const ProductsPage: React.FC = () => {
                     <td className="px-4 py-4">
                       <b>{item.name}</b>
                       <small className="block text-slate-400">
-                        {item.sku || "Sem código"} · {item.active ? "Ativo" : "Inativo"}
+                        {item.sku || item.barcode || "Sem código"} · {item.active ? "Ativo" : "Inativo"}
                       </small>
                     </td>
                     <td className="px-4">{item.type === "service" ? "Serviço" : "Produto"}</td>
@@ -734,7 +743,50 @@ const ProductForm = ({
   save: (value: ProductFormValue) => Promise<void>;
 }) => {
   const [form, setForm] = React.useState<ProductFormValue>(initialValue ? { ...defaultForm(), ...initialValue } : defaultForm());
+  const [lookingUpBarcode, setLookingUpBarcode] = React.useState(false);
+  const [barcodeMessage, setBarcodeMessage] = React.useState("");
   const isEditing = Boolean(initialValue);
+
+  const lookupBarcode = async () => {
+    const barcode = String(form.barcode || "").replace(/\D/g, "");
+    setForm((current) => ({ ...current, barcode }));
+    if (![8, 12, 13, 14].includes(barcode.length)) {
+      setBarcodeMessage("Informe um GTIN/EAN válido com 8, 12, 13 ou 14 dígitos.");
+      return;
+    }
+    setLookingUpBarcode(true);
+    setBarcodeMessage("");
+    try {
+      const callable = httpsCallable<{ barcode: string }, { found: boolean; product?: { name?: string; brand?: string; category?: string; quantity?: string; imageUrl?: string }; source?: string }>(functions, "lookupProductBarcode");
+      const response = await callable({ barcode });
+      if (!response.data.found || !response.data.product) {
+        setBarcodeMessage("Produto não encontrado na base pública. Você pode preencher os dados manualmente.");
+        return;
+      }
+      const product = response.data.product;
+      setForm((current) => ({
+        ...current,
+        barcode,
+        name: product.name || current.name,
+        category: product.category || current.category,
+        notes: [current.notes, product.brand ? `Marca: ${product.brand}` : "", product.quantity ? `Apresentação: ${product.quantity}` : ""].filter(Boolean).join("\n"),
+      }));
+      setBarcodeMessage(`Dados localizados e preenchidos pela ${response.data.source || "base de produtos"}. Revise antes de salvar.`);
+    } catch (error) {
+      console.error("Erro ao consultar código de barras:", error);
+      const code = String((error as { code?: string })?.code || "");
+      const message = String((error as { message?: string })?.message || "");
+      if (code.includes("unauthenticated")) {
+        setBarcodeMessage("Sua sessão expirou. Entre novamente para consultar o código de barras.");
+      } else if (code.includes("invalid-argument")) {
+        setBarcodeMessage("O código informado não é um GTIN/EAN válido.");
+      } else {
+        setBarcodeMessage(message || "Não foi possível consultar o código agora. Tente novamente ou preencha manualmente.");
+      }
+    } finally {
+      setLookingUpBarcode(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/55 p-4">
@@ -767,6 +819,27 @@ const ProductForm = ({
                   <option value="service">Serviço</option>
                 </select>
               </label>
+              {form.type === "product" && (
+                <label className="text-xs font-bold text-slate-600 md:col-span-2">
+                  Código de barras (GTIN/EAN)
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      inputMode="numeric"
+                      maxLength={14}
+                      value={form.barcode || ""}
+                      onChange={(event) => setForm({ ...form, barcode: event.target.value.replace(/\D/g, "") })}
+                      onBlur={() => { if (form.barcode && !form.name) void lookupBarcode(); }}
+                      placeholder="Ex.: 7891234567890"
+                      className="min-w-0 flex-1 rounded-xl border bg-white px-3 py-2.5 text-sm font-normal"
+                    />
+                    <button type="button" disabled={lookingUpBarcode} onClick={lookupBarcode} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+                      {lookingUpBarcode ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                      Buscar
+                    </button>
+                  </div>
+                  {barcodeMessage && <span className="mt-2 block text-xs font-medium text-slate-500">{barcodeMessage}</span>}
+                </label>
+              )}
               <Field label="Nome" value={form.name} set={(v) => setForm({ ...form, name: v })} />
               <Field label="SKU/Código interno" value={form.sku || ""} set={(v) => setForm({ ...form, sku: v })} />
               <Field label="Categoria comercial" value={form.category} set={(v) => setForm({ ...form, category: v })} />

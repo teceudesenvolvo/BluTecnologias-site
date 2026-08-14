@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
+exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.lookupProductBarcode = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -610,6 +610,105 @@ exports.tceCeProxy = functions.https.onRequest((req, res) => { cors({ origin: tr
     return;
 } const allowed = ['codigo_municipio', 'data_inicio', 'data_fim', '$format', '$count', '$start_index']; const query = new URLSearchParams(); allowed.forEach((name) => { const value = req.query[name]; if (typeof value === 'string' && value.length <= 32)
     query.set(name, value); }); https.get(`https://api-dados-abertos.tce.ce.gov.br/sim${path}?${query}`, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-TCECE-Connector/1.0' } }, (upstream) => { const chunks = []; upstream.on('data', (chunk) => chunks.push(Buffer.from(chunk))); upstream.on('end', () => { res.status(upstream.statusCode || 502); res.set('Content-Type', upstream.headers['content-type'] || 'application/json'); res.set('Cache-Control', path === '/municipios' ? 'public, max-age=86400' : 'public, max-age=300'); res.send(Buffer.concat(chunks)); }); }).on('error', () => res.status(502).json({ message: 'TCE-CE temporariamente indisponível.' })); }); });
+const validGtin = (barcode) => {
+    if (![8, 12, 13, 14].includes(barcode.length) || !/^\d+$/.test(barcode))
+        return false;
+    const digits = barcode.split('').map(Number);
+    const checkDigit = digits.pop();
+    const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+    return (10 - (sum % 10)) % 10 === checkDigit;
+};
+const getPublicProductJson = (url, redirects = 0) => new Promise((resolve, reject) => {
+    if (redirects > 3) {
+        reject(new Error('Muitos redirecionamentos na consulta do produto.'));
+        return;
+    }
+    const request = https.get(url, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-ProductCatalog/1.0 (contato@blutecnologias.com.br)' } }, (response) => {
+        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            response.resume();
+            getPublicProductJson(new URL(response.headers.location, url).toString(), redirects + 1).then(resolve, reject);
+            return;
+        }
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on('end', () => {
+            if (response.statusCode !== 200) {
+                reject(new Error(`Base de produtos retornou HTTP ${response.statusCode || 502}.`));
+                return;
+            }
+            try {
+                resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+            }
+            catch {
+                reject(new Error('A base de produtos retornou uma resposta inválida.'));
+            }
+        });
+    });
+    request.on('error', reject);
+    request.setTimeout(10000, () => request.destroy(new Error('A consulta do produto excedeu o tempo limite.')));
+});
+exports.lookupProductBarcode = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para consultar produtos.');
+    const barcode = String(payload?.barcode || '').replace(/\D/g, '');
+    if (!validGtin(barcode))
+        throw new functions.https.HttpsError('invalid-argument', 'Informe um código GTIN/EAN válido.');
+    try {
+        const fields = 'code,product_name,product_name_pt,generic_name,generic_name_pt,brands,categories,categories_tags,quantity,image_front_url';
+        let data;
+        let source = 'Open Food Facts';
+        let lastError;
+        const sources = [
+            `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${fields}`,
+            `https://br.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${fields}`,
+        ];
+        for (const url of sources) {
+            try {
+                data = await getPublicProductJson(url);
+                break;
+            }
+            catch (error) {
+                lastError = error;
+            }
+        }
+        if (!data) {
+            try {
+                data = await getPublicProductJson(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+                source = 'UPCitemdb';
+            }
+            catch (error) {
+                lastError = error;
+            }
+        }
+        if (!data) {
+            if (String(lastError?.message || '').includes('HTTP 404')) {
+                return { found: false, barcode, source: 'catálogos públicos' };
+            }
+            throw lastError || new Error('Nenhuma base de produtos respondeu.');
+        }
+        const product = (data.product || (Array.isArray(data.items) ? data.items[0] : undefined));
+        if (!product)
+            return { found: false, barcode, source };
+        const first = (...values) => values.map((value) => String(value || '').trim()).find(Boolean) || '';
+        const rawCategory = first(product.categories, Array.isArray(product.categories_tags) ? product.categories_tags[0] : '');
+        return {
+            found: true,
+            barcode,
+            source,
+            product: {
+                name: first(product.product_name_pt, product.product_name, product.generic_name_pt, product.generic_name, product.title),
+                brand: first(product.brands, product.brand),
+                category: first(rawCategory, product.category).replace(/^[a-z]{2}:/i, '').replace(/-/g, ' '),
+                quantity: first(product.quantity, product.size, product.weight),
+                imageUrl: first(product.image_front_url, Array.isArray(product.images) ? product.images[0] : ''),
+            },
+        };
+    }
+    catch (error) {
+        console.error('lookupProductBarcode:', error);
+        throw new functions.https.HttpsError('unavailable', 'A consulta por código de barras está temporariamente indisponível.');
+    }
+});
 exports.portalComprasPublicasProxy = functions.https.onRequest((req, res) => {
     cors({ origin: true, methods: ['GET'] })(req, res, () => {
         if (req.method !== 'GET') {
