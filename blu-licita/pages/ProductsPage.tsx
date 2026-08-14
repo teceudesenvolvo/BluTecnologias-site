@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, Download, Loader2, Package2, Plus, RotateCcw, Save, Search, Trash2, Warehouse, X } from "lucide-react";
+import { AlertTriangle, Download, FileUp, Loader2, Package2, Plus, RotateCcw, Save, Search, Trash2, Warehouse, X } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useBluAuth } from "../contexts/BluAuthContext";
@@ -99,6 +99,7 @@ export const ProductsPage: React.FC = () => {
   const [stockMinQuantityFilter, setStockMinQuantityFilter] = React.useState("");
   const [stockMaxQuantityFilter, setStockMaxQuantityFilter] = React.useState("");
   const [exportOpen, setExportOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -125,9 +126,13 @@ export const ProductsPage: React.FC = () => {
     void loadCompany();
   }, [user?.companyId]);
 
-  const visible = items.filter((item) =>
-    `${item.type} ${item.name} ${item.barcode} ${item.sku} ${item.category}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const normalizedQuery = query.trim().toLowerCase();
+  const numericQuery = query.replace(/\D/g, "");
+  const visible = items.filter((item) => {
+    const textualMatch = `${item.type} ${item.name} ${item.barcode || ""} ${item.sku || ""} ${item.category}`.toLowerCase().includes(normalizedQuery);
+    const barcodeMatch = Boolean(numericQuery && String(item.barcode || "").replace(/\D/g, "").includes(numericQuery));
+    return textualMatch || barcodeMatch;
+  });
 
   const stockProducts = visible.filter((item) => (item.type || "product") === "product");
   const stockCategories = React.useMemo(
@@ -410,6 +415,36 @@ export const ProductsPage: React.FC = () => {
     await load();
   };
 
+  const importProducts = async (products: ProductFormValue[]) => {
+    if (!user) return { created: 0, updated: 0 };
+    let created = 0;
+    let updated = 0;
+    const current = [...items];
+    for (const incoming of products) {
+      const barcode = String(incoming.barcode || "").replace(/\D/g, "");
+      const sku = String(incoming.sku || "").trim().toLowerCase();
+      const existing = current.find((item) =>
+        (barcode && String(item.barcode || "").replace(/\D/g, "") === barcode) ||
+        (sku && String(item.sku || "").trim().toLowerCase() === sku),
+      );
+      const payload = { ...incoming, barcode, lastStockUpdateAt: incoming.lastStockUpdateAt || new Date().toISOString() };
+      if (existing) {
+        const merged = Object.fromEntries(
+          Object.entries(payload).filter(([, value]) => value !== "" && value !== undefined && value !== null),
+        );
+        await updateCompanyDoc("products", existing.id, user.id, merged);
+        Object.assign(existing, merged);
+        updated += 1;
+      } else {
+        const reference = await createCompanyDoc("products", user.companyId, user.id, payload);
+        current.push({ id: reference.id, ...payload });
+        created += 1;
+      }
+    }
+    await load();
+    return { created, updated };
+  };
+
   const removeItem = async (item: Product) => {
     if (!confirm(`Excluir ${item.name} do catálogo?`)) return;
     await deleteCompanyDoc("products", item.id);
@@ -444,16 +479,21 @@ export const ProductsPage: React.FC = () => {
             Agora com gestão comercial e uma aba dedicada para controle de estoque dos itens físicos.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditingItem(null);
-            setOpen(true);
-          }}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"
-        >
-          <Plus size={17} />
-          Novo item
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm font-bold text-slate-700">
+            <FileUp size={17} /> Importar lote
+          </button>
+          <button
+            onClick={() => {
+              setEditingItem(null);
+              setOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"
+          >
+            <Plus size={17} />
+            Novo item
+          </button>
+        </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-4">
@@ -481,7 +521,7 @@ export const ProductsPage: React.FC = () => {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === "catalog" ? "Buscar produto, serviço, categoria ou SKU" : "Buscar item por nome, SKU ou categoria"}
+            placeholder={tab === "catalog" ? "Buscar por nome, código de barras, SKU ou categoria" : "Buscar por nome, código de barras, SKU ou categoria"}
             className="w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm"
           />
         </label>
@@ -729,6 +769,180 @@ export const ProductsPage: React.FC = () => {
           }}
         />
       )}
+
+      {importOpen && <ProductImportModal close={() => setImportOpen(false)} importProducts={importProducts} />}
+    </div>
+  );
+};
+
+const normalizeImportKey = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const parseCsvRows = (text: string) => {
+  const delimiter = (text.split(/\r?\n/, 1)[0].match(/;/g) || []).length > (text.split(/\r?\n/, 1)[0].match(/,/g) || []).length ? ";" : ",";
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === delimiter && !quoted) { row.push(cell.trim()); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = []; cell = "";
+    } else cell += char;
+  }
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(normalizeImportKey);
+  return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""])));
+};
+
+const importNumber = (value: unknown) => {
+  const raw = String(value ?? "").replace(/R\$/gi, "").replace(/\s/g, "");
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const result = Number(normalized.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(result) ? result : 0;
+};
+
+const valueFrom = (row: Record<string, string>, aliases: string[]) => aliases.map(normalizeImportKey).map((key) => row[key]).find((value) => String(value || "").trim()) || "";
+
+const rowToProduct = (row: Record<string, string>): ProductFormValue => ({
+  ...defaultForm(),
+  type: normalizeImportKey(valueFrom(row, ["tipo"])) === "servico" ? "service" : "product",
+  name: valueFrom(row, ["nome", "produto", "descricao", "xProd"]),
+  barcode: valueFrom(row, ["codigo de barras", "codigo_barras", "gtin", "ean", "cEAN"]).replace(/\D/g, ""),
+  sku: valueFrom(row, ["sku", "codigo", "codigo interno", "cProd"]),
+  category: valueFrom(row, ["categoria", "grupo"]),
+  unit: valueFrom(row, ["unidade", "un", "uCom"]) || "un",
+  salePriceCents: Math.round(importNumber(valueFrom(row, ["preco de venda", "preco", "valor unitario", "vUnCom"])) * 100),
+  costCents: Math.round(importNumber(valueFrom(row, ["custo", "preco de custo"])) * 100),
+  taxPercent: importNumber(valueFrom(row, ["impostos", "imposto percentual", "tributos"])),
+  taxRegime: valueFrom(row, ["regime tributario", "regra tributaria"]),
+  taxCode: valueFrom(row, ["codigo fiscal", "codigo tributario"]),
+  serviceCode: valueFrom(row, ["codigo de servico", "servico lc116"]),
+  ncm: valueFrom(row, ["ncm"]),
+  cfop: valueFrom(row, ["cfop"]),
+  issPercent: importNumber(valueFrom(row, ["iss", "iss percentual"])),
+  icmsPercent: importNumber(valueFrom(row, ["icms", "icms percentual"])),
+  pisPercent: importNumber(valueFrom(row, ["pis", "pis percentual"])),
+  cofinsPercent: importNumber(valueFrom(row, ["cofins", "cofins percentual"])),
+  stockQuantity: importNumber(valueFrom(row, ["estoque", "quantidade", "saldo", "qCom"])),
+  minStock: importNumber(valueFrom(row, ["estoque minimo", "minimo"])),
+  stockLocation: valueFrom(row, ["localizacao", "local"]),
+  notes: valueFrom(row, ["observacoes", "notas"]),
+  active: !["nao", "false", "0", "inativo"].includes(normalizeImportKey(valueFrom(row, ["ativo", "status"]) || "sim")),
+});
+
+const parseXmlProducts = (text: string) => {
+  const xml = new DOMParser().parseFromString(text, "application/xml");
+  if (xml.querySelector("parsererror")) throw new Error("O XML está inválido ou corrompido.");
+  let nodes = Array.from(xml.querySelectorAll("det"));
+  if (!nodes.length) nodes = Array.from(xml.querySelectorAll("produto, product, item"));
+  const read = (node: Element, names: string[]) => {
+    for (const name of names) {
+      const value = node.querySelector(name)?.textContent?.trim();
+      if (value) return value;
+    }
+    return "";
+  };
+  return nodes.map((node) => rowToProduct({
+    nome: read(node, ["xProd", "nome", "name", "descricao"]),
+    codigodebarras: read(node, ["cEANTrib", "cEAN", "gtin", "ean", "barcode"]),
+    sku: read(node, ["cProd", "sku", "codigo"]),
+    categoria: read(node, ["categoria", "category"]),
+    unidade: read(node, ["uCom", "unidade", "unit"]),
+    precodevenda: read(node, ["vUnCom", "preco", "price"]),
+    ncm: read(node, ["NCM", "ncm"]),
+    cfop: read(node, ["CFOP", "cfop"]),
+    estoque: read(node, ["qCom", "quantidade", "quantity"]),
+  }));
+};
+
+const ProductImportModal = ({ close, importProducts }: { close: () => void; importProducts: (products: ProductFormValue[]) => Promise<{ created: number; updated: number }> }) => {
+  const [rows, setRows] = React.useState<ProductFormValue[]>([]);
+  const [fileName, setFileName] = React.useState("");
+  const [error, setError] = React.useState("");
+  const [importing, setImporting] = React.useState(false);
+  const [result, setResult] = React.useState("");
+  const updateRow = (index: number, changes: Partial<ProductFormValue>) => setRows((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, ...changes } : item));
+  const cellClass = "w-full min-w-[110px] rounded-lg border bg-white px-2 py-2 text-xs text-slate-800 outline-none focus:border-blue-500";
+
+  const readFile = async (file?: File) => {
+    if (!file) return;
+    setError(""); setResult(""); setFileName(file.name);
+    try {
+      const text = await file.text();
+      const parsed = file.name.toLowerCase().endsWith(".xml") ? parseXmlProducts(text) : parseCsvRows(text).map(rowToProduct);
+      const valid = parsed.filter((item) => item.name.trim());
+      const unique = new Map<string, ProductFormValue>();
+      valid.forEach((item, index) => {
+        const key = item.barcode || item.sku?.trim().toLowerCase() || `row-${index}`;
+        unique.set(key, { ...(unique.get(key) || {}), ...item });
+      });
+      setRows(Array.from(unique.values()));
+      if (!valid.length) setError("Nenhum produto válido foi identificado. Confira os cabeçalhos ou a estrutura do XML.");
+    } catch (reason) {
+      setRows([]);
+      setError(reason instanceof Error ? reason.message : "Não foi possível ler o arquivo.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] grid place-items-center bg-slate-950/55 p-4">
+      <section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <header className="flex items-center justify-between border-b p-5">
+          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Importação inteligente</p><h2 className="mt-1 text-xl font-bold">Importar produtos em lote</h2></div>
+          <button onClick={close}><X /></button>
+        </header>
+        <div className="overflow-y-auto p-5">
+          <label className="grid cursor-pointer place-items-center rounded-2xl border-2 border-dashed bg-slate-50 p-8 text-center">
+            <FileUp className="mb-3 text-blue-600" />
+            <b>{fileName || "Selecione um arquivo CSV ou XML"}</b>
+            <span className="mt-1 text-xs text-slate-500">CSV: nome, código de barras, SKU, categoria, unidade, preço, custo, estoque, NCM e CFOP. XML de NF-e também é reconhecido.</span>
+            <input type="file" accept=".csv,text/csv,.xml,text/xml,application/xml" className="hidden" onChange={(event) => void readFile(event.target.files?.[0])} />
+          </label>
+          {error && <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-700">{error}</p>}
+          {result && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-700">{result}</p>}
+          {rows.length > 0 && <div className="mt-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b>{rows.length} produto(s) identificado(s)</b><p className="text-xs text-slate-500">Revise e edite as células antes de importar. A tabela pode ser rolada horizontalmente.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Tabela editável</span></div>
+            <div className="max-h-[45vh] overflow-auto rounded-xl border">
+              <table className="min-w-[3650px] text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-100 uppercase text-slate-500"><tr>{["Tipo", "Nome *", "GTIN/EAN", "SKU", "Categoria", "Unidade", "Venda (R$)", "Custo (R$)", "Impostos %", "Regime tributário", "Código fiscal", "Código serviço", "NCM", "CFOP", "ISS %", "ICMS %", "PIS %", "COFINS %", "Estoque", "Mínimo", "Localização", "Ativo", "Observações", ""].map((label) => <th key={label} className="whitespace-nowrap p-2">{label}</th>)}</tr></thead>
+                <tbody className="divide-y bg-white">{rows.map((item, index) => <tr key={`${item.barcode}-${item.sku}-${index}`} className={!item.name.trim() ? "bg-rose-50" : ""}>
+                  <td className="p-2"><select className={cellClass} value={item.type} onChange={(event) => updateRow(index, { type: event.target.value as Product["type"] })}><option value="product">Produto</option><option value="service">Serviço</option></select></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[220px] ${!item.name.trim() ? "border-rose-400" : ""}`} value={item.name} onChange={(event) => updateRow(index, { name: event.target.value })} /></td>
+                  <td className="p-2"><input inputMode="numeric" maxLength={14} className={cellClass} value={item.barcode || ""} onChange={(event) => updateRow(index, { barcode: event.target.value.replace(/\D/g, "") })} /></td>
+                  <td className="p-2"><input className={cellClass} value={item.sku || ""} onChange={(event) => updateRow(index, { sku: event.target.value })} /></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[170px]`} value={item.category} onChange={(event) => updateRow(index, { category: event.target.value })} /></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[75px]`} value={item.unit} onChange={(event) => updateRow(index, { unit: event.target.value })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.salePriceCents / 100} onChange={(event) => updateRow(index, { salePriceCents: Math.round(Number(event.target.value) * 100) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.costCents / 100} onChange={(event) => updateRow(index, { costCents: Math.round(Number(event.target.value) * 100) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.taxPercent} onChange={(event) => updateRow(index, { taxPercent: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[150px]`} value={item.taxRegime || ""} onChange={(event) => updateRow(index, { taxRegime: event.target.value })} /></td>
+                  <td className="p-2"><input className={cellClass} value={item.taxCode || ""} onChange={(event) => updateRow(index, { taxCode: event.target.value })} /></td>
+                  <td className="p-2"><input className={cellClass} value={item.serviceCode || ""} onChange={(event) => updateRow(index, { serviceCode: event.target.value })} /></td>
+                  <td className="p-2"><input className={cellClass} value={item.ncm || ""} onChange={(event) => updateRow(index, { ncm: event.target.value })} /></td>
+                  <td className="p-2"><input className={cellClass} value={item.cfop || ""} onChange={(event) => updateRow(index, { cfop: event.target.value })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.issPercent || 0} onChange={(event) => updateRow(index, { issPercent: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.icmsPercent || 0} onChange={(event) => updateRow(index, { icmsPercent: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.pisPercent || 0} onChange={(event) => updateRow(index, { pisPercent: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" className={cellClass} value={item.cofinsPercent || 0} onChange={(event) => updateRow(index, { cofinsPercent: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.001" className={cellClass} value={item.stockQuantity || 0} onChange={(event) => updateRow(index, { stockQuantity: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.001" className={cellClass} value={item.minStock || 0} onChange={(event) => updateRow(index, { minStock: Number(event.target.value) })} /></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[150px]`} value={item.stockLocation || ""} onChange={(event) => updateRow(index, { stockLocation: event.target.value })} /></td>
+                  <td className="p-2 text-center"><input type="checkbox" checked={item.active} onChange={(event) => updateRow(index, { active: event.target.checked })} /></td>
+                  <td className="p-2"><input className={`${cellClass} min-w-[200px]`} value={item.notes || ""} onChange={(event) => updateRow(index, { notes: event.target.value })} /></td>
+                  <td className="p-2"><button type="button" title="Remover linha" onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16} /></button></td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </div>}
+        </div>
+        <footer className="flex items-center justify-between gap-3 border-t p-5"><p className="text-xs text-slate-500">Duplicidades são identificadas por GTIN/EAN ou SKU e atualizadas automaticamente.</p><div className="flex gap-2"><button onClick={close} className="rounded-xl border px-4 py-2 font-bold">Cancelar</button><button disabled={!rows.length || importing || rows.some((item) => !item.name.trim())} onClick={async () => { setImporting(true); setError(""); try { const summary = await importProducts(rows); setResult(`${summary.created} produto(s) criado(s) e ${summary.updated} atualizado(s).`); setRows([]); } catch (reason) { setError(reason instanceof Error ? reason.message : "A importação não pôde ser concluída."); } finally { setImporting(false); } }} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-bold text-white disabled:opacity-50">{importing && <Loader2 size={16} className="animate-spin" />} Importar {rows.length || ""}</button></div></footer>
+      </section>
     </div>
   );
 };

@@ -9,6 +9,7 @@ export { commandBudget } from './budgets';
 export { commandDrePeriod } from './dre';
 export { getFinancialOverview } from './financialOverview';
 export { queryFinancialReport, commandFinancialReport } from './financialReports';
+export { completePublicSale } from './pdv';
 export {
   billingCheckout,
   billingSummary,

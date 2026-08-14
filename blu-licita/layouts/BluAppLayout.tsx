@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, CreditCard, Database, FileText, Headphones, HelpCircle, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
+import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, CreditCard, Database, FileText, Headphones, HelpCircle, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck, ShoppingCart, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
 import { auth, certificateService, onAuthStateChanged, type Certificate } from '../../services/firebase';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
@@ -21,6 +21,7 @@ const nav = [
   { label: 'Orçamentos', to: '/admin/orcamentos', icon: CircleDollarSign },
   { label: 'Ordens', to: '/admin/ordens', icon: ListTodo },
   { label: 'Produtos', to: '/admin/produtos', icon: Package },
+  { label: 'PDV Público', to: '/admin/pdv', icon: ShoppingCart },
   { label: 'Financeiro', to: '/admin/financeiro', icon: WalletCards },
   { label: 'Documentos', to: '/admin/documentos', icon: FileText },
   { label: 'Calendário', to: '/admin/calendario', icon: CalendarDays },
@@ -43,6 +44,7 @@ const quickFeatures = [
   { label: 'Áreas de interesse', to: '/admin/oportunidades', description: 'Configurar filtros de objetos e estados de interesse', keywords: 'areas interesse filtros estados oportunidades notificações notificacoes' },
   { label: 'Gerar proposta', to: '/admin/licitacoes', description: 'Gerar propostas, impugnações, esclarecimentos e parecer com IA', keywords: 'proposta impugnação impugnacao esclarecimento parecer ia edital saved licitacoes' },
   { label: 'Novo orçamento', to: '/admin/orcamentos', description: 'Criar orçamento e PDF timbrado da proposta', keywords: 'orcamento orçamento pdf proposta itens produto serviço servico impostos' },
+  { label: 'Nova venda no PDV', to: '/admin/pdv', description: 'Venda para órgão público com estoque, financeiro e documento fiscal', keywords: 'pdv venda balcão cupom fiscal estoque órgão cliente nota email' },
   { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email pagarme checkout pix cartão' },
   { label: 'Contas bancárias', to: '/admin/financeiro/contas-bancarias', description: 'Gerenciar bancos, caixas, recebimentos e pagamentos', keywords: 'banco conta bancaria bancária pix saldo transferência transferencia' },
   { label: 'Fluxo de caixa', to: '/admin/financeiro/fluxo-de-caixa', description: 'Entradas, saídas, previsto, realizado e vencimentos', keywords: 'fluxo caixa entrada saida saída receita despesa vencido previsto realizado' },
@@ -205,7 +207,7 @@ export const BluAppLayout: React.FC = () => {
   };
   const navGroups = [
     { title: 'Essencial', labels: ['Dashboard', 'Oportunidades', 'CRM', 'Equipe', 'Licitações'] },
-    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos'] },
+    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'PDV Público'] },
     { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
     { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
   ] as const;

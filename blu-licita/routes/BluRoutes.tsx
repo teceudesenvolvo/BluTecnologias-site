@@ -30,6 +30,7 @@ import { CalendarPage } from "../pages/CalendarPage";
 import { OrdersPage } from "../pages/OrdersPage";
 import { ReportsPage } from "../pages/ReportsPage";
 import { ProductsPage } from "../pages/ProductsPage";
+import { PublicPointOfSalePage } from "../pages/PublicPointOfSalePage";
 import { SavedBiddingsPage } from "../pages/SavedBiddingsPage";
 import { FinancialCenterPage } from "../pages/FinancialCenterPage";
 import { FinancialPhaseOnePage, type FinancialCoreView } from "../financial/pages/FinancialPhaseOnePage";
@@ -262,6 +263,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="licitacoes" element={<SavedBiddingsPage />} />
         <Route path="ordens" element={<OrdersPage />} />
         <Route path="produtos" element={<ProductsPage />} />
+        <Route path="pdv" element={<PublicPointOfSalePage />} />
         <Route
           path="cobrancas"
           element={<Navigate to="/admin/financeiro/cobrancas" replace />}
