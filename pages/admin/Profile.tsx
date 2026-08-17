@@ -100,6 +100,41 @@ export const Profile: React.FC = () => {
       ? first.replace(/^(\(\d{2}\)\s\d{5})(\d)/, '$1-$2')
       : first.replace(/^(\(\d{2}\)\s\d{4})(\d)/, '$1-$2');
   };
+  const isRepeatedDigits = (value: string) => /^(\d)\1+$/.test(value);
+  const isValidCpf = (value: string) => {
+    const digits = onlyDigits(value);
+    if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
+    let sum = 0;
+    for (let i = 0; i < 9; i += 1) sum += Number(digits[i]) * (10 - i);
+    let check = (sum * 10) % 11;
+    if (check === 10) check = 0;
+    if (check !== Number(digits[9])) return false;
+    sum = 0;
+    for (let i = 0; i < 10; i += 1) sum += Number(digits[i]) * (11 - i);
+    check = (sum * 10) % 11;
+    if (check === 10) check = 0;
+    return check === Number(digits[10]);
+  };
+  const isValidCnpj = (value: string) => {
+    const digits = onlyDigits(value);
+    if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
+    const calc = (base: string) => {
+      const factors = base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+      const total = base.split('').reduce((acc, digit, index) => acc + Number(digit) * factors[index], 0);
+      const remainder = total % 11;
+      return remainder < 2 ? 0 : 11 - remainder;
+    };
+    const first = calc(digits.slice(0, 12));
+    const second = calc(digits.slice(0, 12) + String(first));
+    return first === Number(digits[12]) && second === Number(digits[13]);
+  };
+  const validateCpfOrCnpj = (value: string) => {
+    const digits = onlyDigits(value);
+    if (!digits) return true;
+    if (digits.length === 11) return isValidCpf(digits);
+    if (digits.length === 14) return isValidCnpj(digits);
+    return false;
+  };
 
 
   useEffect(() => {
@@ -223,6 +258,19 @@ export const Profile: React.FC = () => {
     setMessage(null);
 
     try {
+      const companyCnpj = String(currentCompanyFormData.cnpj || '');
+      if (!isValidCnpj(companyCnpj)) {
+        throw new Error('Informe um CNPJ válido para a empresa.');
+      }
+
+      const invalidPartnerDocument = (currentCompanyFormData.socios || []).find((socio: any) => {
+        const document = String(socio?.numeroInscricao || '');
+        return document && !validateCpfOrCnpj(document);
+      });
+      if (invalidPartnerDocument) {
+        throw new Error('Existe sócio/representante com CPF/CNPJ inválido. Revise os documentos antes de salvar.');
+      }
+
       let finalLogoUrl = currentCompanyFormData.logoUrl;
 
       // Se for uma imagem nova em base64 (preview), faz o upload real para o Storage
@@ -337,6 +385,10 @@ export const Profile: React.FC = () => {
   const fetchCnpjData = async (cnpj: string) => {
     const cleanCnpj = cnpj.replace(/\D/g, '');
     if (cleanCnpj.length === 14) {
+      if (!isValidCnpj(cleanCnpj)) {
+        setMessage({ type: 'error', text: 'CNPJ inválido. Verifique os dígitos informados.' });
+        return;
+      }
       setMessage(null);
       setSaving(true); // Indicate loading for API call
       try {

@@ -403,6 +403,14 @@ export const BluAppLayout: React.FC = () => {
                 <button onClick={()=>{setNotificationOpen(false);navigate('/admin/oportunidades')}} className="w-full border-t border-slate-100 bg-slate-50/80 p-3 text-xs font-semibold text-blue-600 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-blue-300 dark:hover:bg-white/[0.06]">Configurar áreas de interesse</button>
               </div>}
           </div>
+          <button
+            onClick={() => navigate('/admin/perfil')}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
+            aria-label="Meu perfil"
+            title={footerUserName || 'Meu perfil'}
+          >
+            {initials}
+          </button>
         </header>
         <main className="p-4 md:p-7">
           {!isFreeBillingPlan&&['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
