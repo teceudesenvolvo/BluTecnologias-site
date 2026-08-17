@@ -70,6 +70,14 @@ const errorMessage = (error: unknown): string => {
 };
 
 const pncp = getPncpConnector();
+const fallbackModalities: PncpModality[] = [
+  { id: 8, nome: "Pregão - Eletrônico", statusAtivo: true },
+  { id: 6, nome: "Concorrência - Eletrônica", statusAtivo: true },
+  { id: 7, nome: "Concorrência - Presencial", statusAtivo: true },
+  { id: 9, nome: "Dispensa", statusAtivo: true },
+  { id: 10, nome: "Inexigibilidade", statusAtivo: true },
+  { id: 5, nome: "Leilão - Eletrônico", statusAtivo: true },
+];
 
 export const integrationOpportunityService = {
   async listModalities(): Promise<PncpModality[]> {
@@ -81,12 +89,7 @@ export const integrationOpportunityService = {
       );
     } catch (error) {
       console.error("[PNCP] Erro ao consultar modalidades:", error);
-
-      throw new Error(
-        `Não foi possível carregar as modalidades do PNCP. ${errorMessage(
-          error,
-        )}`,
-      );
+      return fallbackModalities;
     }
   },
 

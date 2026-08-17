@@ -16,19 +16,15 @@ import type {
 } from "./pncpTypes";
 
 /**
- * URLs oficiais do PNCP.
+ * A aplicação já publica/proxyfica as rotas do PNCP em:
+ * - /api/pncp           -> https://pncp.gov.br/api
+ * - /api/pncp/domain    -> https://pncp.gov.br/api/pncp
  *
- * Não usamos caminhos relativos como "/api/pncp/..." porque eles dependem
- * do proxy do Vite e quebram quando o frontend é publicado na Vercel.
+ * Usamos os caminhos relativos para funcionar tanto no localhost quanto
+ * no ambiente publicado, evitando CORS e timeouts desnecessários.
  */
-const PNCP_ORIGIN =
-  String(import.meta.env.VITE_PNCP_ORIGIN || "https://pncp.gov.br").replace(
-    /\/+$/,
-    "",
-  );
-
-const BASE_URL = `${PNCP_ORIGIN}/api/consulta/v1`;
-const DOMAIN_BASE_URL = `${PNCP_ORIGIN}/api/pncp/v1`;
+const BASE_URL = "/api/pncp/consulta/v1";
+const DOMAIN_BASE_URL = "/api/pncp/domain/v1";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 

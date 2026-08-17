@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -117,6 +118,8 @@ const processStatusMeta:Record<ProcessStatus,{label:string;color:string}>={publi
 
 export const OpportunitiesPage: React.FC = () => {
   const { user } = useBluAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [interestKeywords, setInterestKeywords] = useState<string[]>([]);
   const [interestStates, setInterestStates] = useState<string[]>([]);
   const [statusFilter,setStatusFilter]=useState<"all"|ProcessStatus>("all");
@@ -189,6 +192,14 @@ export const OpportunitiesPage: React.FC = () => {
           setError("Não foi possível carregar os municípios do TCE-CE."),
         );
   }, [source]);
+  useEffect(() => {
+    const opportunityFromNotification = (
+      location.state as { openOpportunity?: ExternalOpportunity } | null
+    )?.openOpportunity;
+    if (!opportunityFromNotification) return;
+    setSelected(opportunityFromNotification);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
   const load = async (cursor = source === "tce-ce" ? "0" : "1") => {
     if (
       source !== "tce-ce" &&

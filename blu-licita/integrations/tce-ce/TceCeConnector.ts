@@ -45,14 +45,77 @@ const BASE_URL = `${TCE_CE_ORIGIN}/sim`;
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
-const repair = (value: string): string => {
+const suspiciousMojibake =
+  /Ã|â|ðŸ|�|&#\d+;|[\u00C0-\u00FF]{2,}[\u0080-\u00BF]?/;
+
+const scorePortugueseText = (value: string) => {
+  const replacementPenalty = (value.match(/�/g) || []).length * -5;
+  const portugueseBonus =
+    (value.match(/[áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]/g) || []).length * 2;
+  const readableBonus =
+    (value.match(/[A-Za-zÀ-ÿ]{3,}/g) || []).length;
+  return replacementPenalty + portugueseBonus + readableBonus;
+};
+
+const tryDecodeUtf8FromLatin1 = (value: string) => {
   try {
-    return new TextDecoder("utf-8").decode(
-      Uint8Array.from(value, (char) => char.charCodeAt(0)),
+    return decodeURIComponent(
+      Array.from(value)
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
     );
   } catch {
     return value;
   }
+};
+
+const repair = (value: string): string => {
+  const original = String(value || "");
+
+  if (!original || !suspiciousMojibake.test(original)) {
+    return original;
+  }
+
+  const candidates = [
+    original,
+    tryDecodeUtf8FromLatin1(original),
+    (() => {
+      try {
+        return new TextDecoder("utf-8").decode(
+          Uint8Array.from(original, (char) => char.charCodeAt(0) & 0xff),
+        );
+      } catch {
+        return original;
+      }
+    })(),
+  ]
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return candidates.sort(
+    (left, right) => scorePortugueseText(right) - scorePortugueseText(left),
+  )[0] || original;
+};
+
+const repairDeep = <T,>(value: T): T => {
+  if (typeof value === "string") {
+    return repair(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => repairDeep(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        repairDeep(item),
+      ]),
+    ) as T;
+  }
+
+  return value;
 };
 
 const requestWithTimeout = async (
@@ -412,42 +475,43 @@ export class TceCeConnector implements ProcurementConnector {
   }
 
   private toExternal(row: Row): ExternalOpportunity {
+    const normalizedRow = repairDeep(row);
     const pncp = String(
-      row.numero_id_contratacao_pncp || "",
+      normalizedRow.numero_id_contratacao_pncp || "",
     ).trim();
 
     return {
       externalId:
         pncp ||
-        `CE-${row.codigo_municipio}-${row.numero_licitacao}`,
+        `CE-${normalizedRow.codigo_municipio}-${normalizedRow.numero_licitacao}`,
 
       source: "tce-ce",
 
       organizationName:
-        `Município do Ceará · código ${row.codigo_municipio}`,
+        `Município do Ceará · código ${normalizedRow.codigo_municipio}`,
 
       processNumber:
-        row.numero_licitacao || "Não informado",
+        normalizedRow.numero_licitacao || "Não informado",
 
       object: repair(
-        row.descricao_objeto_licitacao ||
+        normalizedRow.descricao_objeto_licitacao ||
           "Objeto não informado",
       ),
 
       estimatedValue:
-        typeof row.valor_orcado_estimado === "number"
-          ? row.valor_orcado_estimado
+        typeof normalizedRow.valor_orcado_estimado === "number"
+          ? normalizedRow.valor_orcado_estimado
           : undefined,
 
       publicationDate:
-        row.data_realizacao_autuacao_licitacao,
+        normalizedRow.data_realizacao_autuacao_licitacao,
 
       openingDate:
-        row.data_realizacao_licitacao,
+        normalizedRow.data_realizacao_licitacao,
 
       status: "Informado ao TCE-CE",
 
-      raw: row,
+      raw: normalizedRow,
     };
   }
 

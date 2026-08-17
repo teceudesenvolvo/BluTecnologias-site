@@ -72,13 +72,13 @@ const totals = (items: any[]) => {
 
 export class FirebaseBudgetAdapter {
   async load(companyId: string) {
-    const [budgets, items, projects, costCenters, transactions, clients, members, products, serviceOrders, companies] = await Promise.all(
+    const [budgets, items, projects, costCenters, transactions, clients, prospects, members, products, serviceOrders, companies] = await Promise.all(
       [
-        ...["budgets", "budgetItems", "projects", "costCenters", "financialTransactions", "clients", "teamMembers", "products", "serviceOrders"].map((name) => list(name, companyId)),
+        ...["budgets", "budgetItems", "projects", "costCenters", "financialTransactions", "clients", "prospects", "teamMembers", "products", "serviceOrders"].map((name) => list(name, companyId)),
         companySettingsService.getAll().catch(() => []),
       ],
     );
-    return { budgets, items, projects, costCenters, transactions, clients, members, products, serviceOrders, companies };
+    return { budgets, items, projects, costCenters, transactions, clients, prospects, members, products, serviceOrders, companies };
   }
 
   async command(value: any) {

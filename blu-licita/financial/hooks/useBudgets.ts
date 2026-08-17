@@ -7,7 +7,7 @@ const adapter = new FirebaseBudgetAdapter();
 export const useBudgets = () => {
   const { user } = useBluAuth();
   const companyId = user?.companyId || "";
-  const [data, setData] = React.useState<any>({ budgets: [], items: [], projects: [], costCenters: [], transactions: [], clients: [], members: [], companies: [] });
+  const [data, setData] = React.useState<any>({ budgets: [], items: [], projects: [], costCenters: [], transactions: [], clients: [], prospects: [], members: [], companies: [] });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");

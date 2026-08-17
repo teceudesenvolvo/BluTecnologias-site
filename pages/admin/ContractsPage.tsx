@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, CalendarClock, FileSignature, Loader2, Plus, Search, X } from 'lucide-react';
+import { Building2, CalendarClock, FilePenLine, FileSignature, Loader2, Plus, Search, X } from 'lucide-react';
 import { auth, clientService, contactService, type ClientContract, type ContactLead } from '../../services/firebase';
 import { PlanLimitWarning, usePlanLimits } from '../../blu-licita/hooks/usePlanLimits';
 
@@ -17,6 +17,9 @@ type ContractRow = ClientContract & {
   clientName: string;
   clientCnpj?: string;
   clientEmail?: string;
+  contractKind?: 'single_purchase' | 'monthly_annual';
+  billingFrequency?: 'one_time' | 'monthly';
+  projectedMonthlyValue?: number;
 };
 
 const emptyForm = () => ({
@@ -33,6 +36,8 @@ const emptyForm = () => ({
   complement: '',
   financialContact: '',
   title: '',
+  contractKind: 'single_purchase' as 'single_purchase' | 'monthly_annual',
+  billingFrequency: 'one_time' as 'one_time' | 'monthly',
   processNumber: '',
   procurementNumber: '',
   startDate: today(),
@@ -49,6 +54,8 @@ export const ContractsPage: React.FC = () => {
   const [contractStep, setContractStep] = React.useState<1 | 2 | 3>(1);
   const [search, setSearch] = React.useState('');
   const [form, setForm] = React.useState(emptyForm);
+  const [editingContractId, setEditingContractId] = React.useState<string | null>(null);
+  const [editingClientId, setEditingClientId] = React.useState<string | null>(null);
   const plan = usePlanLimits();
 
   const load = React.useCallback(async () => {
@@ -74,6 +81,9 @@ export const ContractsPage: React.FC = () => {
       value: contractValue(contract),
       processNumber: first(contract.processNumber, contract.processo, contract.process, contract.numeroProcesso),
       procurementNumber: first(contract.procurementNumber, contract.licitacao, contract.numeroLicitacao, contract.number),
+      contractKind: first(contract.contractKind, contract.kind, contract.contractType, 'single_purchase'),
+      billingFrequency: first(contract.billingFrequency, contract.recurrence, 'one_time'),
+      projectedMonthlyValue: Number(first(contract.projectedMonthlyValue, contract.monthlyAmount, contract.recurringAmount, 0)),
       clientId: client.id,
       clientName: client.razaoSocial || client.name || 'Cliente',
       clientCnpj: client.cnpj,
@@ -89,6 +99,7 @@ export const ContractsPage: React.FC = () => {
   const canCreateContract = plan.allowed('activeContracts', active.length);
   const endingThisMonth = active.filter((item) => item.endDate?.slice(0, 7) === today().slice(0, 7));
   const totalValue = active.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const projectedMonthlyRevenue = active.reduce((sum, item) => sum + (item.contractKind === 'monthly_annual' ? Number(item.projectedMonthlyValue || item.value || 0) : 0), 0);
   const step1Valid = form.clientMode === 'existing' ? Boolean(form.clientId) : Boolean(form.cnpj && form.razaoSocial && form.email);
   const step2Valid = Boolean(form.title && form.value);
 
@@ -127,9 +138,41 @@ export const ContractsPage: React.FC = () => {
     }
   };
 
+  const openNewContract = () => {
+    if (!canCreateContract) {
+      alert(plan.message('contratos ativos', 'activeContracts'));
+      return;
+    }
+    setEditingContractId(null);
+    setEditingClientId(null);
+    setForm(emptyForm());
+    setContractStep(1);
+    setFormOpen(true);
+  };
+
+  const openEditContract = (contract: ContractRow) => {
+    setEditingContractId(contract.id || null);
+    setEditingClientId(contract.clientId);
+    setForm({
+      ...emptyForm(),
+      clientMode: 'existing',
+      clientId: contract.clientId,
+      title: contract.title || '',
+      contractKind: contract.contractKind || 'single_purchase',
+      billingFrequency: contract.billingFrequency || (contract.contractKind === 'monthly_annual' ? 'monthly' : 'one_time'),
+      processNumber: String(contract.processNumber || ''),
+      procurementNumber: String(contract.procurementNumber || ''),
+      startDate: contract.startDate || today(),
+      endDate: contract.endDate || '',
+      value: String(contract.value || ''),
+    });
+    setContractStep(1);
+    setFormOpen(true);
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!canCreateContract) {
+    if (!editingContractId && !canCreateContract) {
       alert(plan.message('contratos ativos', 'activeContracts'));
       return;
     }
@@ -165,27 +208,38 @@ export const ContractsPage: React.FC = () => {
       if (!targetClient) throw new Error('Selecione ou cadastre o cliente do contrato.');
 
       const contract: ClientContract = {
-        id: crypto.randomUUID(),
+        id: editingContractId || crypto.randomUUID(),
         title: form.title,
         startDate: form.startDate,
         endDate: form.endDate,
         value: Number(form.value || 0),
         source: 'manual',
+        contractKind: form.contractKind,
+        billingFrequency: form.contractKind === 'monthly_annual' ? 'monthly' : 'one_time',
+        projectedMonthlyValue: form.contractKind === 'monthly_annual' ? Number(form.value || 0) : 0,
+        validityStatus: form.endDate && form.endDate < today() ? 'expired' : form.endDate?.slice(0, 7) === today().slice(0, 7) ? 'expiring' : 'active',
         processNumber: form.processNumber,
         procurementNumber: form.procurementNumber,
         importedAt: new Date().toISOString(),
       };
 
+      const currentContracts = [...(targetClient.contracts || [])];
+      const nextContracts = editingContractId
+        ? currentContracts.map((item: any, index: number) => String(item.id || `${targetClient!.id}-${index}`) === editingContractId ? { ...item, ...contract } : item)
+        : [...currentContracts, contract];
+
       const updated = await clientService.update(targetClient.id, {
-        contracts: [...(targetClient.contracts || []), contract],
+        contracts: nextContracts,
       } as any);
-      if (!updated) throw new Error('Não foi possível salvar o contrato.');
+      if (!updated) throw new Error(`Não foi possível ${editingContractId ? 'atualizar' : 'salvar'} o contrato.`);
 
       setForm(emptyForm());
       setFormOpen(false);
+      setEditingContractId(null);
+      setEditingClientId(null);
       await load();
     } catch (error: any) {
-      alert(error?.message || 'Não foi possível criar o contrato.');
+      alert(error?.message || `Não foi possível ${editingContractId ? 'editar' : 'criar'} o contrato.`);
     } finally {
       setSaving(false);
     }
@@ -203,7 +257,7 @@ export const ContractsPage: React.FC = () => {
           <h1 className="mt-2 text-3xl font-bold text-slate-950">Contratos</h1>
           <p className="mt-1 text-sm text-slate-500">Contratos salvos em Clientes, centralizados para acompanhamento comercial e financeiro.</p>
         </div>
-        <button onClick={() => { if (!canCreateContract) { alert(plan.message('contratos ativos', 'activeContracts')); return; } setContractStep(1); setFormOpen(true); }} disabled={!canCreateContract} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+        <button onClick={openNewContract} disabled={!canCreateContract} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
           <Plus size={17} /> Novo contrato
         </button>
       </header>
@@ -214,7 +268,7 @@ export const ContractsPage: React.FC = () => {
         <Metric label="Contratos ativos" value={String(active.length)} />
         <Metric label="Vencem este mês" value={String(endingThisMonth.length)} warning />
         <Metric label="Valor contratado" value={money(totalValue)} />
-        <Metric label="Clientes com contrato" value={String(new Set(contracts.map((item) => item.clientId)).size)} />
+        <Metric label="Receita mensal projetada" value={money(projectedMonthlyRevenue)} />
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -228,7 +282,7 @@ export const ContractsPage: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-slate-50 text-[10px] uppercase text-slate-400">
-              <tr>{['Contrato', 'Cliente/órgão', 'Processo', 'Vigência', 'Valor', 'Contato'].map((item) => <th key={item} className="px-4 py-3">{item}</th>)}</tr>
+              <tr>{['Contrato', 'Cliente/órgão', 'Modelo', 'Processo', 'Vigência', 'Valor', 'Contato', 'Ações'].map((item) => <th key={item} className="px-4 py-3">{item}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((item) => (
@@ -241,15 +295,17 @@ export const ContractsPage: React.FC = () => {
                     <p className="font-semibold">{item.clientName}</p>
                     <p className="mt-1 text-xs text-slate-400">{item.clientCnpj || 'CNPJ não informado'}</p>
                   </td>
+                  <td className="px-4 py-4 text-slate-500">{item.contractKind === 'monthly_annual' ? 'Mensal · vigência anual' : 'Compra única'}{item.contractKind === 'monthly_annual' && <span className="mt-1 block text-xs text-emerald-600">Projeta {money(Number(item.projectedMonthlyValue || item.value || 0))}/mês</span>}</td>
                   <td className="px-4 py-4 text-slate-500">{item.processNumber || item.procurementNumber || '—'}</td>
                   <td className="px-4 py-4">{date(item.startDate)} até {date(item.endDate)}</td>
                   <td className="px-4 py-4 font-bold">{money(Number(item.value || 0))}</td>
                   <td className="px-4 py-4 text-slate-500">{item.clientEmail || '—'}</td>
+                  <td className="px-4 py-4"><button type="button" onClick={() => openEditContract(item)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"><FilePenLine size={14} />Editar</button></td>
                 </tr>
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-slate-400">
+                  <td colSpan={8} className="p-12 text-center text-slate-400">
                     <FileSignature className="mx-auto mb-3 opacity-20" size={44} />
                     Nenhum contrato encontrado.
                   </td>
@@ -266,7 +322,7 @@ export const ContractsPage: React.FC = () => {
             <header className="flex items-center justify-between border-b p-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[.16em] text-blue-600">Contratos</p>
-                <h2 className="text-xl font-bold">Novo contrato</h2>
+                <h2 className="text-xl font-bold">{editingContractId ? 'Editar contrato' : 'Novo contrato'}</h2>
               </div>
               <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl p-2 hover:bg-slate-100"><X size={20} /></button>
             </header>
@@ -330,9 +386,11 @@ export const ContractsPage: React.FC = () => {
                     <p className="text-sm font-bold text-slate-700">2 &gt; Dados e Valores do Contrato</p>
                   </section>
                   <Input label="Título do contrato" required value={form.title} set={(value) => update('title', value)} />
+                  <Select label="Modelo do contrato" required value={form.contractKind} set={(value) => update('contractKind', value)} options={[["single_purchase", 'Compra única'], ["monthly_annual", 'Contrato mensal com vigência de 1 ano']]} />
                   <Input label="Valor do contrato (R$)" type="number" required value={form.value} set={(value) => update('value', value)} />
                   <Input label="Processo" value={form.processNumber} set={(value) => update('processNumber', value)} />
                   <Input label="Número da licitação/contratação" value={form.procurementNumber} set={(value) => update('procurementNumber', value)} />
+                  {form.contractKind === 'monthly_annual' && <ReadOnlyCard label="Projeção financeira" value={`Este contrato projetará ${money(Number(form.value || 0))} por mês no fluxo financeiro.`} />}
                 </>
               )}
 
@@ -355,7 +413,7 @@ export const ContractsPage: React.FC = () => {
               ) : (
               <button disabled={saving || !step1Valid || !step2Valid || !form.startDate || !form.endDate} className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:opacity-60">
                 {saving && <Loader2 className="animate-spin" size={16} />}
-                Salvar contrato
+                {editingContractId ? 'Salvar alterações' : 'Salvar contrato'}
               </button>
               )}
             </footer>
@@ -388,4 +446,11 @@ const Select = ({ label, value, set, options, required = false }: { label: strin
       {options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{label}</option>)}
     </select>
   </label>
+);
+
+const ReadOnlyCard = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm sm:col-span-2">
+    <p className="text-xs font-bold uppercase tracking-[.14em] text-emerald-700">{label}</p>
+    <p className="mt-2 font-semibold text-emerald-900">{value}</p>
+  </div>
 );

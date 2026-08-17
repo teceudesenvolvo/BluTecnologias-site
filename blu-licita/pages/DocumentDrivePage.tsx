@@ -354,13 +354,32 @@ const emptyDocumentForm = (document?: DriveDocument | null): DocumentFormValues 
 
 const DocumentForm = ({ document, companies, saving, close, submit }: { document: DriveDocument | null; companies: Company[]; saving: boolean; close: () => void; submit: (form: DocumentFormValues, editingId?: string) => Promise<void> }) => {
   const [form, setForm] = React.useState<DocumentFormValues>(() => emptyDocumentForm(document));
+  const [resolvedCompanies, setResolvedCompanies] = React.useState<Company[]>(companies);
   const [fileName, setFileName] = React.useState("");
   const isEditing = Boolean(document?.id);
   const selectedType = normalize(form.type);
   const requiresExpiry = selectedType.includes("cnd") || selectedType.includes("certidao") || selectedType.includes("alvara");
 
+  React.useEffect(() => {
+    setResolvedCompanies(companies);
+  }, [companies]);
+
+  React.useEffect(() => {
+    if (resolvedCompanies.length) return;
+    let active = true;
+    companySettingsService
+      .getAll()
+      .then((items) => {
+        if (active && items.length) setResolvedCompanies(items);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [resolvedCompanies.length]);
+
   const selectCompany = (value: string) => {
-    const company = companies.find((item) => item.id === value);
+    const company = resolvedCompanies.find((item) => item.id === value);
     setForm({
       ...form,
       legalEntityId: value,
@@ -405,10 +424,10 @@ const DocumentForm = ({ document, companies, saving, close, submit }: { document
 
             <label className="text-sm font-bold text-slate-700">
               Empresa
-              {companies.length ? (
+              {resolvedCompanies.length ? (
                 <select required={!form.company} value={form.legalEntityId} onChange={(event) => selectCompany(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-normal outline-none focus:border-blue-500">
                   <option value="">{form.company ? `Manter: ${form.company}` : "Selecione a empresa"}</option>
-                  {companies.map((company) => <option key={company.id} value={company.id}>{company.razaoSocial || company.nomeFantasia}</option>)}
+                  {resolvedCompanies.map((company) => <option key={company.id} value={company.id}>{company.razaoSocial || company.nomeFantasia}</option>)}
                 </select>
               ) : (
                 <input required value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} placeholder="Razão social da empresa" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-blue-500" />
