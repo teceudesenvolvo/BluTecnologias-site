@@ -310,7 +310,7 @@ export const OpportunitiesPage: React.FC = () => {
           </button>
           <button
             onClick={() => load()}
-            disabled={loading || (source === "pncp" || source === "compras-gov" ? !modality : false)}
+            disabled={loading || (source === "pncp" ? !modality : false)}
             className="flex items-center justify-center gap-2 rounded-xl bg-[#0877ff] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             {loading ? (
@@ -449,7 +449,7 @@ export const OpportunitiesPage: React.FC = () => {
           </select>
           <button
             onClick={() => load(source === "tce-ce" ? "0" : "1")}
-            disabled={(source === "pncp" || source === "compras-gov" ? !modality : false) || loading}
+            disabled={(source === "pncp" ? !modality : false) || loading}
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           >
             <Filter size={16} />

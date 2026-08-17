@@ -167,15 +167,6 @@ export class ComprasGovConnector
     filters: OpportunityQuery,
     cursor = "1",
   ): Promise<PaginatedResult<ExternalOpportunity>> {
-    if (!filters.modalityCode) {
-      throw new IntegrationError(
-        "CONFIGURATION_REQUIRED",
-        "Selecione uma modalidade.",
-        "compras-gov",
-        "listOpportunities",
-      );
-    }
-
     const params = new URLSearchParams({
       pagina: cursor,
       tamanhoPagina: String(
@@ -183,8 +174,14 @@ export class ComprasGovConnector
       ),
       dataPublicacaoPncpInicial: filters.startDate,
       dataPublicacaoPncpFinal: filters.endDate,
-      codigoModalidade: String(filters.modalityCode),
     });
+
+    if (filters.modalityCode) {
+      params.set(
+        "codigoModalidade",
+        String(filters.modalityCode),
+      );
+    }
 
     if (filters.state) {
       params.set(

@@ -120,6 +120,51 @@ export const integrationOpportunityService = {
       throw new Error(`Fonte não registrada: ${source}.`);
     }
 
+    if (source === "compras-gov") {
+      try {
+        const result = await connector.listOpportunities(filters, cursor);
+        if (result.data.length > 0) {
+          return result;
+        }
+
+        console.warn(
+          "[compras-gov] Consulta sem retorno. Aplicando fallback no PNCP.",
+        );
+
+        return await withTimeout(
+          pncp.listOpportunities(filters, cursor),
+          PNCP_TIMEOUT_MS,
+          "A consulta do PNCP excedeu o tempo limite.",
+        );
+      } catch (comprasGovError) {
+        console.warn(
+          "[compras-gov] Consulta falhou. Aplicando fallback no PNCP:",
+          comprasGovError,
+        );
+
+        try {
+          return await withTimeout(
+            pncp.listOpportunities(filters, cursor),
+            PNCP_TIMEOUT_MS,
+            "A consulta do PNCP excedeu o tempo limite.",
+          );
+        } catch (pncpFallbackError) {
+          console.error(
+            "[compras-gov] Falha também no fallback do PNCP:",
+            pncpFallbackError,
+          );
+
+          throw new Error(
+            [
+              "Não foi possível consultar as oportunidades.",
+              `Compras.gov: ${errorMessage(comprasGovError)}.`,
+              `PNCP: ${errorMessage(pncpFallbackError)}.`,
+            ].join(" "),
+          );
+        }
+      }
+    }
+
     if (source !== "pncp") {
       try {
         return await connector.listOpportunities(filters, cursor);
