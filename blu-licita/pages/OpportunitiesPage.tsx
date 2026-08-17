@@ -265,24 +265,14 @@ export const OpportunitiesPage: React.FC = () => {
       });
   }, [user]);
   const visible = items.filter((item) => {
-    const raw = item.raw as Record<string, any>;
-    const itemUf = String(raw.uf || raw.UF || raw.unidadeOrgao?.ufSigla || raw.unidadeOrgao?.uf || raw.estado || "").toUpperCase();
     const searchable = normalizeText(
       `${item.object} ${item.organizationName} ${item.processNumber || ""}`,
     );
     const normalizedQuery = normalizeText(query.trim());
     const matchesSearch =
       !normalizedQuery || searchable.includes(normalizedQuery);
-    const matchesInterest =
-      normalizedQuery.length > 0 ||
-      interestKeywords.length === 0 ||
-      interestSettingsService.matches(item.object, interestKeywords);
-    const matchesInterestState =
-      interestStates.length === 0 ||
-      !itemUf ||
-      interestStates.includes(itemUf);
     const matchesStatus=statusFilter==="all"||processStatus(item)===statusFilter;
-    return matchesSearch && matchesInterest && matchesInterestState && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
