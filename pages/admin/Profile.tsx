@@ -780,7 +780,7 @@ export const Profile: React.FC = () => {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-2xl text-sm font-medium flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100 dark:bg-green-500/10 dark:text-green-100 dark:border-green-400/20' : 'bg-red-50 text-red-700 border border-red-100 dark:bg-red-500/10 dark:text-red-100 dark:border-red-400/20'}`}>
+        <div className={`fixed left-4 top-4 z-[120] flex w-[min(420px,calc(100vw-2rem))] items-center gap-2 rounded-2xl border p-4 text-sm font-medium shadow-xl backdrop-blur-sm ${message.type === 'success' ? 'border-green-100 bg-green-50/95 text-green-700 dark:border-green-400/20 dark:bg-green-500/10 dark:text-green-100' : 'border-red-100 bg-red-50/95 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100'}`}>
           {message.type === 'success' ? <Shield size={18} /> : <Lock size={18} />}
           {message.text}
         </div>
