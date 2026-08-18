@@ -5,7 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { createCompanyDoc, deleteCompanyDoc, listCompanyDocs, updateCompanyDoc } from "../services/firestoreCompany";
-import { db, functions, type Company } from "../../services/firebase";
+import { db, functions, storageService, type Company } from "../../services/firebase";
 
 type Product = {
   id: string;
@@ -34,6 +34,7 @@ type Product = {
   stockLocation?: string;
   stockNotes?: string;
   lastStockUpdateAt?: string;
+  images?: string[];
 };
 
 type ProductFormValue = Omit<Product, "id">;
@@ -80,7 +81,19 @@ const defaultForm = (): ProductFormValue => ({
   stockLocation: "",
   stockNotes: "",
   lastStockUpdateAt: "",
+  images: [],
 });
+
+const MAX_PRODUCT_IMAGES = 3;
+const MAX_PRODUCT_IMAGE_SIZE = 2 * 1024 * 1024;
+
+const fileToDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 export const ProductsPage: React.FC = () => {
   const { user } = useBluAuth();
@@ -406,7 +419,23 @@ export const ProductsPage: React.FC = () => {
       alert("Já existe um produto cadastrado com este código de barras.");
       return;
     }
-    value = { ...value, barcode };
+    const imageUrls: string[] = [];
+    for (const image of value.images || []) {
+      if (image.startsWith("data:")) {
+        const [meta, data] = image.split(",");
+        const mimeType = meta.match(/data:(.*?);base64/)?.[1] || "image/jpeg";
+        const extension = mimeType.split("/")[1] || "jpg";
+        const uploaded = await storageService.uploadBase64(
+          data,
+          `products/${user.companyId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`,
+          mimeType,
+        );
+        if (uploaded) imageUrls.push(uploaded);
+      } else if (image) {
+        imageUrls.push(image);
+      }
+    }
+    value = { ...value, barcode, images: imageUrls.slice(0, MAX_PRODUCT_IMAGES) };
     if (editingItem) {
       await updateCompanyDoc("products", editingItem.id, user.id, value);
     } else {
@@ -550,10 +579,18 @@ export const ProductsPage: React.FC = () => {
                 {visible.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-4">
-                      <b>{item.name}</b>
-                      <small className="block text-slate-400">
-                        {item.sku || item.barcode || "Sem código"} · {item.active ? "Ativo" : "Inativo"}
-                      </small>
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100">
+                          {item.images?.[0] ? <img src={item.images[0]} alt={item.name} className="h-full w-full object-cover" /> : <Package2 size={18} className="text-slate-400" />}
+                        </div>
+                        <div>
+                          <b>{item.name}</b>
+                          <small className="block text-slate-400">
+                            {item.sku || item.barcode || "Sem código"} · {item.active ? "Ativo" : "Inativo"}
+                            {item.images?.length ? ` · ${item.images.length} imagem(ns)` : ""}
+                          </small>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4">{item.type === "service" ? "Serviço" : "Produto"}</td>
                     <td className="px-4">{item.category || "—"}</td>
@@ -961,7 +998,32 @@ const ProductForm = ({
   const [form, setForm] = React.useState<ProductFormValue>(initialValue ? { ...defaultForm(), ...initialValue } : defaultForm());
   const [lookingUpBarcode, setLookingUpBarcode] = React.useState(false);
   const [barcodeMessage, setBarcodeMessage] = React.useState("");
+  const [imageMessage, setImageMessage] = React.useState("");
   const isEditing = Boolean(initialValue);
+
+  const addImages = async (files?: FileList | null) => {
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    const currentImages = form.images || [];
+    const remainingSlots = MAX_PRODUCT_IMAGES - currentImages.length;
+    if (remainingSlots <= 0) {
+      setImageMessage(`Você pode enviar no máximo ${MAX_PRODUCT_IMAGES} imagens por produto.`);
+      return;
+    }
+    const accepted = selected.slice(0, remainingSlots);
+    const oversized = accepted.find((file) => file.size > MAX_PRODUCT_IMAGE_SIZE);
+    if (oversized) {
+      setImageMessage(`A imagem ${oversized.name} excede o limite de 2 MB.`);
+      return;
+    }
+    try {
+      const dataUrls = await Promise.all(accepted.map((file) => fileToDataUrl(file)));
+      setForm((current) => ({ ...current, images: [...(current.images || []), ...dataUrls].slice(0, MAX_PRODUCT_IMAGES) }));
+      setImageMessage(`${Math.min(accepted.length, remainingSlots)} imagem(ns) pronta(s) para salvar.`);
+    } catch {
+      setImageMessage("Não foi possível carregar as imagens selecionadas.");
+    }
+  };
 
   const lookupBarcode = async () => {
     const barcode = String(form.barcode || "").replace(/\D/g, "");
@@ -1106,6 +1168,54 @@ const ProductForm = ({
               Observações comerciais
               <textarea value={form.notes || ""} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="mt-2 w-full rounded-xl border p-3 text-sm font-normal" />
             </label>
+            <section className="grid gap-4 rounded-2xl border bg-white p-4 md:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold">Imagens do produto</h3>
+                  <p className="mt-1 text-xs text-slate-500">Envie até {MAX_PRODUCT_IMAGES} imagens de até 2 MB cada.</p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">
+                  <FileUp size={16} />
+                  Adicionar imagens
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      void addImages(event.target.files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              {imageMessage && <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">{imageMessage}</p>}
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(form.images || []).map((image, index) => (
+                  <article key={`${image.slice(0, 20)}-${index}`} className="overflow-hidden rounded-2xl border bg-slate-50">
+                    <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+                      <img src={image} alt={`Imagem ${index + 1} do produto`} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-xs font-semibold text-slate-500">Imagem {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((current) => ({ ...current, images: (current.images || []).filter((_, imageIndex) => imageIndex !== index) }))}
+                        className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"
+                        title="Remover imagem"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </article>
+                ))}
+                {Array.from({ length: Math.max(0, MAX_PRODUCT_IMAGES - (form.images || []).length) }).map((_, index) => (
+                  <div key={`placeholder-${index}`} className="grid aspect-[4/3] place-items-center rounded-2xl border border-dashed bg-slate-50 text-xs font-medium text-slate-400">
+                    Slot disponível
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
           <footer className="flex justify-end gap-2 border-t p-5">
             <button type="button" onClick={close} className="rounded-xl border px-4 py-2 font-bold">
