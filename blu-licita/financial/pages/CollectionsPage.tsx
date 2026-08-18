@@ -189,17 +189,44 @@ export const CollectionsPage = () => {
     const confirmed = confirm(`Excluir a cobrança ${item.number}? Esta ação a ocultará da lista e manterá o histórico.`);
     if (!confirmed) return;
     const now = new Date().toISOString();
+    const syncLegacySibling = async (clientId: string, matcher: (billing: any, index: number) => boolean) => {
+      const client = data.aux.clients.find((entry: ContactLead) => entry.id === clientId);
+      if (!client) return;
+      const updatedBillings = (client.cobrancas || []).map((billing: any, index: number) =>
+        matcher(billing, index)
+          ? {
+              ...billing,
+              status: "cancelled",
+              deletedAt: now,
+              deletedBy: auth.currentUser?.uid || "",
+              cancellationReason: "Exclusão solicitada pelo usuário.",
+              updatedAt: now,
+              updatedBy: auth.currentUser?.uid || "",
+            }
+          : billing,
+      );
+      await clientService.update(client.id, { cobrancas: updatedBillings });
+    };
     try {
       if (item.id.startsWith("legacy:")) {
         const [, clientId, billingId] = item.id.split(":");
-        const client = data.aux.clients.find((entry: ContactLead) => entry.id === clientId);
-        if (!client) throw new Error("Cliente da cobrança não encontrado.");
-        const updatedBillings = (client.cobrancas || []).map((billing: any, index: number) =>
-          String(billing.id || index) === billingId
-            ? { ...billing, status: "cancelled", deletedAt: now, deletedBy: auth.currentUser?.uid || "", cancellationReason: "Exclusão solicitada pelo usuário.", updatedAt: now, updatedBy: auth.currentUser?.uid || "" }
-            : billing,
+        await syncLegacySibling(clientId, (billing, index) => String(billing.id || index) === billingId);
+        const mirroredCurrent = data.items.find((entry) =>
+          !entry.id.startsWith("legacy:") &&
+          entry.originType === "officialBilling" &&
+          entry.originId === clientId &&
+          entry.number === `COB-${billingId}`,
         );
-        await clientService.update(client.id, { cobrancas: updatedBillings });
+        if (mirroredCurrent) {
+          await updateDoc(doc(db, "collections", mirroredCurrent.id), {
+            status: "cancelled",
+            deletedAt: now,
+            deletedBy: auth.currentUser?.uid || "",
+            cancellationReason: "Exclusão solicitada pelo usuário.",
+            updatedAt: now,
+            updatedBy: auth.currentUser?.uid || "",
+          });
+        }
         await data.reload();
         return;
       }
@@ -211,6 +238,15 @@ export const CollectionsPage = () => {
         updatedAt: now,
         updatedBy: auth.currentUser?.uid || "",
       });
+      if (item.originType === "officialBilling" && item.originId) {
+        const mirroredLegacyId = item.number.startsWith("COB-") ? item.number.replace(/^COB-/, "") : item.number;
+        await syncLegacySibling(
+          item.originId,
+          (billing, index) =>
+            String(billing.id || index) === mirroredLegacyId ||
+            String(billing.number || "") === mirroredLegacyId,
+        );
+      }
       await data.reload();
     } catch (error) {
       console.error(error);
@@ -223,17 +259,42 @@ export const CollectionsPage = () => {
   };
 
   React.useEffect(() => {
-    Promise.all([
-      companySettingsService.getAll(),
-      certificateService.getAll(),
-      financialSettingsService.get(),
-    ])
-      .then(([companyList, certList, settings]) => {
-        setCompanies(companyList);
-        setCertificates(certList);
-        setFinancialSettings(settings);
+    let cancelled = false;
+    const loadBillingDependencies = async () => {
+      await auth.authStateReady();
+      if (cancelled || !auth.currentUser) return;
+      return Promise.allSettled([
+        companySettingsService.getAll(),
+        certificateService.getAll(),
+        financialSettingsService.get(),
+      ])
+      .then(([companiesResult, certificatesResult, settingsResult]) => {
+        if (cancelled) return;
+        if (companiesResult.status === "fulfilled") {
+          setCompanies(companiesResult.value || []);
+        } else {
+          console.error("Não foi possível carregar as empresas emitentes.", companiesResult.reason);
+          setCompanies([]);
+        }
+
+        if (certificatesResult.status === "fulfilled") {
+          setCertificates(certificatesResult.value || []);
+        } else {
+          console.error("Não foi possível carregar as certidões da cobrança.", certificatesResult.reason);
+          setCertificates([]);
+        }
+
+        if (settingsResult.status === "fulfilled") {
+          setFinancialSettings(settingsResult.value);
+        } else {
+          console.error("Não foi possível carregar as configurações financeiras da cobrança.", settingsResult.reason);
+          setFinancialSettings(null);
+        }
       })
-      .catch((error) => console.error("Não foi possível carregar dados oficiais de cobrança.", error));
+      .catch((error) => console.error("Não foi possível inicializar os dados da cobrança.", error));
+    };
+    void loadBillingDependencies();
+    return () => { cancelled = true; };
   }, []);
 
   const items = data.items.filter((item) => (status === "all" || item.status === status) && (!search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase())));
@@ -361,7 +422,16 @@ const OfficialBillingForm = ({
   const [sending, setSending] = React.useState(false);
   const client = aux.clients.find((item: ContactLead) => item.id === clientId);
   const contracts = client?.contracts || [];
-  const selectedCompany = companies.find((company) => company.razaoSocial === form.senderCompany || company.id === form.senderCompanyId);
+  const companyLabel = (company?: Company | null) => company?.razaoSocial || company?.nomeFantasia || company?.cnpj || company?.id || "Empresa emitente";
+  const selectedCompany = companies.find((company) => company.id === form.senderCompanyId || company.razaoSocial === form.senderCompany || company.nomeFantasia === form.senderCompany);
+  const availableBankAccounts = (aux.accounts || [])
+    .filter((account: any) => account.status !== 'inactive' && account.status !== 'blocked')
+    .map((account: any) => {
+      const label = account.name || account.institution || account.bankName || 'Conta bancária';
+      const details = [account.agency && `Ag ${account.agency}`, account.accountNumber && `CC ${account.accountNumber}`].filter(Boolean).join(' · ');
+      const fullLabel = details && !String(label).includes(details) ? `${label} · ${details}` : label;
+      return [account.id || fullLabel, fullLabel] as [string, string];
+    });
   const selectedCertificates = certificates.filter((certificate) => form.selectedCertificates.includes(certificate.id));
   const validCertificates = certificates.filter((certificate) => {
     if (!form.senderCompany || (certificate as any).company !== form.senderCompany) return false;
@@ -509,10 +579,15 @@ const OfficialBillingForm = ({
               clientDocument: selected?.cnpj || "",
             }));
           }} options={[["", "Selecione"], ...aux.clients.map((item: ContactLead) => [item.id, item.razaoSocial || item.name])]} />
-          <Select label="Empresa emitente" value={form.senderCompany} set={(value) => {
-            const company = companies.find((item) => item.razaoSocial === value || item.id === value);
-            setForm((current) => ({ ...current, senderCompany: company?.razaoSocial || value, senderCompanyId: company?.id || "", selectedCertificates: [] }));
-          }} options={[["", "Empresa emitente"], ...companies.map((company) => [company.razaoSocial, company.razaoSocial])]} />
+          <Select label="Empresa emitente" value={form.senderCompanyId || form.senderCompany} set={(value) => {
+            const company = companies.find((item) => item.id === value || item.razaoSocial === value || item.nomeFantasia === value);
+            setForm((current) => ({
+              ...current,
+              senderCompany: companyLabel(company) || value,
+              senderCompanyId: company?.id || "",
+              selectedCertificates: [],
+            }));
+          }} options={[["", "Empresa emitente"], ...companies.map((company) => [company.id, companyLabel(company)])]} />
           <Select
             label="Contrato salvo do cliente"
             value={form.solutionSelect}
@@ -533,7 +608,7 @@ const OfficialBillingForm = ({
           <Input label="Título da cobrança" value={form.title} set={(value) => set("title", value)} />
           <Input label="Valor (R$)" type="number" value={form.value} set={(value) => set("value", value)} />
           <Input label="Vencimento" type="date" value={form.dueDate} set={(value) => set("dueDate", value)} />
-          <Select label="Conta bancária" value={form.bankAccount} set={(value) => set("bankAccount", value)} options={[["", "Selecione a conta"], ...(financialSettings?.bankAccounts || []).map((account: any) => [account.name || `${account.bankName} - Ag ${account.agency} CC ${account.accountNumber}`, account.name || `${account.bankName} - Ag ${account.agency} CC ${account.accountNumber}`])]} />
+          <Select label="Conta bancária" value={form.bankAccount} set={(value) => set("bankAccount", value)} options={[["", availableBankAccounts.length ? "Selecione a conta" : "Nenhuma conta cadastrada"], ...availableBankAccounts]} />
           <Select label="Chave PIX" value={form.pixKey} set={(value) => set("pixKey", value)} options={[["", "Selecione a chave PIX"], ...(financialSettings?.pixKeys || []).map((pix: any) => [`${pix.type?.toUpperCase?.() || "PIX"}: ${pix.key}`, `${pix.type?.toUpperCase?.() || "PIX"}: ${pix.key}`])]} />
 
           <FileInput label="Anexar nota fiscal" onChange={(file) => handleFile(file, "invoiceFile")} selected={Boolean(form.invoiceFile)} />
@@ -607,7 +682,7 @@ const OfficialBillingForm = ({
               <div className="space-y-3">
                 <div className="rounded-2xl border bg-white p-4">
                   <p className="text-[11px] font-black uppercase tracking-[.18em] text-blue-600">Prévia timbrada</p>
-                  <p className="mt-2 text-sm font-bold">{selectedCompany?.razaoSocial || "Empresa emitente"}</p>
+                  <p className="mt-2 text-sm font-bold">{companyLabel(selectedCompany)}</p>
                   <p className="mt-1 text-xs text-slate-500">{selectedCompany?.email || "Email da empresa"} · {selectedCompany?.telefoneCelular || selectedCompany?.telefoneFixo || "Telefone"}</p>
                   <p className="mt-4 text-xs text-slate-400">Cliente: <b className="text-slate-700">{client?.razaoSocial || client?.name || "—"}</b></p>
                   <p className="mt-1 text-xs text-slate-400">Contrato: <b className="text-slate-700">{selectedContract?.title || selectedContract?.number || "—"}</b></p>
@@ -991,22 +1066,36 @@ const Receive = ({ item, accounts, saving, close, save }: { item: FinancialColle
   const [paymentDate, setPaymentDate] = React.useState(today());
   const [bank, setBank] = React.useState("");
   const [reason, setReason] = React.useState("");
+  const [submitError, setSubmitError] = React.useState("");
   const activeAccounts = accounts
     .filter((account) => account.status !== "inactive" && account.status !== "blocked")
     .map((account) => {
       const name = account.name || account.institution || account.bankName || "Conta bancária";
       const details = [account.agency && `Ag ${account.agency}`, account.accountNumber && `CC ${account.accountNumber}`].filter(Boolean).join(" · ");
-      return [account.id || name, details && !String(name).includes(details) ? `${name} · ${details}` : name];
+      const label = details && !String(name).includes(details) ? `${name} · ${details}` : name;
+      return [account.id || name, account.legacyFinancialSettings ? `${label} · conta existente` : label];
     });
   return (
     <Drawer title="Registrar recebimento" close={close}>
-      <form onSubmit={(event) => { event.preventDefault(); save(amount, paymentDate, bank, reason); }} className="flex flex-1 flex-col">
+      <form onSubmit={async (event) => {
+        event.preventDefault();
+        setSubmitError("");
+        try {
+          await save(amount, paymentDate, bank, reason);
+        } catch (error: any) {
+          const message = String(error?.message || "Não foi possível registrar o recebimento.")
+            .replace(/^Firebase:\s*/i, "")
+            .replace(/^FirebaseError:\s*/i, "");
+          setSubmitError(message);
+        }
+      }} className="flex flex-1 flex-col">
         <div className="flex-1 space-y-4 p-6">
           <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-700">Saldo pendente: <b>{money(item.balanceAmountCents)}</b>.</p>
           <Input label="Valor recebido (centavos)" type="number" value={amount} set={(value) => setAmount(Number(value))} />
           <Input label="Data do recebimento" type="date" value={paymentDate} set={setPaymentDate} />
           <Select label="Conta bancária" value={bank} set={setBank} options={[["", activeAccounts.length ? "Selecione" : "Nenhuma conta cadastrada"], ...activeAccounts]} />
           {!activeAccounts.length && <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-700">Cadastre uma conta bancária em Financeiro › Contas Bancárias ou Dados financeiros para registrar o recebimento.</p>}
+          {submitError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">{submitError}</p>}
           {amount > item.balanceAmountCents && <Input label="Autorização para exceder saldo" value={reason} set={setReason} />}
         </div>
         <footer className="flex justify-end gap-2 border-t p-5">

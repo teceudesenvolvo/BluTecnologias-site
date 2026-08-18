@@ -71,11 +71,42 @@ const legacy = (clients: any[], companyId: string): FinancialCollection[] => cli
   })
 );
 
+const normalizeCollectionNumber = (value?: string) => String(value || '').replace(/^COB-/i, '').trim();
+
+const duplicateKey = (item: FinancialCollection) =>
+  [
+    item.originId || item.organizationId || '',
+    normalizeCollectionNumber(item.number),
+    item.dueDate || '',
+    item.originalAmountCents || 0,
+  ].join('::');
+
 export class FirebaseCollectionAdapter implements CollectionRepository {
   async list(context: CollectionContext) {
     const [current, clients] = await Promise.all([list<FinancialCollection>('collections', context.companyId), list<any>('clients', context.companyId)]);
-    return [...current, ...legacy(clients, context.companyId)]
-      .filter(item => !item.deletedAt && item.status !== 'cancelled')
+    const combined = [...current, ...legacy(clients, context.companyId)];
+    const groups = new Map<string, FinancialCollection[]>();
+    combined.forEach((item) => {
+      const key = duplicateKey(item);
+      groups.set(key, [...(groups.get(key) || []), item]);
+    });
+
+    return Array.from(groups.values())
+      .flatMap((group) => {
+        const hasCancelledSibling = group.some((item) => item.deletedAt || item.status === 'cancelled');
+        if (hasCancelledSibling) return [];
+
+        const active = group.filter((item) => !item.deletedAt && item.status !== 'cancelled');
+        if (active.length <= 1) return active;
+
+        const currentOfficial = active.find((item) => !item.id.startsWith('legacy:') && item.originType === 'officialBilling');
+        if (currentOfficial) return [currentOfficial];
+
+        const currentRecord = active.find((item) => !item.id.startsWith('legacy:'));
+        if (currentRecord) return [currentRecord];
+
+        return [active[0]];
+      })
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate));
   }
   events(context: CollectionContext) { return list<CollectionEvent>('collectionEvents', context.companyId); }
@@ -90,7 +121,10 @@ export class FirebaseCollectionAdapter implements CollectionRepository {
       legacyBankAccounts(context.companyId),
       safeList<any>('financialConfigurationItems', context.companyId),
     ]);
-    const accounts = accountGroups.flat();
+    const accounts = accountGroups.flat().map((account: any) => ({
+      ...account,
+      legacyFinancialSettings: false,
+    }));
     const byId = new Map([...accounts, ...legacyAccounts].map((account: any) => [account.id, { status: 'active', ...account }]));
     return { clients, contracts, projects, centers, accounts: [...byId.values()], paymentMethods: methods.filter(item => item.section === 'paymentMethods') };
   }
