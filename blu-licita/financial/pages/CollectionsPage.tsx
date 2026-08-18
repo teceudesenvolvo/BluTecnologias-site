@@ -451,17 +451,6 @@ const OfficialBillingForm = ({
       if (!sent) throw new Error("Falha ao enviar o e-mail de cobrança.");
 
       const billingId = String(Date.now());
-      const billingRecord = {
-        id: billingId,
-        date: new Date().toISOString(),
-        ...form,
-        status: "sent",
-        userId: auth.currentUser?.uid,
-      };
-      await clientService.update(client.id, {
-        cobrancas: [...(client.cobrancas || []), billingRecord],
-      });
-
       await saveCollection({
         number: `COB-${billingId}`,
         description: form.title || `Cobrança ${client.razaoSocial || client.name}`,
@@ -716,15 +705,6 @@ const OfficialBillingForm = ({
               const sent = await clientService.sendBilling(client.id, payload);
               if (!sent) throw new Error("Falha ao enviar o e-mail de cobrança.");
               const billingId = String(Date.now());
-              const billingRecord = {
-                id: billingId,
-                date: new Date().toISOString(),
-                ...form,
-                attachmentUrls: uploadedAttachments,
-                status: "sent",
-                userId: auth.currentUser?.uid,
-              };
-              await clientService.update(client.id, { cobrancas: [...(client.cobrancas || []), billingRecord] });
               await saveCollection({
                 number: `COB-${billingId}`,
                 description: form.title || `Cobrança ${client.razaoSocial || client.name}`,
