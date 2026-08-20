@@ -162,12 +162,55 @@ exports.mutateBankAccount = functions.https.onCall(async (payload, context) => {
     });
     return { id: reference.id };
 });
-exports.mutateCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
-    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), action = String(payload?.action || ''), id = payload?.id ? String(payload.id) : '', input = cleanFinancialValue(payload?.value || {}); if (!['create', 'update'].includes(action))
-    throw new functions.https.HttpsError('invalid-argument', 'Ação inválida.'); await requireFinancialPermission(membership, action === 'create' ? 'createCollection' : 'editCollection'); const ref = id ? admin.firestore().collection('collections').doc(id) : admin.firestore().collection('collections').doc(), gross = Number(input.originalAmountCents), discount = Number(input.discountCents || 0), interest = Number(input.interestCents || 0), fine = Number(input.fineCents || 0), net = gross - discount + interest + fine; if (!String(input.description || '').trim() || !String(input.organizationName || '').trim() || !String(input.dueDate || '') || !Number.isSafeInteger(gross) || gross <= 0 || net < 0)
-    throw new functions.https.HttpsError('invalid-argument', 'Descrição, cliente, vencimento e valor são obrigatórios.'); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref), before = snap.exists ? snap.data() : null; if (action === 'update' && (!snap.exists || before?.companyId !== membership.companyId))
-    throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); if (before?.status === 'received')
-    throw new functions.https.HttpsError('failed-precondition', 'Cobranças recebidas não podem ser editadas livremente.'); const now = new Date().toISOString(), received = Number(before?.receivedAmountCents || 0), after = { ...input, companyId: membership.companyId, number: String(input.number || `COB-${Date.now()}`), receivedAmountCents: received, balanceAmountCents: Math.max(0, net - received), originType: String(input.originType || 'manual'), attachmentUrls: Array.isArray(input.attachmentUrls) ? input.attachmentUrls : [], status: String(input.status || 'draft'), createdAt: before?.createdAt || now, createdBy: before?.createdBy || context.auth.uid, updatedAt: now, updatedBy: context.auth.uid, version: Number(before?.version || 0) + 1 }; tx.set(ref, after, { merge: false }); const event = admin.firestore().collection('collectionEvents').doc(); tx.set(event, { companyId: membership.companyId, collectionId: ref.id, type: before ? 'updated' : 'created', description: before ? 'Cobrança atualizada' : 'Cobrança criada', eventDate: now, createdAt: now, createdBy: context.auth.uid }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: ref.id, userId: context.auth.uid, createdAt: now, before, after }); }); return { id: ref.id }; });
+exports.mutateCollection = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
+    const membership = await financialMembership(context.auth.uid), action = String(payload?.action || ''), id = payload?.id ? String(payload.id) : '', input = cleanFinancialValue(payload?.value || {});
+    if (!['create', 'update'].includes(action))
+        throw new functions.https.HttpsError('invalid-argument', 'Ação inválida.');
+    await requireFinancialPermission(membership, action === 'create' ? 'createCollection' : 'editCollection');
+    const gross = Number(input.originalAmountCents), discount = Number(input.discountCents || 0), interest = Number(input.interestCents || 0), fine = Number(input.fineCents || 0), net = gross - discount + interest + fine;
+    if (!String(input.description || '').trim() || !String(input.organizationName || '').trim() || !String(input.dueDate || '') || !Number.isSafeInteger(gross) || gross <= 0 || net < 0)
+        throw new functions.https.HttpsError('invalid-argument', 'Descrição, cliente, vencimento e valor são obrigatórios.');
+    const now = new Date().toISOString(), userId = context.auth.uid;
+    if (action === 'update' && id.startsWith('legacy:')) {
+        const [, clientId, billingId] = id.split(':');
+        if (!clientId || billingId === undefined)
+            throw new functions.https.HttpsError('invalid-argument', 'Identificador legado inválido.');
+        const clientRef = admin.firestore().collection('clients').doc(clientId), clientSnap = await clientRef.get(), client = clientSnap.data();
+        if (!clientSnap.exists || !financialTenantAliases(userId, membership).has(String(client?.companyId || '')))
+            throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.');
+        const matches = (billing, index) => String(billing?.id || index) === billingId || String(billing?.number || '').replace(/^COB-/i, '') === billingId.replace(/^COB-/i, '');
+        let before = null, matched = false;
+        const cobrancas = (Array.isArray(client?.cobrancas) ? client.cobrancas : []).map((billing, index) => {
+            if (!matches(billing, index))
+                return billing;
+            matched = true;
+            before = billing;
+            const received = billing.status === 'received';
+            return { ...billing, id: billing.id || billingId, number: String(input.number || billing.number || billingId), title: String(input.description || billing.title || ''), dueDate: String(input.dueDate), date: String(input.issueDate || billing.date || now), value: received ? Number(billing.value || 0) : gross / 100, status: received ? 'received' : String(input.status || billing.status || 'sent'), solutionSelect: String(input.contractName || billing.solutionSelect || ''), invoiceNumber: String(input.invoiceNumber || ''), paymentMethod: String(input.paymentMethodName || ''), notes: String(input.notes || ''), attachmentUrl: Array.isArray(input.attachmentUrls) ? input.attachmentUrls[0] || '' : billing.attachmentUrl || '', senderCompanyId: String(input.issuerCompanyId || billing.senderCompanyId || ''), senderCompany: String(input.issuerCompanyName || billing.senderCompany || ''), updatedAt: now, updatedBy: userId };
+        });
+        if (!matched)
+            throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.');
+        const batch = admin.firestore().batch();
+        batch.update(clientRef, { cobrancas, updatedAt: now, updatedBy: userId });
+        const mirrors = await admin.firestore().collection('collections').where('originId', '==', clientId).get();
+        mirrors.docs.forEach(mirror => {
+            const current = mirror.data(), number = String(current.number || '').replace(/^COB-/i, '');
+            if (current.companyId !== membership.companyId || (number !== billingId.replace(/^COB-/i, '') && String(current.legacyBillingId || '') !== billingId))
+                return;
+            const received = current.status === 'received';
+            batch.update(mirror.ref, { ...input, companyId: membership.companyId, ...(received ? { originalAmountCents: Number(current.originalAmountCents || 0), discountCents: Number(current.discountCents || 0), interestCents: Number(current.interestCents || 0), fineCents: Number(current.fineCents || 0), receivedAmountCents: Number(current.receivedAmountCents || 0), balanceAmountCents: Number(current.balanceAmountCents || 0), status: 'received', bankAccountId: current.bankAccountId || '', bankAccountName: current.bankAccountName || '' } : { receivedAmountCents: Number(current.receivedAmountCents || 0), balanceAmountCents: Math.max(0, net - Number(current.receivedAmountCents || 0)) }), updatedAt: now, updatedBy: userId, version: Number(current.version || 0) + 1 });
+        });
+        batch.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'update', entityType: 'collection', entityId: id, userId, createdAt: now, before, after: input, legacy: true });
+        await batch.commit();
+        return { id };
+    }
+    const ref = id ? admin.firestore().collection('collections').doc(id) : admin.firestore().collection('collections').doc();
+    await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref), before = snap.exists ? snap.data() : null; if (action === 'update' && (!snap.exists || before?.companyId !== membership.companyId))
+        throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); const received = Number(before?.receivedAmountCents || 0), receivedLock = before?.status === 'received', after = { ...input, companyId: membership.companyId, number: String(input.number || `COB-${Date.now()}`), receivedAmountCents: received, balanceAmountCents: Math.max(0, net - received), originType: String(input.originType || 'manual'), attachmentUrls: Array.isArray(input.attachmentUrls) ? input.attachmentUrls : [], status: String(input.status || 'draft'), createdAt: before?.createdAt || now, createdBy: before?.createdBy || userId, updatedAt: now, updatedBy: userId, version: Number(before?.version || 0) + 1, ...(receivedLock ? { originalAmountCents: Number(before?.originalAmountCents || 0), discountCents: Number(before?.discountCents || 0), interestCents: Number(before?.interestCents || 0), fineCents: Number(before?.fineCents || 0), receivedAmountCents: Number(before?.receivedAmountCents || 0), balanceAmountCents: Number(before?.balanceAmountCents || 0), status: 'received', bankAccountId: before?.bankAccountId || '', bankAccountName: before?.bankAccountName || '', receivedAt: before?.receivedAt || null } : {}) }; tx.set(ref, after, { merge: false }); const event = admin.firestore().collection('collectionEvents').doc(); tx.set(event, { companyId: membership.companyId, collectionId: ref.id, type: before ? 'updated' : 'created', description: receivedLock ? 'Dados cadastrais da cobrança recebida atualizados' : before ? 'Cobrança atualizada' : 'Cobrança criada', eventDate: now, createdAt: now, createdBy: userId }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: ref.id, userId, createdAt: now, before, after }); });
+    return { id: ref.id };
+});
 exports.receiveCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
     throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'receiveCollection'); const id = String(payload?.id || ''), requestedBankId = String(payload?.bankAccountId || ''), amount = Number(payload?.amountCents), key = String(payload?.idempotencyKey || ''), authorization = String(payload?.authorizationReason || '').trim(); if (!id || id.startsWith('legacy:') || !requestedBankId || !key || !Number.isSafeInteger(amount) || amount <= 0)
     throw new functions.https.HttpsError('invalid-argument', 'Recebimento inválido.'); const ref = admin.firestore().collection('collections').doc(id), bank = await resolveReceiptBankAccount(context.auth.uid, membership, requestedBankId), bankId = bank.id, marker = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_collectionReceipt_${key}`), tenantAliases = financialTenantAliases(context.auth.uid, membership); await admin.firestore().runTransaction(async (tx) => { const [done, snap, bankSnap] = await Promise.all([tx.get(marker), tx.get(ref), tx.get(bank)]); if (done.exists)
@@ -178,12 +221,72 @@ exports.receiveCollection = functions.https.onCall(async (payload, context) => {
 exports.addCollectionEvent = functions.https.onCall(async (payload, context) => { if (!context.auth)
     throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'manageCollectionEvents'); const id = String(payload?.id || ''), type = String(payload?.type || ''), description = String(payload?.description || '').trim(), ref = admin.firestore().collection('collections').doc(id), snap = await ref.get(); if (!snap.exists || snap.data()?.companyId !== membership.companyId || !description)
     throw new functions.https.HttpsError('invalid-argument', 'Evento inválido.'); const now = new Date().toISOString(), event = admin.firestore().collection('collectionEvents').doc(); await event.set({ companyId: membership.companyId, collectionId: id, type, description, eventDate: String(payload?.eventDate || now), responsibleId: String(payload?.responsibleId || context.auth.uid), responsibleName: String(payload?.responsibleName || ''), amountCents: Number(payload?.amountCents || 0), attachmentUrl: String(payload?.attachmentUrl || ''), createdAt: now, createdBy: context.auth.uid }); return { id: event.id }; });
-exports.commandCollection = functions.https.onCall(async (payload, context) => { if (!context.auth)
-    throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim(); if (!id || id.startsWith('legacy:') || !['send', 'renegotiate', 'cancel', 'secondCopy', 'delete'].includes(action))
-    throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await requireFinancialPermission(membership, action === 'cancel' || action === 'delete' ? 'cancelCollection' : 'sendCollection'); if (['cancel', 'renegotiate', 'delete'].includes(action) && !reason && action !== 'delete')
-    throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo.'); const ref = admin.firestore().collection('collections').doc(id); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
-    throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); const before = snap.data(), now = new Date().toISOString(); if (before.status === 'received' && action !== 'secondCopy')
-    throw new functions.https.HttpsError('failed-precondition', 'Cobrança recebida não pode ser alterada.'); const status = action === 'send' ? 'sent' : action === 'cancel' || action === 'delete' ? 'cancelled' : action === 'renegotiate' ? 'renegotiated' : before.status; tx.update(ref, { status, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1, ...(action === 'cancel' || action === 'delete' ? { cancellationReason: reason || before.cancellationReason || 'Cobrança removida' } : {}), ...(action === 'renegotiate' ? { renegotiationReason: reason } : {}), ...(action === 'delete' ? { deletedAt: now, deletedBy: context.auth.uid } : {}) }); tx.set(admin.firestore().collection('collectionEvents').doc(), { companyId: membership.companyId, collectionId: id, type: action === 'secondCopy' ? 'sent' : action === 'delete' ? 'deleted' : action, description: action === 'secondCopy' ? 'Segunda via gerada' : action === 'delete' ? 'Cobrança excluída' : reason || 'Cobrança enviada', eventDate: now, createdAt: now, createdBy: context.auth.uid }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: id, userId: context.auth.uid, createdAt: now, before, after: { status, reason, deletedAt: action === 'delete' ? now : undefined } }); }); return { id }; });
+exports.commandCollection = functions.https.onCall(async (payload, context) => {
+    if (!context.auth)
+        throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
+    const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim();
+    if (!id || !['send', 'renegotiate', 'cancel', 'secondCopy', 'delete'].includes(action))
+        throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.');
+    await requireFinancialPermission(membership, action === 'cancel' || action === 'delete' ? 'cancelCollection' : 'sendCollection');
+    if (['cancel', 'renegotiate'].includes(action) && !reason)
+        throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo.');
+    const now = new Date().toISOString(), userId = context.auth.uid, deleteReason = reason || 'Exclusão solicitada pelo usuário.';
+    const deletedFields = { status: 'cancelled', deletedAt: now, deletedBy: userId, cancellationReason: deleteReason, updatedAt: now, updatedBy: userId };
+    const billingMatches = (billing, index, billingId) => String(billing?.id || index) === billingId || String(billing?.number || '').replace(/^COB-/i, '') === billingId.replace(/^COB-/i, '');
+    if (action === 'delete') {
+        const batch = admin.firestore().batch();
+        let before = null;
+        if (id.startsWith('legacy:')) {
+            const [, clientId, billingId] = id.split(':');
+            if (!clientId || billingId === undefined)
+                throw new functions.https.HttpsError('invalid-argument', 'Identificador legado inválido.');
+            const clientRef = admin.firestore().collection('clients').doc(clientId), clientSnap = await clientRef.get(), client = clientSnap.data();
+            if (!clientSnap.exists || !financialTenantAliases(userId, membership).has(String(client?.companyId || '')))
+                throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.');
+            let matched = false;
+            const cobrancas = (Array.isArray(client?.cobrancas) ? client.cobrancas : []).map((billing, index) => {
+                if (!billingMatches(billing, index, billingId))
+                    return billing;
+                matched = true;
+                before = billing;
+                return { ...billing, ...deletedFields };
+            });
+            if (!matched)
+                throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.');
+            batch.update(clientRef, { cobrancas, updatedAt: now, updatedBy: userId });
+            const mirrors = await admin.firestore().collection('collections').where('originId', '==', clientId).get();
+            mirrors.docs.forEach(mirror => {
+                const value = mirror.data(), number = String(value.number || '').replace(/^COB-/i, '');
+                if (value.companyId === membership.companyId && (number === billingId.replace(/^COB-/i, '') || String(value.legacyBillingId || '') === billingId))
+                    batch.update(mirror.ref, { ...deletedFields, version: Number(value.version || 0) + 1 });
+            });
+        }
+        else {
+            const ref = admin.firestore().collection('collections').doc(id), snap = await ref.get();
+            before = snap.data();
+            if (!snap.exists || before?.companyId !== membership.companyId)
+                throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.');
+            batch.update(ref, { ...deletedFields, version: Number(before.version || 0) + 1 });
+            if (before.originType === 'officialBilling' && before.originId) {
+                const clientRef = admin.firestore().collection('clients').doc(String(before.originId)), clientSnap = await clientRef.get(), client = clientSnap.data();
+                if (clientSnap.exists && financialTenantAliases(userId, membership).has(String(client?.companyId || ''))) {
+                    const billingId = String(before.legacyBillingId || before.number || '').replace(/^COB-/i, '');
+                    const cobrancas = (Array.isArray(client?.cobrancas) ? client.cobrancas : []).map((billing, index) => billingMatches(billing, index, billingId) ? { ...billing, ...deletedFields } : billing);
+                    batch.update(clientRef, { cobrancas, updatedAt: now, updatedBy: userId });
+                }
+            }
+        }
+        batch.set(admin.firestore().collection('collectionEvents').doc(), { companyId: membership.companyId, collectionId: id, type: 'deleted', description: 'Cobrança excluída', eventDate: now, createdAt: now, createdBy: userId });
+        batch.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action: 'delete', entityType: 'collection', entityId: id, userId, createdAt: now, before, after: { ...deletedFields } });
+        await batch.commit();
+        return { id };
+    }
+    const ref = admin.firestore().collection('collections').doc(id);
+    await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
+        throw new functions.https.HttpsError('not-found', 'Cobrança não encontrada.'); const before = snap.data(); if (before.status === 'received' && action !== 'secondCopy')
+        throw new functions.https.HttpsError('failed-precondition', 'Cobrança recebida não pode ser alterada.'); const status = action === 'send' ? 'sent' : action === 'cancel' ? 'cancelled' : action === 'renegotiate' ? 'renegotiated' : before.status; tx.update(ref, { status, updatedAt: now, updatedBy: userId, version: Number(before.version || 0) + 1, ...(action === 'cancel' ? { cancellationReason: reason } : {}), ...(action === 'renegotiate' ? { renegotiationReason: reason } : {}) }); tx.set(admin.firestore().collection('collectionEvents').doc(), { companyId: membership.companyId, collectionId: id, type: action === 'secondCopy' ? 'sent' : action, description: action === 'secondCopy' ? 'Segunda via gerada' : reason || 'Cobrança enviada', eventDate: now, createdAt: now, createdBy: userId }); tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId: membership.companyId, action, entityType: 'collection', entityId: id, userId, createdAt: now, before, after: { status, reason } }); });
+    return { id };
+});
 exports.transferBetweenBankAccounts = functions.https.onCall(async (payload, context) => { if (!context.auth)
     throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid); await requireFinancialPermission(membership, 'transferBetweenAccounts'); const sourceId = String(payload?.sourceAccountId || ''), destinationId = String(payload?.destinationAccountId || ''), key = String(payload?.idempotencyKey || ''); const amountCents = Number(payload?.amountCents); if (!sourceId || !destinationId || sourceId === destinationId || !key || !Number.isSafeInteger(amountCents) || amountCents <= 0)
     throw new functions.https.HttpsError('invalid-argument', 'Transferência inválida.'); const source = admin.firestore().collection('bankAccounts').doc(sourceId), destination = admin.firestore().collection('bankAccounts').doc(destinationId), idempotency = admin.firestore().collection('idempotencyKeys').doc(`${membership.companyId}_bankTransfer_${key}`), transfer = admin.firestore().collection('bankTransfers').doc(); await admin.firestore().runTransaction(async (tx) => { const [existing, sourceSnap, destinationSnap] = await Promise.all([tx.get(idempotency), tx.get(source), tx.get(destination)]); if (existing.exists)

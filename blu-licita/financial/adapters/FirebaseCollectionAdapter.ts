@@ -57,6 +57,8 @@ const legacy = (clients: any[], companyId: string): FinancialCollection[] => cli
     const today = new Date().toISOString().slice(0, 10);
     return {
       id: `legacy:${client.id}:${billing.id || index}`, companyId,
+      issuerCompanyId: billing.senderCompanyId || billing.issuerCompanyId || '',
+      issuerCompanyName: billing.senderCompany || billing.issuerCompanyName || '',
       number: String(billing.number || billing.id || `LEG-${index + 1}`),
       description: billing.title || 'Cobrança enviada', organizationId: client.id,
       organizationName: client.razaoSocial || client.name || 'Cliente', contractName: billing.solutionSelect || '',

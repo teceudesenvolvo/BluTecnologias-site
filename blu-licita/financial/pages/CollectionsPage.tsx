@@ -1,5 +1,4 @@
 import React from "react";
-import { doc, updateDoc } from "firebase/firestore";
 import {
   CalendarDays,
   Bold,
@@ -23,9 +22,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { auth, certificateService, clientService, db, storageService, type Certificate, type Company, type ContactLead, type FinancialSettings } from "../../../services/firebase";
+import { auth, certificateService, clientService, storageService, type Certificate, type Company, type ContactLead, type FinancialSettings } from "../../../services/firebase";
 import { companySettingsService, financialSettingsService } from "../../../services/firestoreSettingsService";
 import { useCollections } from "../hooks/useCollections";
+import { useFinancialCompany } from "../contexts/FinancialCompanyContext";
 import type { CollectionInput, CollectionStatus, FinancialCollection } from "../domain/collectionTypes";
 
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((value || 0) / 100);
@@ -173,6 +173,7 @@ const buildBillingReportHtml = ({
 };
 
 export const CollectionsPage = () => {
+  const { selectedCompany } = useFinancialCompany();
   const data = useCollections();
   const [view, setView] = React.useState<"table" | "kanban" | "calendar">("table");
   const [search, setSearch] = React.useState("");
@@ -188,73 +189,13 @@ export const CollectionsPage = () => {
   const handleDelete = async (item: FinancialCollection) => {
     const confirmed = confirm(`Excluir a cobrança ${item.number}? Esta ação a ocultará da lista e manterá o histórico.`);
     if (!confirmed) return;
-    const now = new Date().toISOString();
-    const syncLegacySibling = async (clientId: string, matcher: (billing: any, index: number) => boolean) => {
-      const client = data.aux.clients.find((entry: ContactLead) => entry.id === clientId);
-      if (!client) return;
-      const updatedBillings = (client.cobrancas || []).map((billing: any, index: number) =>
-        matcher(billing, index)
-          ? {
-              ...billing,
-              status: "cancelled",
-              deletedAt: now,
-              deletedBy: auth.currentUser?.uid || "",
-              cancellationReason: "Exclusão solicitada pelo usuário.",
-              updatedAt: now,
-              updatedBy: auth.currentUser?.uid || "",
-            }
-          : billing,
-      );
-      await clientService.update(client.id, { cobrancas: updatedBillings });
-    };
     try {
-      if (item.id.startsWith("legacy:")) {
-        const [, clientId, billingId] = item.id.split(":");
-        await syncLegacySibling(clientId, (billing, index) => String(billing.id || index) === billingId);
-        const mirroredCurrent = data.items.find((entry) =>
-          !entry.id.startsWith("legacy:") &&
-          entry.originType === "officialBilling" &&
-          entry.originId === clientId &&
-          entry.number === `COB-${billingId}`,
-        );
-        if (mirroredCurrent) {
-          await updateDoc(doc(db, "collections", mirroredCurrent.id), {
-            status: "cancelled",
-            deletedAt: now,
-            deletedBy: auth.currentUser?.uid || "",
-            cancellationReason: "Exclusão solicitada pelo usuário.",
-            updatedAt: now,
-            updatedBy: auth.currentUser?.uid || "",
-          });
-        }
-        await data.reload();
-        return;
-      }
-      await updateDoc(doc(db, "collections", item.id), {
-        status: "cancelled",
-        deletedAt: now,
-        deletedBy: auth.currentUser?.uid || "",
-        cancellationReason: "Exclusão solicitada pelo usuário.",
-        updatedAt: now,
-        updatedBy: auth.currentUser?.uid || "",
-      });
-      if (item.originType === "officialBilling" && item.originId) {
-        const mirroredLegacyId = item.number.startsWith("COB-") ? item.number.replace(/^COB-/, "") : item.number;
-        await syncLegacySibling(
-          item.originId,
-          (billing, index) =>
-            String(billing.id || index) === mirroredLegacyId ||
-            String(billing.number || "") === mirroredLegacyId,
-        );
-      }
-      await data.reload();
+      await data.command(item.id, "delete", "Exclusão solicitada pelo usuário.");
     } catch (error) {
       console.error(error);
-      try {
-        await data.command(item.id, "delete", "Exclusão solicitada pelo usuário.");
-      } finally {
-        await data.reload();
-      }
+      alert(error instanceof Error ? error.message : "Não foi possível excluir a cobrança.");
+    } finally {
+      await data.reload();
     }
   };
 
@@ -361,6 +302,7 @@ export const CollectionsPage = () => {
         <OfficialBillingForm
           aux={data.aux}
           companies={companies}
+          preferredCompany={selectedCompany}
           certificates={certificates}
           financialSettings={financialSettings}
           previewHtml={previewHtml}
@@ -397,6 +339,7 @@ export const CollectionsPage = () => {
 const OfficialBillingForm = ({
   aux,
   companies,
+  preferredCompany,
   certificates,
   financialSettings,
   previewHtml,
@@ -408,6 +351,7 @@ const OfficialBillingForm = ({
 }: {
   aux: any;
   companies: Company[];
+  preferredCompany: Company | null;
   certificates: Certificate[];
   financialSettings: FinancialSettings | null;
   previewHtml: string | null;
@@ -441,6 +385,15 @@ const OfficialBillingForm = ({
   const selectedContract = contracts.find((item: any) => String(item.id || item.title) === form.solutionSelect);
 
   const set = (key: keyof BillingForm, value: any) => setForm((current) => ({ ...current, [key]: value }));
+
+  React.useEffect(() => {
+    if (!preferredCompany) return;
+    setForm((current) => current.senderCompanyId ? current : {
+      ...current,
+      senderCompanyId: preferredCompany.id,
+      senderCompany: companyLabel(preferredCompany),
+    });
+  }, [preferredCompany?.id]);
 
   React.useEffect(() => {
     if (!selectedContract) return;
@@ -522,6 +475,8 @@ const OfficialBillingForm = ({
 
       const billingId = String(Date.now());
       await saveCollection({
+        issuerCompanyId: form.senderCompanyId,
+        issuerCompanyName: form.senderCompany,
         number: `COB-${billingId}`,
         description: form.title || `Cobrança ${client.razaoSocial || client.name}`,
         organizationId: client.id,
@@ -712,6 +667,8 @@ const OfficialBillingForm = ({
               const uploadedAttachments = await uploadAttachments(form.attachmentUrls, `collections/${client.id}/${Date.now()}`);
               const contract = contracts.find((item: any) => String(item.id || item.title) === form.solutionSelect);
               await saveCollection({
+                issuerCompanyId: form.senderCompanyId,
+                issuerCompanyName: form.senderCompany,
                 number: `COB-${Date.now()}`,
                 description: form.title || `Cobrança ${client.razaoSocial || client.name}`,
                 organizationId: client.id,
@@ -781,6 +738,8 @@ const OfficialBillingForm = ({
               if (!sent) throw new Error("Falha ao enviar o e-mail de cobrança.");
               const billingId = String(Date.now());
               await saveCollection({
+                issuerCompanyId: form.senderCompanyId,
+                issuerCompanyName: form.senderCompany,
                 number: `COB-${billingId}`,
                 description: form.title || `Cobrança ${client.razaoSocial || client.name}`,
                 organizationId: client.id,
@@ -871,7 +830,7 @@ const Table = ({ items, open, edit, remove, receive }: { items: FinancialCollect
             <td className="px-4 py-4">
               <div className="flex gap-2">
                 <button onClick={() => open(item)} className="rounded-lg border px-3 py-2 text-xs font-bold">Detalhar</button>
-                {item.status !== "received" && <button onClick={() => edit(item)} className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700">Editar</button>}
+                <button onClick={() => edit(item)} className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700">Editar</button>
                 {item.status !== "received" && <button onClick={() => remove(item)} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600">Excluir</button>}
                 {item.balanceAmountCents > 0 && <button onClick={() => receive(item)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Receber</button>}
               </div>
@@ -939,7 +898,7 @@ const Detail = ({ item, close, edit, remove, receive }: { item: FinancialCollect
     </div>
     <footer className="flex justify-end gap-2 border-t p-5">
       <button onClick={close} className="rounded-xl border px-4 py-2">Fechar</button>
-      {item.status !== "received" && <button onClick={edit} className="rounded-xl border border-blue-200 px-4 py-2 font-bold text-blue-700">Editar</button>}
+      <button onClick={edit} className="rounded-xl border border-blue-200 px-4 py-2 font-bold text-blue-700">Editar</button>
       {item.status !== "received" && <button onClick={remove} className="rounded-xl border border-rose-200 px-4 py-2 font-bold text-rose-600">Excluir</button>}
       {item.balanceAmountCents > 0 && <button onClick={receive} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white">Marcar recebida</button>}
     </footer>
@@ -959,7 +918,10 @@ const CollectionEditForm = ({
   close: () => void;
   saveCollection: (value: CollectionInput, id?: string) => Promise<void>;
 }) => {
+  const isReceived = item.status === "received";
   const [form, setForm] = React.useState({
+    issuerCompanyId: item.issuerCompanyId || "",
+    issuerCompanyName: item.issuerCompanyName || "",
     number: item.number || "",
     description: item.description || "",
     organizationId: item.organizationId || "",
@@ -1031,20 +993,25 @@ const CollectionEditForm = ({
     <Drawer title={`Editar cobrança · ${item.number}`} close={close}>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="grid flex-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2">
+          {isReceived && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:col-span-2">
+              Esta cobrança já foi recebida. Você pode corrigir dados cadastrais, vínculos, datas e observações. Status, valores e conta da baixa permanecem protegidos; alterações financeiras devem ser feitas por estorno ou ajuste auditável.
+            </div>
+          )}
           <Input label="Número" value={form.number} set={(value) => set("number", value)} />
-          <Select label="Status" value={form.status} set={(value) => set("status", value)} options={statuses.map((value) => [value, labels[value]])} />
+          <Select disabled={isReceived} label="Status" value={form.status} set={(value) => set("status", value)} options={statuses.map((value) => [value, labels[value]])} />
           <Select label="Órgão / cliente" value={form.organizationId} set={(value) => { const client = aux.clients.find((item: any) => item.id === value); setForm({ ...form, organizationId: value, organizationName: client?.razaoSocial || client?.name || "" }); }} options={[["", "Selecione"], ...aux.clients.map((item: any) => [item.id, item.razaoSocial || item.name])]}/>
           <Select label="Contrato" value={form.contractId} set={(value) => { const contract = aux.contracts.find((item: any) => item.id === value); setForm({ ...form, contractId: value, contractName: contract?.title || contract?.number || "" }); }} options={[["", "Selecione"], ...aux.contracts.map((item: any) => [item.id, item.title || item.number])]}/>
           <Input label="Título / descrição" value={form.description} set={(value) => set("description", value)} />
           <Input label="Emissão" type="date" value={form.issueDate} set={(value) => set("issueDate", value)} />
           <Input label="Vencimento" type="date" value={form.dueDate} set={(value) => set("dueDate", value)} />
-          <Input label="Valor original (centavos)" type="number" value={form.originalAmountCents} set={(value) => set("originalAmountCents", Number(value))} />
-          <Input label="Desconto (centavos)" type="number" value={form.discountCents} set={(value) => set("discountCents", Number(value))} />
-          <Input label="Juros (centavos)" type="number" value={form.interestCents} set={(value) => set("interestCents", Number(value))} />
-          <Input label="Multa (centavos)" type="number" value={form.fineCents} set={(value) => set("fineCents", Number(value))} />
+          <Input disabled={isReceived} label="Valor original (centavos)" type="number" value={form.originalAmountCents} set={(value) => set("originalAmountCents", Number(value))} />
+          <Input disabled={isReceived} label="Desconto (centavos)" type="number" value={form.discountCents} set={(value) => set("discountCents", Number(value))} />
+          <Input disabled={isReceived} label="Juros (centavos)" type="number" value={form.interestCents} set={(value) => set("interestCents", Number(value))} />
+          <Input disabled={isReceived} label="Multa (centavos)" type="number" value={form.fineCents} set={(value) => set("fineCents", Number(value))} />
           <Select label="Projeto" value={form.projectId} set={(value) => { const project = aux.projects.find((item: any) => item.id === value); setForm({ ...form, projectId: value, projectName: project?.name || "" }); }} options={[["", "Nenhum"], ...aux.projects.map((item: any) => [item.id, item.name])]} />
           <Select label="Centro de custo" value={form.costCenterId} set={(value) => { const center = aux.centers.find((item: any) => item.id === value); setForm({ ...form, costCenterId: value, costCenterName: center?.name || "" }); }} options={[["", "Nenhum"], ...aux.centers.map((item: any) => [item.id, item.name])]} />
-          <Select label="Conta bancária" value={form.bankAccountId} set={(value) => { const bank = aux.accounts.find((item: any) => item.id === value); setForm({ ...form, bankAccountId: value, bankAccountName: bank?.name || bank?.institution || "" }); }} options={[["", "Nenhuma"], ...aux.accounts.map((item: any) => [item.id, item.name || item.institution || item.bankName || "Conta bancária"])]} />
+          <Select disabled={isReceived} label="Conta bancária" value={form.bankAccountId} set={(value) => { const bank = aux.accounts.find((item: any) => item.id === value); setForm({ ...form, bankAccountId: value, bankAccountName: bank?.name || bank?.institution || "" }); }} options={[["", "Nenhuma"], ...aux.accounts.map((item: any) => [item.id, item.name || item.institution || item.bankName || "Conta bancária"])]} />
           <Select label="Forma de pagamento" value={form.paymentMethodId} set={(value) => { const method = aux.paymentMethods.find((item: any) => item.id === value); setForm({ ...form, paymentMethodId: value, paymentMethodName: method?.name || "" }); }} options={[["", "Nenhuma"], ...aux.paymentMethods.map((item: any) => [item.id, item.name || item.label || "Forma de pagamento"])]} />
           <Input label="Responsável" value={form.responsibleName} set={(value) => set("responsibleName", value)} />
           <Input label="Protocolo" value={form.protocol} set={(value) => set("protocol", value)} />
@@ -1144,11 +1111,11 @@ const ModalPreview = ({ html, close }: { html: string; close: () => void }) => (
   </div>
 );
 
-const Input = ({ label, value, set, type = "text" }: { label: string; value: any; set: (value: string) => void; type?: string }) => (
-  <label className="text-xs font-bold text-slate-600">{label}<input required type={type} value={value ?? ""} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal" /></label>
+const Input = ({ label, value, set, type = "text", disabled = false }: { label: string; value: any; set: (value: string) => void; type?: string; disabled?: boolean }) => (
+  <label className="text-xs font-bold text-slate-600">{label}<input required disabled={disabled} type={type} value={value ?? ""} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" /></label>
 );
-const Select = ({ label, value, set, options }: { label: string; value: string; set: (value: string) => void; options: any[] }) => (
-  <label className="text-xs font-bold text-slate-600">{label}<select value={value || ""} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-normal">{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+const Select = ({ label, value, set, options, disabled = false }: { label: string; value: string; set: (value: string) => void; options: any[]; disabled?: boolean }) => (
+  <label className="text-xs font-bold text-slate-600">{label}<select disabled={disabled} value={value || ""} onChange={(event) => set(event.target.value)} className="mt-2 w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-normal disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
 );
 const FileInput = ({ label, selected, onChange }: { label: string; selected: boolean; onChange: (file?: File) => void }) => (
   <label className="text-xs font-bold text-slate-600">{label}<input type="file" accept="application/pdf,image/*" onChange={(event) => onChange(event.target.files?.[0])} className="mt-2 block w-full rounded-xl border p-3 text-sm font-normal" />{selected && <span className="mt-1 block text-[10px] text-emerald-600">Arquivo anexado</span>}</label>

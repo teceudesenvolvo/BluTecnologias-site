@@ -47,6 +47,7 @@ import { BudgetsPage } from "../financial/pages/BudgetsPage";
 import { DreManagementPage } from "../financial/pages/DreManagementPage";
 import { FinancialExecutiveOverviewPage } from "../financial/pages/FinancialExecutiveOverviewPage";
 import { FinancialReportsPage } from "../financial/pages/FinancialReportsPage";
+import { FinancialCompanyProvider, FinancialCompanySelector } from "../financial/contexts/FinancialCompanyContext";
 import { DocumentDrivePage } from "../pages/DocumentDrivePage";
 import { CrmBoardPage } from "../pages/CrmBoardPage";
 import { TeamPage } from "../pages/TeamPage";
@@ -180,7 +181,14 @@ const UnifiedFinancialRoute: React.FC = () => {
   }, [navigate]);
 
   return (
+    <FinancialCompanyProvider>
     <div className="mx-auto grid max-w-[1700px] gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <section className="rounded-2xl border border-white/65 bg-white/72 p-4 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:col-span-2 dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Organização financeira</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Visualize o consolidado ou filtre lançamentos e indicadores por empresa emitente.</p></div>
+          <FinancialCompanySelector />
+        </div>
+      </section>
       <section className="rounded-2xl border border-white/65 bg-white/72 p-4 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl xl:hidden dark:border-white/10 dark:bg-white/[0.075] dark:shadow-black/20">
         <label className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 dark:text-slate-300">
           Seção financeira
@@ -206,6 +214,7 @@ const UnifiedFinancialRoute: React.FC = () => {
         {section === "financialOverview" ? <FinancialExecutiveOverviewPage /> : core.some(([id])=>id===section) ? <FinancialPhaseOnePage view={section as FinancialCoreView} embedded /> : section === "collections" ? <CollectionsPage /> : section === "invoices" ? <FiscalDocumentsPage /> : section === "taxes" ? <TaxManagementPage /> : section === "reconciliation" ? <BankReconciliationPage /> : section === "settings" ? <FinancialSettingsPage /> : section === "banking" ? <BankAccountsPage /> : section === "costCenters" ? <CostCentersPage /> : section === "projects" ? <FinancialProjectsPage /> : section === "dre" ? <DreManagementPage /> : section === "reports" ? <FinancialReportsPage /> : section === "cashFlow" ? <CashFlowPage /> : <FinancialSectionLanding title={planned[section as keyof typeof planned][0]} description={planned[section as keyof typeof planned][1]} />}
       </main>
     </div>
+    </FinancialCompanyProvider>
   );
 };
 

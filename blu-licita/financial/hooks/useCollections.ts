@@ -3,11 +3,13 @@ import { useBluAuth } from "../../contexts/BluAuthContext";
 import { FirebaseCollectionAdapter } from "../adapters/FirebaseCollectionAdapter";
 import type { CollectionEvent, CollectionInput, FinancialCollection } from "../domain/collectionTypes";
 import { CollectionService } from "../services/CollectionService";
+import { useFinancialCompany } from "../contexts/FinancialCompanyContext";
 
 const service = new CollectionService(new FirebaseCollectionAdapter());
 
 export const useCollections = () => {
   const { user } = useBluAuth();
+  const { selectedCompanyId, selectedCompany } = useFinancialCompany();
   const context = React.useMemo(
     () => ({
       companyId: user?.companyId || "",
@@ -51,15 +53,21 @@ export const useCollections = () => {
     setError("");
     try {
       const [loadedItems, loadedEvents, loadedAux] = await service.load(context);
-      setItems(loadedItems);
-      setEvents(loadedEvents);
+      const names = [selectedCompany?.razaoSocial, selectedCompany?.nomeFantasia, selectedCompany?.cnpj].filter(Boolean).map((value) => String(value).trim().toLocaleLowerCase("pt-BR"));
+      const visibleItems = !selectedCompanyId ? loadedItems : loadedItems.filter((item) => {
+        if (item.issuerCompanyId) return item.issuerCompanyId === selectedCompanyId;
+        return names.includes(String(item.issuerCompanyName || "").trim().toLocaleLowerCase("pt-BR"));
+      });
+      const visibleIds = new Set(visibleItems.map((item) => item.id));
+      setItems(visibleItems);
+      setEvents(!selectedCompanyId ? loadedEvents : loadedEvents.filter((event) => visibleIds.has(event.collectionId)));
       setAux(loadedAux);
     } catch (reason: any) {
       setError(reason?.message || "Não foi possível carregar as cobranças.");
     } finally {
       setLoading(false);
     }
-  }, [context]);
+  }, [context, selectedCompanyId, selectedCompany]);
 
   React.useEffect(() => {
     reload();
