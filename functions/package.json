@@ -3,6 +3,7 @@
   "scripts": {
   "lint": "eslint --ext .js .",
     "build": "npm run clean && tsc",
+    "test": "npm run build && node --test test/*.test.js",
     "gcp-build": "npm run build",
     "clean": "rm -rf lib",
     "serve": "npm run build && firebase emulators:start --only functions",

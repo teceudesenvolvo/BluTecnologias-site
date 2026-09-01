@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, db, ensureNoDuplicateRecord } from '../../services/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, ensureNoDuplicateRecord, functions } from '../../services/firebase';
 import { emailTemplateAdminService } from './emailTemplateAdminService';
 
 export type TeamMember = { id: string; name: string; email: string; phone?: string; role: string; department?: string; status: 'active' | 'invited' };
@@ -38,12 +39,21 @@ export const teamService = {
       email: value.email,
       link,
     });
-    await addDoc(collection(db, 'mail_queue'), { to: [value.email], userId: auth.currentUser?.uid, message });
+    await addDoc(collection(db, 'mail_queue'), {
+      to: [value.email],
+      userId: auth.currentUser?.uid,
+      companyId: owner().companyId,
+      notifyCompanyAdmin: true,
+      message,
+    });
     return link;
   },
   async accept(token: string, name: string, email: string, password: string) {
     if (!token) throw new Error('Convite inválido.');
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    const credential = await createUserWithEmailAndPassword(auth, email, password).catch(async (reason: any) => {
+      if (reason?.code === 'auth/email-already-in-use') return signInWithEmailAndPassword(auth, email, password);
+      throw reason;
+    });
     await updateProfile(credential.user, { displayName: name });
     const invitationRef = doc(db, 'teamInvitations', token);
     const invitation = await getDoc(invitationRef);
@@ -52,6 +62,10 @@ export const teamService = {
     if (String(data.email).toLowerCase() !== email.toLowerCase()) throw new Error('Use o mesmo e-mail que recebeu o convite.');
     if (data.status !== 'pending' || new Date(data.expiresAt).getTime() < Date.now()) throw new Error('Este convite expirou ou já foi utilizado.');
     const now = new Date().toISOString();
+    if (data.userType === 'accountant' || Array.isArray(data.companyIds)) {
+      await httpsCallable(functions, 'acceptCompanyInvitation')({ invitationId: token });
+      return credential.user;
+    }
     await setDoc(doc(db, 'teamMembers', memberDocId(data.companyId, email)), { name, email, phone: data.phone || '', role: data.role || 'Analista', department: data.department || '', status: 'active', companyId: data.companyId, createdBy: data.createdBy, userId: credential.user.uid, invitationId: token, acceptedAt: now, updatedAt: now }, { merge: true });
     await setDoc(doc(db, 'companyUsers', `${data.companyId}_${credential.user.uid}`), { companyId: data.companyId, userId: credential.user.uid, role: data.role || 'Analista', invitationId: token, createdAt: new Date().toISOString() }, { merge: true });
     await setDoc(invitationRef, { status: 'accepted', acceptedBy: credential.user.uid, acceptedAt: now }, { merge: true });

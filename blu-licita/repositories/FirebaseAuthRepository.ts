@@ -8,8 +8,14 @@ import type { AuthRepository, PartnerSignupInput, TrialSignupInput } from './Aut
 import { defaultPublicPlans } from '../services/publicPlanCatalog';
 
 const toBluUser = async (user: User): Promise<BluUser> => {
-  const memberships = await getDocs(query(collection(db, 'companyUsers'), where('userId', '==', user.uid), limit(1)));
-  const membership = memberships.docs[0]?.data();
+  const contextualMemberships = await getDocs(query(collection(db, 'companyMemberships'), where('userId', '==', user.uid))).catch(() => ({ docs: [] as any[] }));
+  const activeContextual = contextualMemberships.docs.map((item: any) => ({ id: item.id, ...item.data() })).filter((item: any) => item.status === 'active');
+  let rememberedCompanyId = '';
+  try { rememberedCompanyId = JSON.parse(localStorage.getItem('blu-licita:user') || 'null')?.companyId || ''; } catch {}
+  const contextual = activeContextual.find((item: any) => item.companyId === rememberedCompanyId) || activeContextual[0];
+  const memberships = await getDocs(query(collection(db, 'companyUsers'), where('userId', '==', user.uid), limit(20)));
+  const membershipDoc = memberships.docs.find((item) => item.data().companyId === rememberedCompanyId) || memberships.docs[0];
+  const membership = contextual || membershipDoc?.data();
   const partners = await getDocs(query(collection(db, 'partnerUsers'), where('userId', '==', user.uid), limit(1))).catch(() => ({ docs: [] as any[] }));
   const partnerMembership = partners.docs[0]?.data();
   const userProfile = await getDoc(doc(db, 'users', user.uid)).catch(() => null);
@@ -37,6 +43,9 @@ const toBluUser = async (user: User): Promise<BluUser> => {
     companyId,
     companyName: company?.exists() ? company.data().name || 'Minha empresa' : 'Minha empresa',
     billingCompanyId: String(userProfileData?.billingCompanyId || userProfileData?.primaryBillingCompanyId || companyId),
+    membershipId: contextual?.id || membershipDoc?.id,
+    membershipStatus: contextual?.status || membership?.status || 'active',
+    permissions: contextual?.permissions || membership?.permissions || {},
   };
 };
 
@@ -173,6 +182,7 @@ export class FirebaseAuthRepository implements AuthRepository {
     await Promise.all([
       setDoc(doc(db, 'companies', companyId), companyPayload, { merge: true }),
       setDoc(doc(db, 'companyUsers', membershipPayload.id), membershipPayload, { merge: true }),
+      setDoc(doc(db, 'companyMemberships', membershipPayload.id), { ...membershipPayload, companyName: companyPayload.name, companyDocument: companyPayload.document, permissions: { team: { manage: true } } }, { merge: true }),
       setDoc(doc(db, 'subscriptions', subscriptionId), subscriptionPayload, { merge: true }),
       setDoc(doc(db, 'platformCustomers', companyId), platformCustomerPayload, { merge: true }),
       setDoc(doc(db, 'companies', companyId, 'settings', 'subscription'), { plan: input.plan, status: isFreePlan ? 'active' : trialDays > 0 ? 'trial' : 'payment_pending', updatedAt: now.toISOString(), updatedBy: credential.user.uid }, { merge: true }),

@@ -53,10 +53,11 @@ export const useCollections = () => {
     setError("");
     try {
       const [loadedItems, loadedEvents, loadedAux] = await service.load(context);
-      const names = [selectedCompany?.razaoSocial, selectedCompany?.nomeFantasia, selectedCompany?.cnpj].filter(Boolean).map((value) => String(value).trim().toLocaleLowerCase("pt-BR"));
+      const normalize = (value: unknown) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLocaleLowerCase("pt-BR");
+      const names = [selectedCompanyId, selectedCompany?.razaoSocial, selectedCompany?.nomeFantasia, selectedCompany?.cnpj].filter(Boolean).map(normalize);
       const visibleItems = !selectedCompanyId ? loadedItems : loadedItems.filter((item) => {
-        if (item.issuerCompanyId) return item.issuerCompanyId === selectedCompanyId;
-        return names.includes(String(item.issuerCompanyName || "").trim().toLocaleLowerCase("pt-BR"));
+        const references = [item.issuerCompanyId, item.issuerCompanyName, (item as any).senderCompanyId, (item as any).senderCompany].filter(Boolean).map(normalize);
+        return references.some((reference) => names.includes(reference));
       });
       const visibleIds = new Set(visibleItems.map((item) => item.id));
       setItems(visibleItems);

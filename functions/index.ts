@@ -9,7 +9,9 @@ export { commandBudget } from './budgets';
 export { commandDrePeriod } from './dre';
 export { getFinancialOverview } from './financialOverview';
 export { queryFinancialReport, commandFinancialReport } from './financialReports';
-export { completePublicSale } from './pdv';
+export { completePublicSale, managePointOfSaleRegister, createPointOfSalePayment, checkPointOfSalePayment, managePointOfSalePaymentSettings } from './pdv';
+export { listManagedCompanies, findGlobalProfessional, linkAccountantToCompanies, manageCompanyMembership, acceptCompanyInvitation, accountantWorkspace } from './accountantAccess';
+export { ecommerceStore } from './ecommerceStore';
 export {
   billingCheckout,
   billingSummary,
@@ -1066,7 +1068,13 @@ export const sendBillingEmailHttp = functions.https.onRequest((req, res) => {
         <p> Este é um email automático, por favor, não responda. </p>
       `;
 
-      const mailOptions = { from: effectiveFrom, to, subject: `${title || 'Nova Notificação Financeira'}`, html, attachments } as any;
+      const mailOptions = {
+        from: effectiveFrom,
+        to,
+        subject: `${title || 'Nova Notificação Financeira'}`,
+        html,
+        attachments,
+      } as any;
       console.log('sendBillingEmailHttp: sending mail', { to, from: effectiveFrom, attachments: attachments.length });
       try {
         await transporter.sendMail(mailOptions);
@@ -1135,6 +1143,169 @@ export const handleInboundEmail = functions.https.onRequest(async (req, res) => 
   }
 });
 
+const normalizeMailRecipients = (value: unknown): string[] => {
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  return [...new Set(values.map((email) => String(email || '').trim().toLowerCase()).filter((email) => /^\S+@\S+\.\S+$/.test(email)))];
+};
+
+const companyAdministratorEmails = async (companyId: string): Promise<string[]> => {
+  if (!companyId) return [];
+  const firestore = admin.firestore();
+  const emails = new Set<string>();
+  const userIds = new Set<string>();
+  const addEmail = (value: unknown) => normalizeMailRecipients(value).forEach((email) => emails.add(email));
+  const addUserId = (value: unknown) => {
+    const uid = String(value || '').trim();
+    if (uid) userIds.add(uid);
+  };
+  if (companyId.startsWith('company-')) addUserId(companyId.slice('company-'.length));
+
+  const companySnapshot = await firestore.collection('companies').doc(companyId).get().catch(() => null);
+  const company = companySnapshot?.exists ? companySnapshot.data() || {} : {};
+  ['adminEmail', 'ownerEmail', 'administratorEmail'].forEach((field) => addEmail(company[field]));
+  ['ownerUserId', 'adminUserId', 'createdBy'].forEach((field) => addUserId(company[field]));
+
+  const memberships = await firestore.collection('companyUsers').where('companyId', '==', companyId).limit(250).get().catch(() => null);
+  memberships?.docs.forEach((membership) => {
+    const value = membership.data();
+    const role = String(value.role || value.userType || '').trim().toLocaleLowerCase('pt-BR');
+    if (!['owner', 'proprietário', 'proprietario', 'administrator', 'administrador', 'company_owner', 'company_admin'].includes(role)) return;
+    addEmail(value.email);
+    addUserId(value.userId || value.uid);
+  });
+
+  await Promise.all([...userIds].map(async (uid) => {
+    const profile = await firestore.collection('users').doc(uid).get().catch(() => null);
+    if (profile?.exists) addEmail(profile.data()?.email);
+    try {
+      addEmail((await admin.auth().getUser(uid)).email);
+    } catch {
+      // Perfis legados podem não possuir mais um registro correspondente no Auth.
+    }
+  }));
+
+  return [...emails];
+};
+
+const dailyNotificationSlot = (companyId: string, date: string) => {
+  let hash = 2166136261;
+  for (const character of `${companyId}:${date}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  // Um dos 26 intervalos de 30 minutos entre 08:00 e 20:30.
+  return 16 + (Math.abs(hash) % 26);
+};
+
+const saoPauloClock = (value = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Fortaleza', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(value).reduce<Record<string, string>>((result, part) => {
+    result[part.type] = part.value;
+    return result;
+  }, {});
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    slot: Number(parts.hour) * 2 + (Number(parts.minute) >= 30 ? 1 : 0),
+  };
+};
+
+const dailyCompanyAlertSummary = async (companyId: string) => {
+  const firestore = admin.firestore();
+  const [documents, products, collections] = await Promise.all([
+    firestore.collection('companyDocuments').where('companyId', '==', companyId).limit(1000).get().catch(() => null),
+    firestore.collection('products').where('companyId', '==', companyId).limit(1000).get().catch(() => null),
+    firestore.collection('collections').where('companyId', '==', companyId).limit(1000).get().catch(() => null),
+  ]);
+  const today = new Date(`${saoPauloClock().date}T12:00:00-03:00`).getTime();
+  const latestDocuments = new Map<string, FirebaseFirestore.DocumentData>();
+  documents?.docs.forEach((snapshot) => {
+    const item = snapshot.data();
+    const key = [item.legalEntityId || item.company || companyId, item.type || item.category || item.name || snapshot.id]
+      .map((part) => String(part || '').trim().toLocaleLowerCase('pt-BR')).join(':');
+    const timestamp = Date.parse(String(item.updatedAt || item.createdAt || item.issueDate || item.expiryDate || '')) || 0;
+    const current = latestDocuments.get(key);
+    const currentTimestamp = current ? Date.parse(String(current.updatedAt || current.createdAt || current.issueDate || current.expiryDate || '')) || 0 : -1;
+    if (!current || timestamp >= currentTimestamp) latestDocuments.set(key, item);
+  });
+  let expiredDocuments = 0;
+  let expiringDocuments = 0;
+  latestDocuments.forEach((item) => {
+    if (!item.expiryDate) return;
+    const expiry = Date.parse(`${String(item.expiryDate).slice(0, 10)}T23:59:59-03:00`);
+    if (!Number.isFinite(expiry)) return;
+    const days = Math.ceil((expiry - today) / 86400000);
+    if (days < 0) expiredDocuments += 1;
+    else if (days <= 7) expiringDocuments += 1;
+  });
+  const lowStock = products?.docs.filter((snapshot) => {
+    const item = snapshot.data();
+    return item.active !== false && item.type !== 'service' && Number(item.stockQuantity || 0) <= Number(item.minStock || 0);
+  }).length || 0;
+  const pendingCollections = collections?.docs.filter((snapshot) => {
+    const status = String(snapshot.data().status || '').toLowerCase();
+    return !['received', 'cancelled', 'canceled', 'deleted'].includes(status) && snapshot.data().deletedAt == null;
+  }).length || 0;
+  return { expiredDocuments, expiringDocuments, lowStock, pendingCollections };
+};
+
+export const dispatchDailyCompanyNotificationDigests = functions.pubsub
+  .schedule('every 30 minutes')
+  .timeZone('America/Fortaleza')
+  .onRun(async () => {
+    const clock = saoPauloClock();
+    const firestore = admin.firestore();
+    const [memberships, companies, platformCustomers] = await Promise.all([
+      firestore.collection('companyUsers').limit(3000).get().catch(() => null),
+      firestore.collection('companies').limit(3000).get().catch(() => null),
+      firestore.collection('platformCustomers').limit(3000).get().catch(() => null),
+    ]);
+    const companyIds = new Set<string>();
+    memberships?.docs.forEach((snapshot) => {
+      const id = String(snapshot.data().companyId || '').trim();
+      if (id) companyIds.add(id);
+    });
+    companies?.docs.forEach((snapshot) => {
+      const item = snapshot.data();
+      const id = String(item.ownerCompanyId || item.companyId || (snapshot.id.startsWith('company-') ? snapshot.id : '')).trim();
+      if (id) companyIds.add(id);
+      else if (item.ownerUserId) companyIds.add(`company-${String(item.ownerUserId)}`);
+    });
+    platformCustomers?.docs.forEach((snapshot) => companyIds.add(String(snapshot.data().companyId || snapshot.id)));
+
+    let queued = 0;
+    for (const companyId of companyIds) {
+      if (dailyNotificationSlot(companyId, clock.date) !== clock.slot) continue;
+      const recipients = await companyAdministratorEmails(companyId);
+      if (!recipients.length) continue;
+      const safeCompanyId = companyId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180);
+      const queueRef = firestore.collection('mail_queue').doc(`daily-company-notification_${safeCompanyId}_${clock.date}`);
+      if ((await queueRef.get()).exists) continue;
+      const summary = await dailyCompanyAlertSummary(companyId);
+      const dashboardUrl = `${String(process.env.APP_PUBLIC_URL || 'https://blutecnologias.com.br').replace(/\/$/, '')}/#/admin/dashboard`;
+      const subject = 'Seu resumo diário na Blu';
+      const text = `Resumo diário: ${summary.expiredDocuments} documento(s) vencido(s), ${summary.expiringDocuments} próximo(s) do vencimento, ${summary.lowStock} alerta(s) de estoque e ${summary.pendingCollections} cobrança(s) pendente(s). Acesse ${dashboardUrl}`;
+      const html = `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6"><h2 style="margin:0 0 8px">Seu resumo diário na Blu</h2><p>Confira rapidamente o que merece sua atenção hoje:</p><ul><li><strong>${summary.expiredDocuments}</strong> documento(s) vencido(s)</li><li><strong>${summary.expiringDocuments}</strong> documento(s) próximo(s) do vencimento</li><li><strong>${summary.lowStock}</strong> alerta(s) de estoque</li><li><strong>${summary.pendingCollections}</strong> cobrança(s) pendente(s)</li></ul><p><a href="${dashboardUrl}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#0ea5e9;color:white;text-decoration:none;font-weight:bold">Abrir a Blu</a></p><p style="font-size:12px;color:#64748b">Este é o único resumo automático enviado hoje para esta empresa.</p></div>`;
+      try {
+        await queueRef.create({
+          companyId,
+          to: [recipients[0]],
+          bcc: recipients.slice(1),
+          notifyCompanyAdmin: false,
+          notificationType: 'dailyCompanyDigest',
+          notificationDate: clock.date,
+          message: { subject, text, html },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        queued += 1;
+      } catch (error: any) {
+        if (Number(error?.code) !== 6 && String(error?.code) !== '6') console.error('Unable to queue daily company notification', companyId, error);
+      }
+    }
+    return { queued, date: clock.date, slot: clock.slot };
+  });
+
 export const processFirestoreMailQueue = functions.firestore.document('mail_queue/{pushId}').onCreate(async (snapshot, context) => {
   const mailData = snapshot.data();
   const pushId = context.params.pushId;
@@ -1196,13 +1367,20 @@ export const processFirestoreMailQueue = functions.firestore.document('mail_queu
       throw new Error('SMTP configuration missing: cannot dispatch email.');
     }
 
+    const primaryRecipients = normalizeMailRecipients(to);
+    const existingCc = normalizeMailRecipients(mailData.cc);
+    const existingBcc = normalizeMailRecipients(mailData.bcc);
     const mailOptions: any = {
       from: computedFrom,
-      to: Array.isArray(to) ? to.join(',') : to,
+      to: primaryRecipients.join(','),
       subject: subject || 'Sem assunto',
       html: html || '',
       text: text || ''
     };
+
+    if (existingCc.length) mailOptions.cc = existingCc.join(',');
+    const bccRecipients = existingBcc;
+    if (bccRecipients.length) mailOptions.bcc = bccRecipients.join(',');
 
     if (attachments && Array.isArray(attachments)) {
       mailOptions.attachments = attachments.map((att: any) => {

@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     proxy: {
       '/api/pncp': {
@@ -54,6 +55,12 @@ export default defineConfig({
           .replace(/^\/api\/billing\/summary/, '/billingSummary')
           .replace(/^\/api\/billing\/plans/, '/billingPublicPlans')
           .replace(/^\/api\/billing\/payment-check/, '/billingPaymentCheck'),
+      },
+      '/api/pdv-register': {
+        target: 'https://us-central1-blutecnologias-site.cloudfunctions.net',
+        changeOrigin: true,
+        secure: true,
+        rewrite: () => '/managePointOfSaleRegister',
       },
     },
   },

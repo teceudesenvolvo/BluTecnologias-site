@@ -1,3 +1,38 @@
-import{collection,getDocs,query,where}from'firebase/firestore';import{httpsCallable}from'firebase/functions';import{db,functions}from'../../../services/firebase';import type{CashFlowAuxiliary,CashFlowInput,CashFlowTransaction}from'../domain/cashFlowTypes';import type{CashFlowContext,CashFlowRepository}from'../repositories/cashFlowRepository';const docs=async<T>(name:string,c:string)=>{const s=await getDocs(query(collection(db,name),where('companyId','==',c)));return s.docs.map(x=>({id:x.id,...x.data()}as T))};
-const normalize=(x:any):CashFlowTransaction=>{const gross=x.grossAmountCents??Math.round(Number(x.amount||0)*100),net=x.netAmountCents??gross,completed=['paid','received'].includes(x.status),settled=completed?net:(x.settledAmountCents??0),balance=completed?0:(x.balanceAmountCents??Math.max(0,net-settled)),due=x.dueDate||x.date||'',status=balance>0&&due&&due<new Date().toISOString().slice(0,10)&&['forecast','pending'].includes(x.status)?'overdue':(x.status||(x.type==='income'?'received':'paid'));return{...x,kind:x.kind||(x.type==='income'?'income':'expense'),issueDate:x.issueDate||x.date||'',dueDate:due,competence:x.competence||String(x.date||'').slice(0,7),grossAmountCents:gross,interestCents:x.interestCents||0,fineCents:x.fineCents||0,discountCents:x.discountCents||0,netAmountCents:net,settledAmountCents:settled,balanceAmountCents:balance,status,attachmentUrls:x.attachmentUrls||[],createdAt:x.createdAt||x.date||'',updatedAt:x.updatedAt||x.date||'',createdBy:x.createdBy||x.userId||'',updatedBy:x.updatedBy||x.userId||'',version:x.version||1}as CashFlowTransaction};
-export class FirebaseCashFlowAdapter implements CashFlowRepository{async list(c:CashFlowContext){return(await docs<any>('financialTransactions',c.companyId)).map(normalize).sort((a,b)=>b.dueDate.localeCompare(a.dueDate))}async auxiliary(c:CashFlowContext):Promise<CashFlowAuxiliary>{const[accounts,projects,centers,categories,clients,allocations]=await Promise.all([docs<any>('bankAccounts',c.companyId),docs<any>('projects',c.companyId),docs<any>('costCenters',c.companyId),docs<any>('financialCategories',c.companyId),docs<any>('clients',c.companyId),docs<any>('financialAllocations',c.companyId)]);return{accounts,projects,centers,categories,clients,allocations}}async create(_c:CashFlowContext,value:CashFlowInput){const r=await httpsCallable(functions,'createCashFlowTransaction')(value);return String((r.data as any).id)}async settle(_c:CashFlowContext,id:string,amountCents:number,date:string,bankAccountId:string){await httpsCallable(functions,'settleCashFlowTransaction')({id,amountCents,date,bankAccountId,idempotencyKey:crypto.randomUUID()})}async command(_c:CashFlowContext,id:string,action:'cancel'|'reverse'|'renegotiate'|'duplicate',reason:string){await httpsCallable(functions,'commandCashFlowTransaction')({id,action,reason,idempotencyKey:crypto.randomUUID()})}async importRows(_c:CashFlowContext,rows:CashFlowInput[]){await httpsCallable(functions,'importCashFlowTransactions')({rows})}async allocate(_c:CashFlowContext,transactionId:string,parts:Array<{costCenterId:string;percentageBasisPoints:number}>){await httpsCallable(functions,'allocateFinancialTransaction')({transactionId,allocations:parts})}}
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../../services/firebase';
+import type { CashFlowAuxiliary, CashFlowInput, CashFlowTransaction } from '../domain/cashFlowTypes';
+import type { CashFlowContext, CashFlowRepository } from '../repositories/cashFlowRepository';
+
+const docs = async <T,>(name: string, companyId: string) => {
+  const snapshot = await getDocs(query(collection(db, name), where('companyId', '==', companyId)));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as T));
+};
+
+const normalize = (value: any): CashFlowTransaction => {
+  const gross = value.grossAmountCents ?? Math.round(Number(value.amount || 0) * 100);
+  const net = value.netAmountCents ?? gross;
+  const completed = ['paid', 'received'].includes(value.status);
+  const settled = completed ? net : (value.settledAmountCents ?? 0);
+  const balance = completed ? 0 : (value.balanceAmountCents ?? Math.max(0, net - settled));
+  const due = value.dueDate || value.date || '';
+  const status = balance > 0 && due && due < new Date().toISOString().slice(0, 10) && ['forecast', 'pending'].includes(value.status)
+    ? 'overdue'
+    : (value.status || (value.type === 'income' ? 'received' : 'paid'));
+  return { ...value, kind: value.kind || (value.type === 'income' ? 'income' : 'expense'), issueDate: value.issueDate || value.date || '', dueDate: due, competence: value.competence || String(value.date || '').slice(0, 7), grossAmountCents: gross, interestCents: value.interestCents || 0, fineCents: value.fineCents || 0, discountCents: value.discountCents || 0, netAmountCents: net, settledAmountCents: settled, balanceAmountCents: balance, status, attachmentUrls: value.attachmentUrls || [], createdAt: value.createdAt || value.date || '', updatedAt: value.updatedAt || value.date || '', createdBy: value.createdBy || value.userId || '', updatedBy: value.updatedBy || value.userId || '', version: value.version || 1 } as CashFlowTransaction;
+};
+
+export class FirebaseCashFlowAdapter implements CashFlowRepository {
+  async list(context: CashFlowContext) { return (await docs<any>('financialTransactions', context.companyId)).map(normalize).sort((a, b) => b.dueDate.localeCompare(a.dueDate)); }
+  async auxiliary(context: CashFlowContext): Promise<CashFlowAuxiliary> {
+    const [accounts, projects, centers, categories, clients, allocations, collections] = await Promise.all([
+      docs<any>('bankAccounts', context.companyId), docs<any>('projects', context.companyId), docs<any>('costCenters', context.companyId), docs<any>('financialCategories', context.companyId), docs<any>('clients', context.companyId), docs<any>('financialAllocations', context.companyId), docs<any>('collections', context.companyId),
+    ]);
+    return { accounts, projects, centers, categories, clients, allocations, collections } as CashFlowAuxiliary;
+  }
+  async create(_context: CashFlowContext, value: CashFlowInput) { const result = await httpsCallable(functions, 'createCashFlowTransaction')(value); return String((result.data as any).id); }
+  async settle(_context: CashFlowContext, id: string, amountCents: number, date: string, bankAccountId: string) { await httpsCallable(functions, 'settleCashFlowTransaction')({ id, amountCents, date, bankAccountId, idempotencyKey: crypto.randomUUID() }); }
+  async command(_context: CashFlowContext, id: string, action: 'cancel' | 'reverse' | 'renegotiate' | 'duplicate', reason: string) { await httpsCallable(functions, 'commandCashFlowTransaction')({ id, action, reason, idempotencyKey: crypto.randomUUID() }); }
+  async importRows(_context: CashFlowContext, rows: CashFlowInput[]) { await httpsCallable(functions, 'importCashFlowTransactions')({ rows }); }
+  async allocate(_context: CashFlowContext, transactionId: string, parts: Array<{ costCenterId: string; percentageBasisPoints: number }>) { await httpsCallable(functions, 'allocateFinancialTransaction')({ transactionId, allocations: parts }); }
+}

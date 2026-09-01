@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 
@@ -21,6 +21,7 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { PlansPage } from './blu-licita/billing/pages/PlansPage';
 import { OnboardingPage } from './blu-licita/pages/OnboardingPage';
 import { PartnerProgramPage } from './pages/PartnerProgramPage';
+import { PublicStorePage } from './blu-licita/ecommerce/PublicStorePage';
 
 // Com Login
 import { BluRoutes } from './blu-licita/routes/BluRoutes';
@@ -56,6 +57,10 @@ const AppContent: React.FC = () => {
             <Route path="/products/5" element={<BluGov />} />
             <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/privacy/:id" element={<PrivacyPolicyPage />} />
+            <Route path="/:storeSlug/produto/:productSlug" element={<PublicStorePage product />} />
+            <Route path="/:storeSlug/carrinho" element={<PublicStorePage cart />} />
+            <Route path="/:storeSlug/checkout" element={<PublicStorePage checkout />} />
+            <Route path="/:storeSlug" element={<PublicStorePage />} />
             {/* Com Login */}
             <Route path="/admin/*" element={<BluRoutes />} />
             <Route path="/blu/*" element={<Navigate to="/admin/dashboard" replace />} />
@@ -68,7 +73,7 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppContent />
     </Router>
   );

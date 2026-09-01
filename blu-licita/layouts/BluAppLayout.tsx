@@ -10,6 +10,7 @@ import { interestSettingsService } from '../services/interestSettingsService';
 import { accessControlService, defaultAccessRoles, type AccessRole } from '../services/accessControlService';
 import { billingClient, normalizeBillingStatus, type BillingSummary } from '../billing/services/billingClient';
 import { listCompanyDocs } from '../services/firestoreCompany';
+import { AccountantCompanySwitcher } from '../components/AccountantCompanySwitcher';
 
 type StockAlert = { id: string; name: string; stockQuantity?: number; minStock?: number; sku?: string; barcode?: string; type?: string; active?: boolean };
 
@@ -24,6 +25,7 @@ const nav = [
   { label: 'Orçamentos', to: '/admin/orcamentos', icon: CircleDollarSign },
   { label: 'Ordens', to: '/admin/ordens', icon: ListTodo },
   { label: 'Produtos', to: '/admin/produtos', icon: Package },
+  { label: 'E-commerce', to: '/admin/ecommerce', icon: ShoppingCart },
   { label: 'PDV Público', to: '/admin/pdv', icon: ShoppingCart },
   { label: 'Financeiro', to: '/admin/financeiro', icon: WalletCards },
   { label: 'Documentos', to: '/admin/documentos', icon: FileText },
@@ -40,6 +42,24 @@ const platformAdminNav = [
   { label: 'Novidades', to: '/admin/novidades', icon: Megaphone },
   { label: 'Blu HQ', to: '/admin/hq', icon: ShieldCheck },
   { label: 'Migração', to: '/admin/migracao', icon: Database },
+];
+
+const accountantNav = (companyId: string) => [
+  { label: 'Dashboard Contábil', to: '/admin/contador', icon: LayoutDashboard },
+  { label: 'Meus Clientes', to: '/admin/empresas', icon: BriefcaseBusiness },
+  { label: 'Visão Geral', to: `/admin/contador/empresas/${companyId}/visao-geral`, icon: LayoutDashboard },
+  { label: 'Fiscal', to: `/admin/contador/empresas/${companyId}/fiscal`, icon: ClipboardCheck },
+  { label: 'Financeiro', to: `/admin/contador/empresas/${companyId}/financeiro`, icon: WalletCards },
+  { label: 'Documentos', to: `/admin/contador/empresas/${companyId}/documentos`, icon: FileText },
+  { label: 'Obrigações', to: `/admin/contador/empresas/${companyId}/obrigacoes`, icon: CalendarDays },
+  { label: 'Contas a Pagar', to: `/admin/contador/empresas/${companyId}/contas-a-pagar`, icon: CreditCard },
+  { label: 'Pessoal', to: `/admin/contador/empresas/${companyId}/pessoal`, icon: Users },
+  { label: 'Fechamento', to: `/admin/contador/empresas/${companyId}/fechamento`, icon: ClipboardCheck },
+  { label: 'Pendências', to: `/admin/contador/empresas/${companyId}/pendencias`, icon: ListTodo },
+  { label: 'Solicitações', to: `/admin/contador/empresas/${companyId}/solicitacoes`, icon: Headphones },
+  { label: 'Relatórios', to: `/admin/contador/empresas/${companyId}/relatorios`, icon: BarChart3 },
+  { label: 'Exportações', to: `/admin/contador/empresas/${companyId}/exportacoes`, icon: Database },
+  { label: 'Configurações', to: '/admin/configuracoes', icon: Settings },
 ];
 
 const quickFeatures = [
@@ -200,7 +220,7 @@ export const BluAppLayout: React.FC = () => {
   const [firebaseUid, setFirebaseUid] = useState(auth.currentUser?.uid || '');
   const [accessRoles, setAccessRoles] = useState<AccessRole[]>(defaultAccessRoles);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
-  const { user } = useBluAuth();
+  const { user, memberships, switchCompany } = useBluAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const currentRole = accessControlService.roleFor(user?.role, accessRoles);
@@ -215,8 +235,27 @@ export const BluAppLayout: React.FC = () => {
   };
   const platformAdminEmail = String(user?.email || auth.currentUser?.email || readCachedUser()?.email || '').toLowerCase();
   const isBluPlatformStaff = platformAdminEmail === 'admin@blutecnologias.com.br' || String(user?.companyId || '').toLowerCase() === 'blu-platform' || /blu/i.test(String(user?.role || ''));
-  const visibleNav = [...nav.filter((item) => canAccessPath(item.to) && (platformAdminEmail === 'admin@blutecnologias.com.br' || item.label !== 'Integrações')), ...(isBluPlatformStaff ? platformAdminNav : [])];
-  const title = [...nav, ...platformAdminNav].find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
+  const isAccountant = String(user?.role || '').toLowerCase() === 'contador';
+  const accountantNavigation = accountantNav(user?.companyId || memberships.find((item) => item.status === 'active')?.companyId || 'selecionar');
+  const accountantCanSee = (label: string) => {
+    const permissions = user?.permissions || {};
+    if (['Dashboard Contábil', 'Meus Clientes', 'Configurações'].includes(label)) return true;
+    if (label === 'Visão Geral') return permissions.accounting?.view === true;
+    if (label === 'Fiscal') return permissions.fiscal?.view === true || permissions.invoices?.view === true;
+    if (label === 'Financeiro') return permissions.financial?.view === true;
+    if (label === 'Documentos') return permissions.accountingDocuments?.view === true;
+    if (label === 'Obrigações') return permissions.accountingObligations?.view === true;
+    if (label === 'Contas a Pagar') return permissions.financial?.view === true;
+    if (label === 'Pessoal') return permissions.payroll?.view === true;
+    if (label === 'Fechamento') return permissions.accountingClosing?.view === true;
+    if (label === 'Pendências') return permissions.accountingPending?.view === true;
+    if (label === 'Solicitações') return permissions.accountingRequests?.view === true;
+    if (label === 'Relatórios') return permissions.reports?.view === true;
+    if (label === 'Exportações') return permissions.accountingExports?.view === true;
+    return false;
+  };
+  const visibleNav = isAccountant ? accountantNavigation.filter((item) => accountantCanSee(item.label)) : [...nav.filter((item) => canAccessPath(item.to) && (platformAdminEmail === 'admin@blutecnologias.com.br' || item.label !== 'Integrações')), ...(isBluPlatformStaff ? platformAdminNav : [])];
+  const title = [...nav, ...platformAdminNav, ...accountantNavigation].sort((a,b) => b.to.length - a.to.length).find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
   const subscriptionStatus = normalizeBillingStatus(billing?.subscription?.status || billing?.subscription?.accessStatus || '');
   const isFreeBillingPlan = Boolean(billing?.plan) && Number(billing?.plan?.priceInCents || 0) <= 0;
@@ -275,15 +314,19 @@ export const BluAppLayout: React.FC = () => {
     writeNotificationIds(next);
     setReadNotifications(next);
   };
-  const navGroups = [
+  const navGroups = isAccountant ? [
+    { title: 'Portal do contador', labels: ['Dashboard Contábil', 'Meus Clientes'] },
+    { title: 'Contabilidade', labels: ['Visão Geral', 'Fiscal', 'Financeiro', 'Documentos', 'Obrigações', 'Contas a Pagar', 'Pessoal', 'Fechamento', 'Pendências', 'Solicitações', 'Relatórios', 'Exportações'] },
+    { title: 'Conta', labels: ['Configurações'] },
+  ] : [
     { title: 'Essencial', labels: ['Dashboard', 'Oportunidades', 'CRM', 'Equipe', 'Licitações'] },
-    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'PDV Público'] },
+    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'E-commerce', 'PDV Público'] },
     { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
     { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
-  ] as const;
-  const navByLabel = new Map([...nav, ...platformAdminNav].map((item) => [item.label, item] as const));
+  ];
+  const navByLabel = new Map([...nav, ...platformAdminNav, ...accountantNavigation].map((item) => [item.label, item] as const));
   const renderNavItem = ({ label, to, icon: Icon }: (typeof nav)[number]) => (
-    <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} title={collapsed ? label : undefined} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-[#0877ff] shadow-sm dark:border dark:border-blue-300/20 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:shadow-blue-950/20' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-100'} ${collapsed ? 'justify-center' : ''}`}>
+    <NavLink key={to} to={to} end={to === '/admin/contador'} onClick={() => setMobileOpen(false)} title={collapsed ? label : undefined} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-[#0877ff] shadow-sm dark:border dark:border-blue-300/20 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:shadow-blue-950/20' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-100'} ${collapsed ? 'justify-center' : ''}`}>
       <Icon size={18} strokeWidth={1.9} />
       {!collapsed && <span>{label}</span>}
     </NavLink>
@@ -337,6 +380,7 @@ export const BluAppLayout: React.FC = () => {
         <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-7 dark:border-white/10 dark:bg-slate-950/90">
           <button className="rounded-xl border border-slate-200 p-2 text-slate-600 lg:hidden dark:border-white/10 dark:text-slate-300" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="min-w-0"><h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1><p className="hidden text-xs text-slate-400 sm:block">{new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}</p></div>
+          {isAccountant && !location.pathname.startsWith('/admin/contador/empresas/') ? <AccountantCompanySwitcher/> : !isAccountant && memberships.length > 1 && <select aria-label="Empresa atual" value={user?.companyId || ''} onChange={(event) => void switchCompany(event.target.value)} className="hidden max-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold lg:block dark:border-white/10 dark:bg-slate-900">{memberships.map((membership) => <option key={membership.id} value={membership.companyId}>{membership.companyName}</option>)}</select>}
           <div className="relative ml-auto hidden w-full max-w-[420px] md:block" onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/8">
               <Search size={17} className="text-slate-400"/>

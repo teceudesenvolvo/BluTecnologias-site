@@ -127,6 +127,8 @@ export const BluHqPage: React.FC = () => {
     accountId: '',
     publicKey: '',
     secretKey: '',
+    bluRecipientId: '',
+    posSplitFeeBps: 15,
     capabilities: ['checkout_link', 'credit_card', 'debit_card', 'installments', 'webhook', 'payment_check', 'subscription'],
   });
   const [tenantForm, setTenantForm] = React.useState({
@@ -214,6 +216,8 @@ export const BluHqPage: React.FC = () => {
         accountId: provider.accountId || '',
         publicKey: provider.publicKey || (provider as any).publishableKey || (provider as any).clientKey || '',
         secretKey: provider.secretKey || provider.handle || '',
+        bluRecipientId: provider.bluRecipientId || '',
+        posSplitFeeBps: Number(provider.posSplitFeeBps ?? 15),
         capabilities: (provider.capabilities?.length ? provider.capabilities : ['checkout_link', 'credit_card', 'debit_card', 'installments', 'webhook', 'payment_check', 'subscription'])
           .filter((capability) => capability !== 'pix'),
       }))
@@ -607,6 +611,15 @@ export const BluHqPage: React.FC = () => {
                       <option value="production">Produção</option>
                       <option value="sandbox">Sandbox</option>
                     </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-xs font-black uppercase tracking-[.18em] text-slate-400">Recipient ID da Blu</span>
+                    <input value={gatewayForm.bluRecipientId || ''} onChange={(event) => setGatewayForm((current) => ({ ...current, bluRecipientId: event.target.value.trim() }))} placeholder="rp_..." className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 dark:border-white/10 dark:bg-white/[0.05] dark:text-white"/>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-xs font-black uppercase tracking-[.18em] text-slate-400">Taxa Blu no PDV (%)</span>
+                    <input type="number" min="0" max="100" step="0.01" value={Number(gatewayForm.posSplitFeeBps ?? 15) / 100} onChange={(event) => setGatewayForm((current) => ({ ...current, posSplitFeeBps: Math.round(Math.max(0, Math.min(100, Number(event.target.value || 0))) * 100) }))} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 dark:border-white/10 dark:bg-white/[0.05] dark:text-white"/>
+                    <span className="block text-[11px] text-slate-400">Padrão: 0,15%. O cálculo final é feito exclusivamente no backend.</span>
                   </label>
                   <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
                     <input

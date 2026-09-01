@@ -6,6 +6,9 @@ export interface BluUser {
   companyId: string;
   companyName: string;
   billingCompanyId?: string;
+  membershipId?: string;
+  membershipStatus?: string;
+  permissions?: Record<string, Record<string, boolean>>;
 }
 
 export interface DashboardMetric {

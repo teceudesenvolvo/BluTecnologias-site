@@ -102,6 +102,64 @@ const companyDisplayName = (company?: Company | null) => company?.razaoSocial ||
 const companyFooter = (company?: Company | null) =>
   [company?.email, company?.telefoneCelular || company?.telefoneFixo, company?.address || company?.endereco].filter(Boolean).join(" · ");
 const companyLogo = (company?: Company | null) => company?.logoUrl || "";
+const companyLabel = (company?: Company | null) => company?.razaoSocial || company?.nomeFantasia || company?.cnpj || company?.id || "Empresa emitente";
+const normalizeText = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+const contractMatchesIssuer = (contract: any, company?: Company | null, issuerCompanyName?: string) => {
+  if (!company && !issuerCompanyName) return true;
+  const references = [
+    company?.id,
+    company?.razaoSocial,
+    company?.nomeFantasia,
+    company?.cnpj,
+    issuerCompanyName,
+  ]
+    .filter(Boolean)
+    .map(normalizeText);
+  if (!references.length) return true;
+  const candidates = [
+    contract?.companyId,
+    contract?.issuerCompanyId,
+    contract?.senderCompanyId,
+    contract?.companyName,
+    contract?.issuerCompanyName,
+    contract?.senderCompany,
+    contract?.razaoSocial,
+    contract?.nomeFantasia,
+    contract?.companyDocument,
+    contract?.issuerCompanyDocument,
+    contract?.cnpj,
+  ]
+    .filter(Boolean)
+    .map(normalizeText);
+  if (!candidates.length) return true;
+  return candidates.some((candidate) => references.includes(candidate));
+};
+
+const contractMatchesClient = (contract: any, client?: any) => {
+  if (!client) return true;
+  const references = [client.id, client.razaoSocial, client.name, client.cnpj].filter(Boolean).map(normalizeText);
+  if (!references.length) return true;
+  const candidates = [
+    contract?.clientId,
+    contract?.organizationId,
+    contract?.legacyClientId,
+    contract?.clientName,
+    contract?.organizationName,
+    contract?.clientDocument,
+    contract?.organizationCnpj,
+    contract?.cnpj,
+  ]
+    .filter(Boolean)
+    .map(normalizeText);
+  if (!candidates.length) return true;
+  return candidates.some((candidate) => references.includes(candidate));
+};
 
 const buildBillingReportHtml = ({
   company,
@@ -316,6 +374,7 @@ export const CollectionsPage = () => {
       {editing && (
         <CollectionEditForm
           aux={data.aux}
+          companies={companies}
           item={editing}
           saving={data.saving}
           close={() => setEditing(null)}
@@ -366,7 +425,6 @@ const OfficialBillingForm = ({
   const [sending, setSending] = React.useState(false);
   const client = aux.clients.find((item: ContactLead) => item.id === clientId);
   const contracts = client?.contracts || [];
-  const companyLabel = (company?: Company | null) => company?.razaoSocial || company?.nomeFantasia || company?.cnpj || company?.id || "Empresa emitente";
   const selectedCompany = companies.find((company) => company.id === form.senderCompanyId || company.razaoSocial === form.senderCompany || company.nomeFantasia === form.senderCompany);
   const availableBankAccounts = (aux.accounts || [])
     .filter((account: any) => account.status !== 'inactive' && account.status !== 'blocked')
@@ -907,12 +965,14 @@ const Detail = ({ item, close, edit, remove, receive }: { item: FinancialCollect
 
 const CollectionEditForm = ({
   aux,
+  companies,
   item,
   saving,
   close,
   saveCollection,
 }: {
   aux: any;
+  companies: Company[];
   item: FinancialCollection;
   saving: boolean;
   close: () => void;
@@ -965,8 +1025,14 @@ const CollectionEditForm = ({
   });
 
   const set = (key: string, value: any) => setForm((current) => ({ ...current, [key]: value }));
-  const selectedContract = aux.contracts.find((contract: any) => contract.id === form.contractId);
   const selectedClient = aux.clients.find((client: any) => client.id === form.organizationId);
+  const selectedCompany = companies.find((company) => company.id === form.issuerCompanyId || company.razaoSocial === form.issuerCompanyName || company.nomeFantasia === form.issuerCompanyName);
+  const availableContracts = (aux.contracts || []).filter((contract: any) => {
+    if (!contractMatchesIssuer(contract, selectedCompany, form.issuerCompanyName)) return false;
+    if (!contractMatchesClient(contract, selectedClient)) return false;
+    return true;
+  });
+  const selectedContract = availableContracts.find((contract: any) => String(contract.id || contract.title || contract.number) === String(form.contractId));
   const selectedProject = aux.projects.find((project: any) => project.id === form.projectId);
   const selectedCenter = aux.centers.find((center: any) => center.id === form.costCenterId);
   const selectedBank = aux.accounts.find((account: any) => account.id === form.bankAccountId);
@@ -1000,8 +1066,35 @@ const CollectionEditForm = ({
           )}
           <Input label="Número" value={form.number} set={(value) => set("number", value)} />
           <Select disabled={isReceived} label="Status" value={form.status} set={(value) => set("status", value)} options={statuses.map((value) => [value, labels[value]])} />
+          <Select
+            label="Empresa emitente"
+            value={form.issuerCompanyId || form.issuerCompanyName}
+            set={(value) => {
+              const company = companies.find((item) => item.id === value || item.razaoSocial === value || item.nomeFantasia === value);
+              setForm((current) => ({
+                ...current,
+                issuerCompanyId: company?.id || "",
+                issuerCompanyName: companyLabel(company) || value,
+                contractId: "",
+                contractName: "",
+              }));
+            }}
+            options={[["", "Empresa emitente"], ...companies.map((company) => [company.id, companyLabel(company)])]}
+          />
           <Select label="Órgão / cliente" value={form.organizationId} set={(value) => { const client = aux.clients.find((item: any) => item.id === value); setForm({ ...form, organizationId: value, organizationName: client?.razaoSocial || client?.name || "" }); }} options={[["", "Selecione"], ...aux.clients.map((item: any) => [item.id, item.razaoSocial || item.name])]}/>
-          <Select label="Contrato" value={form.contractId} set={(value) => { const contract = aux.contracts.find((item: any) => item.id === value); setForm({ ...form, contractId: value, contractName: contract?.title || contract?.number || "" }); }} options={[["", "Selecione"], ...aux.contracts.map((item: any) => [item.id, item.title || item.number])]}/>
+          <Select
+            label="Contrato"
+            value={form.contractId}
+            set={(value) => {
+              const contract = availableContracts.find((entry: any) => String(entry.id || entry.title || entry.number) === String(value));
+              setForm({
+                ...form,
+                contractId: value,
+                contractName: contract?.title || contract?.number || "",
+              });
+            }}
+            options={[["", availableContracts.length ? "Selecione" : "Nenhum contrato disponível"], ...availableContracts.map((entry: any) => [String(entry.id || entry.title || entry.number), entry.title || entry.number || "Contrato"])]}
+          />
           <Input label="Título / descrição" value={form.description} set={(value) => set("description", value)} />
           <Input label="Emissão" type="date" value={form.issueDate} set={(value) => set("issueDate", value)} />
           <Input label="Vencimento" type="date" value={form.dueDate} set={(value) => set("dueDate", value)} />

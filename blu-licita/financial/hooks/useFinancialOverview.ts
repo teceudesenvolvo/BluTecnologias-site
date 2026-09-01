@@ -1,8 +1,8 @@
 import React from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../../../services/firebase';
+import { db } from '../../../services/firebase';
 import { useBluAuth } from '../../contexts/BluAuthContext';
+import { useFinancialCompany } from '../contexts/FinancialCompanyContext';
 
 const initial = {
   from: new Date().toISOString().slice(0, 8) + '01',
@@ -91,18 +91,73 @@ const isRealized = (item: any) => {
   return !status && Boolean(item.date) && Boolean(item.type || item.kind) && Number(item.amount || item.value || item.amountCents || item.netAmountCents || 0) !== 0;
 };
 
-const list = async (name: string, companyId: string) => {
+const list = async (name: string, companyIds: string[]) => {
   try {
-    const snapshot = await getDocs(query(collection(db, name), where('companyId', '==', companyId)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const snapshots = await Promise.all(
+      companyIds.map((companyId) => getDocs(query(collection(db, name), where('companyId', '==', companyId)))),
+    );
+    return snapshots.flatMap((snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
   } catch {
     return [];
   }
 };
 
-const buildOverview = async (filters: typeof initial, companyId: string) => {
-  const entries = await Promise.all(collections.map(async (name) => [name, await list(name, companyId)] as const));
+const normalize = (value: unknown) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .toLocaleLowerCase('pt-BR');
+
+const belongsToSelectedCompany = (item: any, selectedCompanyId: string | null, selectedCompany?: any | null) => {
+  if (!selectedCompanyId || !selectedCompany) return true;
+  const aliases = [
+    selectedCompany.id,
+    selectedCompany.razaoSocial,
+    selectedCompany.nomeFantasia,
+    selectedCompany.cnpj,
+  ]
+    .filter(Boolean)
+    .map(normalize);
+
+  const candidates = [
+    item?.issuerCompanyId,
+    item?.issuerCompanyName,
+    item?.companyName,
+    item?.legalEntityId,
+    item?.senderCompanyId,
+    item?.senderCompany,
+    item?.issuerCompanyDocument,
+    item?.holderName,
+    item?.holderDocument,
+    item?.cnpj,
+    item?.document,
+  ]
+    .filter(Boolean)
+    .map(normalize);
+
+  return candidates.some((candidate) => aliases.includes(candidate));
+};
+
+const buildOverview = async (filters: typeof initial, companyIds: string[], selectedCompanyId: string | null, selectedCompany?: any | null) => {
+  const entries = await Promise.all(collections.map(async (name) => [name, await list(name, companyIds)] as const));
   const data = Object.fromEntries(entries) as Record<(typeof collections)[number], any[]>;
+  const relationMaps = {
+    collections: new Map(data.collections.map((item) => [item.id, item])),
+    accounts: new Map(data.bankAccounts.map((item) => [item.id, item])),
+    projects: new Map(data.projects.map((item) => [item.id, item])),
+    costCenters: new Map(data.costCenters.map((item) => [item.id, item])),
+  };
+  const belongs = (item: any) => {
+    if (!selectedCompanyId) return true;
+    if (belongsToSelectedCompany(item, selectedCompanyId, selectedCompany)) return true;
+    const related = [
+      relationMaps.collections.get(item?.collectionId || (item?.originType === 'collection' ? item?.originId : '')),
+      relationMaps.accounts.get(item?.bankAccountId),
+      relationMaps.projects.get(item?.projectId),
+      relationMaps.costCenters.get(item?.costCenterId),
+    ].filter(Boolean);
+    return related.some((record) => belongsToSelectedCompany(record, selectedCompanyId, selectedCompany));
+  };
   const today = new Date().toISOString().slice(0, 10);
   const filterValues = {
     projectId: filters.projectId,
@@ -117,7 +172,7 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
     return date >= filters.from && date <= filters.to;
   };
   const transactions = data.financialTransactions.filter(
-    (item) => matches(item) && item.dreImpact !== false && !['transferIn', 'transferOut', 'balanceAdjustment'].includes(item.kind),
+    (item) => belongs(item) && matches(item) && item.dreImpact !== false && !['transferIn', 'transferOut', 'balanceAdjustment'].includes(item.kind),
   );
   const periodTransactions = transactions.filter(inPeriod);
   const realized = periodTransactions.filter(isRealized);
@@ -136,15 +191,15 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
       status: account.status || 'active',
     })),
   );
-  const accounts = [...data.bankAccounts, ...legacyAccounts].filter((item) => matches(item) && item.status !== 'inactive');
+  const accounts = [...data.bankAccounts, ...legacyAccounts].filter((item) => belongs(item) && matches(item) && item.status !== 'inactive');
   const consolidatedCents = accounts.reduce((sum, item) => sum + Number(item.currentBalanceCents || 0), 0);
   const availableCents = accounts.reduce((sum, item) => sum + Number(item.currentBalanceCents || 0) - Number(item.blockedBalanceCents || 0), 0);
-  const receivables = data.accountsReceivable.filter((item) => matches(item) && !['received', 'cancelled'].includes(item.status));
-  const payables = data.accountsPayable.filter((item) => matches(item) && !['paid', 'cancelled'].includes(item.status));
-  const collectionsData = data.collections.filter((item) => matches(item) && !item.deletedAt);
-  const taxes = data.taxRecords.filter(matches);
-  const documents = data.fiscalDocuments.filter(matches);
-  const projects = data.projects.filter(matches);
+  const receivables = data.accountsReceivable.filter((item) => belongs(item) && matches(item) && !['received', 'cancelled'].includes(item.status));
+  const payables = data.accountsPayable.filter((item) => belongs(item) && matches(item) && !['paid', 'cancelled'].includes(item.status));
+  const collectionsData = data.collections.filter((item) => matches(item) && !item.deletedAt && belongsToSelectedCompany(item, selectedCompanyId, selectedCompany));
+  const taxes = data.taxRecords.filter((item) => matches(item) && belongsToSelectedCompany(item, selectedCompanyId, selectedCompany));
+  const documents = data.fiscalDocuments.filter((item) => matches(item) && belongsToSelectedCompany(item, selectedCompanyId, selectedCompany));
+  const projects = data.projects.filter((item) => matches(item) && belongsToSelectedCompany(item, selectedCompanyId, selectedCompany));
   const legacyClientInvoices = data.clients.flatMap((client) =>
     (client.invoices || []).filter(Boolean).map((invoice: any, index: number) => ({
       ...invoice,
@@ -158,7 +213,7 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
       netAmountCents: cents(invoice, 'netAmountCents', 'amountCents'),
       status: invoice.status || 'issued',
     })),
-  ).filter(matches);
+  ).filter((item) => belongs(item) && matches(item));
   const openCollections = collectionsData.filter((item) => !['received', 'cancelled'].includes(String(item.status)));
   const pendingExpenseTransactions = transactions.filter((item) => (item.kind === 'expense' || item.type === 'expense') && !isRealized(item) && !['cancelled'].includes(String(item.status)));
   const receivableCents =
@@ -183,7 +238,8 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
   ];
   const billingCents = billingSources.reduce((sum, item) => sum + cents(item, 'grossAmountCents', 'originalAmountCents', 'amountCents'), 0);
   const receivedCents = collectionsData.filter(inPeriod).reduce((sum, item) => sum + cents(item, 'receivedAmountCents'), 0);
-  const contracts = data.clients
+  const scopedClients = data.clients.filter((item) => belongsToSelectedCompany(item, selectedCompanyId, selectedCompany));
+  const contracts = scopedClients
     .flatMap((client) => (client.contracts || []).map((contract: any) => ({ ...contract, clientId: client.id, organizationName: client.razaoSocial || client.name })))
     .filter(matches);
   const activeContracts = contracts.filter((item) => !['closed', 'cancelled', 'completed'].includes(String(item.status)));
@@ -245,7 +301,7 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
     const fallback = Number(project.realizedRevenueCents || 0) - Number(project.realizedCostCents || 0);
     return { id: project.id, name: project.name, valueCents: projectIncome || projectExpense ? projectIncome - projectExpense : fallback };
   }).filter((item) => item.valueCents !== 0);
-  const unreconciled = data.bankStatementItems.filter((item) => matches(item) && ['unreconciled', 'partiallyReconciled', 'divergent'].includes(item.status));
+  const unreconciled = data.bankStatementItems.filter((item) => belongs(item) && matches(item) && ['unreconciled', 'partiallyReconciled', 'divergent'].includes(item.status));
   const overBudget = projects.filter((item) => Number(item.budgetCents || 0) > 0 && Number(item.realizedCostCents || 0) > Number(item.budgetCents || 0));
   const taxSoon = taxes.filter((item) => !['paid', 'cancelled'].includes(item.status) && String(item.dueDate || '') >= today && String(item.dueDate || '') <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
   const notesWithoutCollection = invoices.filter((item) => !item.collectionId);
@@ -291,11 +347,11 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
     },
     alerts,
     options: {
-      projects: data.projects.map((item) => ({ id: item.id, name: item.name })),
-      costCenters: data.costCenters.map((item) => ({ id: item.id, name: item.name })),
-      accounts: accounts.map((item) => ({ id: item.id, name: item.name })),
+      projects: projects.map((item) => ({ id: item.id, name: item.name })),
+      costCenters: data.costCenters.filter((item) => belongsToSelectedCompany(item, selectedCompanyId, selectedCompany)).map((item) => ({ id: item.id, name: item.name })),
+      accounts: accounts.filter((item) => belongsToSelectedCompany(item, selectedCompanyId, selectedCompany)).map((item) => ({ id: item.id, name: item.name })),
       contracts: [...new Map(contracts.map((item) => [item.id, { id: item.id, name: item.title || item.name }])).values()],
-      organizations: [...new Map(data.clients.map((item) => [item.id, { id: item.id, name: item.razaoSocial || item.name }])).values()],
+      organizations: [...new Map(scopedClients.map((item) => [item.id, { id: item.id, name: item.razaoSocial || item.name }])).values()],
     },
     updatedAt: new Date().toISOString(),
     source: 'firestore-fallback',
@@ -304,26 +360,23 @@ const buildOverview = async (filters: typeof initial, companyId: string) => {
 
 export const useFinancialOverview = () => {
   const { user } = useBluAuth();
+  const { selectedCompanyId, selectedCompany } = useFinancialCompany();
   const [filters, setFilters] = React.useState(initial);
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+
   const reload = React.useCallback(async () => {
-    if (!user?.companyId) {
+    const companyIds = user?.companyId ? [user.companyId] : [];
+    if (!companyIds.length) {
       setData(empty);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const firestoreData = await buildOverview(filters, user.companyId);
-      try {
-        const response = await httpsCallable(functions, 'getFinancialOverview')(filters);
-        const functionData = response.data;
-        setData(usefulScore(functionData) > usefulScore(firestoreData) ? functionData : firestoreData);
-      } catch {
-        setData(firestoreData);
-      }
+      const firestoreData = await buildOverview(filters, companyIds, selectedCompanyId, selectedCompany);
+      setData(firestoreData);
       setError('');
     } catch (error: any) {
       setData((current: any) => current || empty);
@@ -331,7 +384,7 @@ export const useFinancialOverview = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, user?.companyId]);
+  }, [filters, selectedCompany, selectedCompanyId, user?.companyId]);
   React.useEffect(() => {
     const timer = setTimeout(reload, 250);
     return () => clearTimeout(timer);

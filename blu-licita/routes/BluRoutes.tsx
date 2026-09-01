@@ -63,12 +63,16 @@ import { SupportPage } from "../pages/SupportPage";
 import { MigrationPage } from "../pages/MigrationPage";
 import { PartnerSignupPage } from "../pages/PartnerSignupPage";
 import { PartnerPortalPage } from "../pages/PartnerPortalPage";
+import { AccountantCompaniesPage, AccountantDashboardPage } from "../pages/AccountantCompaniesPage";
+import { AccountingWorkspacePage } from "../pages/AccountingWorkspacePage";
+import { AccountantCompanyProvider } from "../contexts/AccountantCompanyContext";
+import { EcommercePage } from "../pages/EcommercePage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
   const location = useLocation();
   return user ? (
-    <BluAppLayout />
+    <AccountantCompanyProvider><BluAppLayout /></AccountantCompanyProvider>
   ) : (
     <Navigate to="/admin/login" replace state={{ from: location.pathname }} />
   );
@@ -269,9 +273,14 @@ export const BluRoutes: React.FC = () => (
         <Route path="oportunidades" element={<OpportunitiesPage />} />
         <Route path="crm" element={<CrmBoardPage />} />
         <Route path="equipe" element={<TeamPage />} />
+        <Route path="empresas" element={<AccountantCompaniesPage />} />
+        <Route path="contador" element={<AccountantDashboardPage />} />
+        <Route path="contador/central" element={<AccountingWorkspacePage />} />
+        <Route path="contador/empresas/:companyId/:section" element={<AccountingWorkspacePage />} />
         <Route path="licitacoes" element={<SavedBiddingsPage />} />
         <Route path="ordens" element={<OrdersPage />} />
         <Route path="produtos" element={<ProductsPage />} />
+        <Route path="ecommerce" element={<EcommercePage />} />
         <Route path="pdv" element={<PublicPointOfSalePage />} />
         <Route
           path="cobrancas"

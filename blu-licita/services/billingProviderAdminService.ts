@@ -11,6 +11,8 @@ export type BillingProviderConfig = {
   accountId?: string;
   publicKey?: string;
   secretKey?: string;
+  bluRecipientId?: string;
+  posSplitFeeBps?: number;
   capabilities: string[];
   createdAt?: string;
   updatedAt?: string;

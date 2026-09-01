@@ -73,6 +73,39 @@ const legacy = (clients: any[], companyId: string): FinancialCollection[] => cli
   })
 );
 
+const firstValue = (...values: any[]) => values.find(value => value !== undefined && value !== null && value !== '') ?? '';
+
+// Contratos do fluxo atual são mantidos dentro do documento do cliente.
+// O financeiro também aceita a coleção `contracts`, então consolidamos as duas
+// origens em um formato único antes de entregar os dados aos formulários.
+const embeddedClientContracts = (clients: any[]) => clients.flatMap(client =>
+  (client.contracts || []).filter(Boolean).map((contract: any, index: number) => ({
+    ...contract,
+    id: String(firstValue(contract.id, `${client.id}-${index}`)),
+    title: String(firstValue(contract.title, contract.name, contract.description, contract.object, contract.numeroContrato, contract.number, 'Contrato')),
+    number: String(firstValue(contract.number, contract.numeroContrato, contract.procurementNumber, contract.numeroLicitacao)),
+    clientId: client.id,
+    organizationId: client.id,
+    legacyClientId: client.id,
+    clientName: String(firstValue(client.razaoSocial, client.name, client.nomeFantasia, 'Cliente')),
+    organizationName: String(firstValue(client.razaoSocial, client.name, client.nomeFantasia, 'Cliente')),
+    clientDocument: String(firstValue(client.cnpj, client.cpfCnpj, client.document)),
+    organizationCnpj: String(firstValue(client.cnpj, client.cpfCnpj, client.document)),
+    embeddedInClient: true,
+  }))
+);
+
+const mergeContracts = (standalone: any[], embedded: any[]) => {
+  const merged = new Map<string, any>();
+  [...standalone, ...embedded].forEach(contract => {
+    const key = String(firstValue(contract.id, contract.number, contract.title));
+    const clientKey = String(firstValue(contract.clientId, contract.organizationId, contract.legacyClientId));
+    const compositeKey = `${clientKey}::${key}`;
+    merged.set(compositeKey, { ...(merged.get(compositeKey) || {}), ...contract });
+  });
+  return [...merged.values()];
+};
+
 const normalizeCollectionNumber = (value?: string) => String(value || '').replace(/^COB-/i, '').trim();
 
 const duplicateKey = (item: FinancialCollection) =>
@@ -114,7 +147,7 @@ export class FirebaseCollectionAdapter implements CollectionRepository {
   events(context: CollectionContext) { return list<CollectionEvent>('collectionEvents', context.companyId); }
   async auxiliary(context: CollectionContext): Promise<CollectionAuxiliary> {
     const companyIds = candidateCompanyIds(context.companyId);
-    const [clients, contracts, projects, centers, accountGroups, legacyAccounts, methods] = await Promise.all([
+    const [clients, standaloneContracts, projects, centers, accountGroups, legacyAccounts, methods] = await Promise.all([
       safeList<any>('clients', context.companyId),
       safeList<any>('contracts', context.companyId),
       safeList<any>('projects', context.companyId),
@@ -128,6 +161,7 @@ export class FirebaseCollectionAdapter implements CollectionRepository {
       legacyFinancialSettings: false,
     }));
     const byId = new Map([...accounts, ...legacyAccounts].map((account: any) => [account.id, { status: 'active', ...account }]));
+    const contracts = mergeContracts(standaloneContracts, embeddedClientContracts(clients));
     return { clients, contracts, projects, centers, accounts: [...byId.values()], paymentMethods: methods.filter(item => item.section === 'paymentMethods') };
   }
   async save(_context: CollectionContext, value: CollectionInput, id?: string) { const result = await httpsCallable(functions, 'mutateCollection')({ action: id ? 'update' : 'create', id, value, idempotencyKey: crypto.randomUUID() }); return String((result.data as any).id); }
