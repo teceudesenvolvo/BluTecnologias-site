@@ -46,4 +46,5 @@ export const ecommerceService = {
   saveStore: (companyId:string,store:Partial<EcommerceStore>) => invoke<{storeId:string;storeSlug:string}>({action:'save_store',companyId,store}),
   publishProduct: (companyId:string,productId:string,published:boolean) => invoke({action:'update_product_channel',companyId,productId,published}),
   publicStore: (slug:string) => invoke<{redirectTo?:string;store?:EcommerceStore & {slug:string};products?:EcommerceCatalogProduct[]}>({action:'public_store',slug}),
+  quoteDelivery: (slug:string,input:{postalCode:string;state:string;city:string;neighborhood:string;subtotalCents:number}) => invoke<{available:boolean;feeCents:number;estimatedDays:number;method:string;message:string}>({action:'quote_delivery',slug,...input}),
 };

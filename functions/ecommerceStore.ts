@@ -38,8 +38,39 @@ async function publicCompanyIdentity(companyId: string, root: Record<string, any
   return {...root, ...selected};
 }
 
+function normalizeLocation(value: unknown) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+function normalizedShipping(value: any = {}) {
+  const modes = ['correios', 'own', 'fixed'];
+  const list = (items: any) => Array.isArray(items) ? items.map((item) => String(item).trim()).filter(Boolean).slice(0, 100) : [];
+  return {enabled:Boolean(value.enabled),mode:modes.includes(value.mode) ? value.mode : 'fixed',originPostalCode:String(value.originPostalCode || '').replace(/\D/g, '').slice(0, 8),fixedFeeCents:Math.max(0, Number(value.fixedFeeCents || 0)),freeOverCents:Math.max(0, Number(value.freeOverCents || 0)),estimatedDays:Math.max(0, Math.min(60, Number(value.estimatedDays || 0))),coverage:{states:list(value.coverage?.states).map((item) => item.toUpperCase()),cities:list(value.coverage?.cities),neighborhoods:list(value.coverage?.neighborhoods)},correios:{services:list(value.correios?.services),contractCode:String(value.correios?.contractCode || ''),credentialsStatus:String(value.correios?.credentialsStatus || 'not_configured'),fallbackFeeCents:Math.max(0, Number(value.correios?.fallbackFeeCents || 0))}};
+}
+
 export const ecommerceStore = functions.https.onCall(async (payload, context) => {
   const action = String(payload?.action || '');
+  if (action === 'quote_delivery') {
+    const requestedSlug = normalizeStoreSlug(payload?.slug);
+    const slugDoc = await db().collection('storeSlugs').doc(requestedSlug).get();
+    const slugData = slugDoc.data() || {};
+    if (!slugDoc.exists || slugData.redirectTo) throw new functions.https.HttpsError('not-found', 'Loja não encontrada.');
+    const store = await db().collection('ecommerceStores').doc(String(slugData.storeId || slugData.companyId)).get();
+    const storeData = store.data() || {};
+    if (!store.exists || storeData.status !== 'active') throw new functions.https.HttpsError('not-found', 'Loja indisponível.');
+    const shipping = normalizedShipping(storeData.shipping);
+    if (!shipping.enabled) return {available:false,feeCents:0,estimatedDays:0,method:'disabled',message:'Esta loja não oferece entrega para o endereço.'};
+    const address = {state:String(payload?.state || '').trim().toUpperCase(),city:normalizeLocation(payload?.city),neighborhood:normalizeLocation(payload?.neighborhood),postalCode:String(payload?.postalCode || '').replace(/\D/g, '').slice(0, 8)};
+    if (address.postalCode.length !== 8) return {available:false,feeCents:0,estimatedDays:0,method:shipping.mode,message:'Informe um CEP válido.'};
+    const allowed = (values: string[], current: string) => !values.length || values.map(normalizeLocation).includes(normalizeLocation(current));
+    const covered = allowed(shipping.coverage.states, address.state) && allowed(shipping.coverage.cities, address.city) && allowed(shipping.coverage.neighborhoods, address.neighborhood);
+    if (!covered) return {available:false,feeCents:0,estimatedDays:0,method:shipping.mode,message:'Endereço fora da área de entrega configurada.'};
+    const subtotal = Math.max(0, Number(payload?.subtotalCents || 0));
+    if (shipping.freeOverCents > 0 && subtotal >= shipping.freeOverCents) return {available:true,feeCents:0,estimatedDays:shipping.estimatedDays,method:shipping.mode,message:'Frete grátis disponível.'};
+    if (shipping.mode === 'correios' && shipping.correios.credentialsStatus !== 'active' && !shipping.correios.fallbackFeeCents) return {available:false,feeCents:0,estimatedDays:0,method:'correios',message:'A cotação dos Correios ainda não foi ativada pela loja.'};
+    const feeCents = shipping.mode === 'correios' ? shipping.correios.fallbackFeeCents : shipping.fixedFeeCents;
+    return {available:true,feeCents,estimatedDays:shipping.estimatedDays,method:shipping.mode,message:'Entrega disponível para este endereço.'};
+  }
   if (action === 'public_store') {
     const requestedSlug = normalizeStoreSlug(payload?.slug);
     const slugRef = db().collection('storeSlugs').doc(requestedSlug);
@@ -113,7 +144,7 @@ export const ecommerceStore = functions.https.onCall(async (payload, context) =>
       const authEmail = String(context.auth?.token?.email || '').trim().toLowerCase();
       const requestedAdmin = input.administrator || {};
       const administrator = {userId: authEmail && authEmail === String(requestedAdmin.email || authEmail).trim().toLowerCase() ? uid : String(requestedAdmin.userId || ''), name:String(requestedAdmin.name || context.auth?.token?.name || authEmail || 'Administrador'), email:String(requestedAdmin.email || authEmail).trim().toLowerCase(), role:'ecommerce_admin', status:authEmail && authEmail === String(requestedAdmin.email || authEmail).trim().toLowerCase() ? 'active' : 'pending'};
-      tx.set(storeRef, {companyId, publicCompanyId:String(input.publicCompanyId || identity.id || ''), storeSlug: validation.slug, name: !requestedName || requestedName === 'Minha empresa' ? companyName : requestedName, description: String(input.description || ''), headerMessage:String(input.headerMessage || ''), logoUrl: String(identity.logoUrl || input.logoUrl || ''), administrator, onboarding:{completed:Boolean(input.onboarding?.completed),completedAt:input.onboarding?.completed ? (previous.onboarding?.completedAt || timestamp) : null}, status: ['draft','active','suspended'].includes(input.status) ? input.status : 'draft', paymentMethods: {pix: Boolean(input.paymentMethods?.pix), creditCard: Boolean(input.paymentMethods?.creditCard), boleto: Boolean(input.paymentMethods?.boleto)}, maxInstallments: Math.min(12, Math.max(1, Number(input.maxInstallments || 1))), shipping: input.shipping || {}, theme: input.theme || {}, seo: input.seo || {}, recipient: previous.recipient || {provider:'pagarme',status:'not_started',onboardingStatus:'not_started'}, meta: previous.meta || {status:'not_connected'}, updatedAt: timestamp, updatedBy: uid, createdAt: previous.createdAt || timestamp, createdBy: previous.createdBy || uid}, {merge: true});
+      tx.set(storeRef, {companyId, publicCompanyId:String(input.publicCompanyId || identity.id || ''), storeSlug: validation.slug, name: !requestedName || requestedName === 'Minha empresa' ? companyName : requestedName, description: String(input.description || ''), headerMessage:String(input.headerMessage || ''), logoUrl: String(identity.logoUrl || input.logoUrl || ''), administrator, onboarding:{completed:Boolean(input.onboarding?.completed),completedAt:input.onboarding?.completed ? (previous.onboarding?.completedAt || timestamp) : null}, status: ['draft','active','suspended'].includes(input.status) ? input.status : 'draft', paymentMethods: {pix: Boolean(input.paymentMethods?.pix), creditCard: Boolean(input.paymentMethods?.creditCard), boleto: Boolean(input.paymentMethods?.boleto)}, maxInstallments: Math.min(12, Math.max(1, Number(input.maxInstallments || 1))), shipping: normalizedShipping(input.shipping), theme: input.theme || {}, seo: input.seo || {}, recipient: previous.recipient || {provider:'pagarme',status:'not_started',onboardingStatus:'not_started'}, meta: previous.meta || {status:'not_connected'}, updatedAt: timestamp, updatedBy: uid, createdAt: previous.createdAt || timestamp, createdBy: previous.createdBy || uid}, {merge: true});
       if (administrator.status === 'pending' && administrator.email && administrator.email !== previous.administrator?.email) {
         const invitationId = `${companyId}_ecommerce_${administrator.email.replace(/[^a-z0-9]/g, '_')}`;
         tx.set(db().collection('teamInvitations').doc(invitationId), {email:administrator.email,name:administrator.name,role:'Administrador do E-commerce',userType:'ecommerce_admin',companyIds:[companyId],status:'pending',createdBy:uid,createdAt:timestamp,expiresAt:new Date(Date.now()+7*86400000).toISOString()}, {merge:true});

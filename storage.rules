@@ -10,6 +10,17 @@ service firebase.storage {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function managesCompany(companyId) {
+      return signedIn() && (
+        companyId == request.auth.uid ||
+        companyId == 'company-' + request.auth.uid ||
+        firestore.get(/databases/(default)/documents/companies/$(companyId)).data.ownerUserId == request.auth.uid ||
+        firestore.get(/databases/(default)/documents/companies/$(companyId)).data.createdBy == request.auth.uid ||
+        firestore.exists(/databases/(default)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)) ||
+        firestore.exists(/databases/(default)/documents/companyUsers/$(companyId + '_' + request.auth.uid))
+      );
+    }
+
     match /documents/{userId}/{fileName=**} {
       allow read, write: if ownsUserFolder(userId);
     }
@@ -29,6 +40,14 @@ service firebase.storage {
 
     match /profiles/{userId}/{fileName=**} {
       allow read, write: if ownsUserFolder(userId);
+    }
+
+    match /products/{companyId}/{fileName=**} {
+      allow read: if true;
+      allow create, update: if managesCompany(companyId)
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if managesCompany(companyId);
     }
 
     match /news/{fileName=**} {

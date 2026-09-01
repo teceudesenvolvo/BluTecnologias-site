@@ -10,6 +10,17 @@ export interface EcommerceAdministrator {
   userId?:string; name:string; email:string; role:'ecommerce_admin'; status:'active'|'pending';
 }
 
+export interface EcommerceShippingSettings {
+  enabled:boolean;
+  mode:'correios'|'own'|'fixed';
+  originPostalCode?:string;
+  fixedFeeCents:number;
+  freeOverCents?:number;
+  estimatedDays?:number;
+  coverage:{states:string[];cities:string[];neighborhoods:string[]};
+  correios?:{services:string[];contractCode?:string;credentialsStatus?:string;fallbackFeeCents?:number};
+}
+
 export interface EcommerceStore {
   id?: string; companyId: string; publicCompanyId?:string; storeSlug: string; name: string; description?: string; logoUrl?: string; headerMessage?:string;
   publicInfo?: {legalName?:string;tradeName?:string;document?:string;city?:string;state?:string;phone?:string;email?:string};
@@ -17,7 +28,7 @@ export interface EcommerceStore {
   recipient?: {provider:'pagarme';recipientId?:string;status:string;onboardingStatus:string};
   administrator?:EcommerceAdministrator;
   onboarding?:{completed:boolean;completedAt?:string};
-  meta?: {status:string}; theme?: {primaryColor?:string;secondaryColor?:string;headerTextColor?:string}; shipping?: Record<string,unknown>; seo?: Record<string,unknown>;
+  meta?: {status:string}; theme?: {primaryColor?:string;secondaryColor?:string;headerTextColor?:string}; shipping?: EcommerceShippingSettings; seo?: Record<string,unknown>;
 }
 
 export interface EcommerceCatalogProduct {id:string;name:string;type:string;active:boolean;priceCents:number;stockQuantity:number;images:string[];published:boolean;slug?:string;description?:string;category?:string;availableQuantity?:number;unit?:string}

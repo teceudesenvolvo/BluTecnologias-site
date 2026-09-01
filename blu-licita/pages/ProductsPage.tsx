@@ -430,7 +430,8 @@ export const ProductsPage: React.FC = () => {
           `products/${user.companyId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`,
           mimeType,
         );
-        if (uploaded) imageUrls.push(uploaded);
+        if (!uploaded) throw new Error("Não foi possível salvar uma das imagens no Storage. Verifique sua conexão e tente novamente.");
+        imageUrls.push(uploaded);
       } else if (image) {
         imageUrls.push(image);
       }
@@ -999,6 +1000,8 @@ const ProductForm = ({
   const [lookingUpBarcode, setLookingUpBarcode] = React.useState(false);
   const [barcodeMessage, setBarcodeMessage] = React.useState("");
   const [imageMessage, setImageMessage] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState("");
   const isEditing = Boolean(initialValue);
 
   const addImages = async (files?: FileList | null) => {
@@ -1076,9 +1079,17 @@ const ProductForm = ({
           </button>
         </header>
         <form
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            save(form);
+            setSaving(true);
+            setSaveError("");
+            try {
+              await save(form);
+            } catch (reason) {
+              setSaveError(reason instanceof Error ? reason.message : "Não foi possível salvar o produto.");
+            } finally {
+              setSaving(false);
+            }
           }}
           className="flex max-h-[calc(92vh-72px)] flex-col"
         >
@@ -1217,13 +1228,14 @@ const ProductForm = ({
               </div>
             </section>
           </div>
+          {saveError && <p className="mx-5 rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{saveError}</p>}
           <footer className="flex justify-end gap-2 border-t p-5">
             <button type="button" onClick={close} className="rounded-xl border px-4 py-2 font-bold">
               Cancelar
             </button>
-            <button className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-bold text-white">
-              <Save size={16} />
-              Salvar
+            <button disabled={saving} className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-bold text-white disabled:opacity-50">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {saving ? "Salvando imagens..." : "Salvar"}
             </button>
           </footer>
         </form>
