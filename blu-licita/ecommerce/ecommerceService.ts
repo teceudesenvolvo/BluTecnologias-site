@@ -1,6 +1,6 @@
 import {httpsCallable} from 'firebase/functions';
 import {functions} from '../../services/firebase';
-import type {EcommerceCatalogProduct,EcommerceStore} from './ecommerceTypes';
+import type {EcommerceCatalogProduct,EcommercePublicCompany,EcommerceStore} from './ecommerceTypes';
 
 const ecommerceApiEnabled = import.meta.env.VITE_ECOMMERCE_API_ENABLED !== 'false';
 const reservedSlugs = new Set([
@@ -39,7 +39,7 @@ const invoke = <T>(payload:Record<string,unknown>) => {
 };
 
 export const ecommerceService = {
-  admin: (companyId:string) => invoke<{store:EcommerceStore|null;products:EcommerceCatalogProduct[]}>({action:'get_admin',companyId}),
+  admin: (companyId:string) => invoke<{store:EcommerceStore|null;products:EcommerceCatalogProduct[];companies:EcommercePublicCompany[]}>({action:'get_admin',companyId}),
   checkSlug: (companyId:string,slug:string) => ecommerceApiEnabled
     ? invoke<{valid:boolean;slug:string;available:boolean;reason:string}>({action:'check_slug',companyId,slug})
     : Promise.resolve(localSlugCheck(slug)),

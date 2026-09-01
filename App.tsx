@@ -31,8 +31,14 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
   const isLanding = location.pathname === '/';
-  const hideFooter = location.pathname === '/login' || isSystem || isLanding;
-  const hideNavbar = location.pathname === '/login' || isSystem || isLanding;
+  const firstSegment = location.pathname.split('/').filter(Boolean)[0] || '';
+  const institutionalRoots = new Set([
+    'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products',
+    'privacy', 'admin', 'blu',
+  ]);
+  const isStorefront = Boolean(firstSegment) && !institutionalRoots.has(firstSegment);
+  const hideFooter = location.pathname === '/login' || isSystem || isLanding || isStorefront;
+  const hideNavbar = location.pathname === '/login' || isSystem || isLanding || isStorefront;
 
   return (
       <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>
