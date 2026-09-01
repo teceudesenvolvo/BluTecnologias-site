@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import {createHash} from 'crypto';
 import {normalizeStoreSlug, publicProductSlug, validateStoreSlug} from './ecommercePolicy';
 
 const db = () => admin.firestore();
@@ -50,6 +51,30 @@ function normalizedShipping(value: any = {}) {
 
 export const ecommerceStore = functions.https.onCall(async (payload, context) => {
   const action = String(payload?.action || '');
+  if (action === 'register_customer') {
+    const requestedSlug = normalizeStoreSlug(payload?.slug);
+    const slugDoc = await db().collection('storeSlugs').doc(requestedSlug).get();
+    const slugData = slugDoc.data() || {};
+    if (!slugDoc.exists || slugData.redirectTo) throw new functions.https.HttpsError('not-found', 'Loja não encontrada.');
+    const store = await db().collection('ecommerceStores').doc(String(slugData.storeId || slugData.companyId)).get();
+    const storeData = store.data() || {};
+    if (!store.exists || storeData.status !== 'active' || storeData.companyId !== slugData.companyId) throw new functions.https.HttpsError('not-found', 'Loja indisponível.');
+    const input = payload?.customer || {};
+    const email = String(input.email || '').trim().toLowerCase();
+    const name = String(input.name || '').trim();
+    const document = String(input.document || '').replace(/\D/g, '').slice(0, 14);
+    const phone = String(input.phone || '').replace(/\D/g, '').slice(0, 13);
+    if (!name || !/^\S+@\S+\.\S+$/.test(email)) throw new functions.https.HttpsError('invalid-argument', 'Informe nome e e-mail válidos.');
+    if (!input.acceptedPrivacy) throw new functions.https.HttpsError('failed-precondition', 'É necessário aceitar o uso dos dados para concluir o cadastro.');
+    const address = (value: any = {}) => ({postalCode:String(value.postalCode || '').replace(/\D/g, '').slice(0, 8),street:String(value.street || '').trim().slice(0, 160),number:String(value.number || '').trim().slice(0, 20),complement:String(value.complement || '').trim().slice(0, 100),neighborhood:String(value.neighborhood || '').trim().slice(0, 100),city:String(value.city || '').trim().slice(0, 100),state:String(value.state || '').trim().toUpperCase().slice(0, 2)});
+    const mainAddress = address(input.address);
+    const billingSameAsAddress = input.billingSameAsAddress !== false;
+    const customerId = createHash('sha256').update(`${storeData.companyId}:${email}`).digest('hex');
+    const ref = db().collection('storeCustomers').doc(customerId);
+    const previous = await ref.get();
+    await ref.set({companyId:storeData.companyId,storeId:store.id,personType:input.personType === 'company' ? 'company' : 'individual',name,email,phone,document,address:mainAddress,billingSameAsAddress,billingAddress:billingSameAsAddress ? mainAddress : address(input.billingAddress),acceptedPrivacyAt:previous.data()?.acceptedPrivacyAt || now(),updatedAt:now(),createdAt:previous.data()?.createdAt || now()}, {merge:true});
+    return {customerId};
+  }
   if (action === 'quote_delivery') {
     const requestedSlug = normalizeStoreSlug(payload?.slug);
     const slugDoc = await db().collection('storeSlugs').doc(requestedSlug).get();
@@ -95,9 +120,10 @@ export const ecommerceStore = functions.https.onCall(async (payload, context) =>
       phone: String(company.telefoneCelular || company.phone || ''),
       email: String(company.email || ''),
     };
-    const catalog = products.docs.filter((item) => item.data().type !== 'service' && item.data().salesChannels?.bluStore === true).map((item) => {
+    const catalog = products.docs.filter((item) => item.data().salesChannels?.bluStore === true).map((item) => {
       const value = item.data();
-      return {id: item.id, slug: value.publicSlug || publicProductSlug(value.name, item.id), name: value.name, description: value.notes || '', category: value.category || '', priceCents: Number(value.salePriceCents || 0), images: Array.isArray(value.images) ? value.images.slice(0, 3) : [], availableQuantity: Math.max(0, Number(value.stockQuantity || 0) - Number(value.reservedQuantity || 0)), unit: value.unit || 'un'};
+      const service = value.type === 'service';
+      return {id: item.id, type:value.type || 'product', slug: value.publicSlug || publicProductSlug(value.name, item.id), name: value.name, description: value.notes || '', category: value.category || (service ? 'Serviços' : ''), priceCents: Number(value.salePriceCents || 0), images: Array.isArray(value.images) ? value.images.slice(0, 3) : [], availableQuantity: service ? 999 : Math.max(0, Number(value.stockQuantity || 0) - Number(value.reservedQuantity || 0)), unit: value.unit || (service ? 'serv' : 'un')};
     });
     return {store: {id: store.id, slug: storeData.storeSlug, name: storeData.name || publicInfo.tradeName, description: storeData.description || '', headerMessage: storeData.headerMessage || '', logoUrl: company.logoUrl || storeData.logoUrl || '', publicInfo, theme: storeData.theme || {}, paymentMethods: storeData.paymentMethods || {}, shipping: storeData.shipping || {}, seo: storeData.seo || {}}, products: catalog};
   }

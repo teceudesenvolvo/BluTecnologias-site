@@ -67,6 +67,7 @@ import { AccountantCompaniesPage, AccountantDashboardPage } from "../pages/Accou
 import { AccountingWorkspacePage } from "../pages/AccountingWorkspacePage";
 import { AccountantCompanyProvider } from "../contexts/AccountantCompanyContext";
 import { EcommercePage } from "../pages/EcommercePage";
+import { ServicesPage } from "../pages/ServicesPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
@@ -280,6 +281,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="licitacoes" element={<SavedBiddingsPage />} />
         <Route path="ordens" element={<OrdersPage />} />
         <Route path="produtos" element={<ProductsPage />} />
+        <Route path="servicos/:section?" element={<ServicesPage />} />
         <Route path="ecommerce" element={<EcommercePage />} />
         <Route path="pdv" element={<PublicPointOfSalePage />} />
         <Route

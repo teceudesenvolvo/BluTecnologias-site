@@ -25,6 +25,7 @@ const nav = [
   { label: 'Orçamentos', to: '/admin/orcamentos', icon: CircleDollarSign },
   { label: 'Ordens', to: '/admin/ordens', icon: ListTodo },
   { label: 'Produtos', to: '/admin/produtos', icon: Package },
+  { label: 'Serviços', to: '/admin/servicos', icon: CalendarDays },
   { label: 'E-commerce', to: '/admin/ecommerce', icon: ShoppingCart },
   { label: 'PDV Público', to: '/admin/pdv', icon: ShoppingCart },
   { label: 'Financeiro', to: '/admin/financeiro', icon: WalletCards },
@@ -67,6 +68,7 @@ const quickFeatures = [
   { label: 'Áreas de interesse', to: '/admin/oportunidades', description: 'Configurar filtros de objetos e estados de interesse', keywords: 'areas interesse filtros estados oportunidades notificações notificacoes' },
   { label: 'Gerar proposta', to: '/admin/licitacoes', description: 'Gerar propostas, impugnações, esclarecimentos e parecer com IA', keywords: 'proposta impugnação impugnacao esclarecimento parecer ia edital saved licitacoes' },
   { label: 'Novo orçamento', to: '/admin/orcamentos', description: 'Criar orçamento e PDF timbrado da proposta', keywords: 'orcamento orçamento pdf proposta itens produto serviço servico impostos' },
+  { label: 'Novo serviço', to: '/admin/servicos/catalog', description: 'Cadastrar serviço, duração, preço e capacidade', keywords: 'serviço servico agenda agendamento duração capacidade atendimento' },
   { label: 'Nova venda no PDV', to: '/admin/pdv', description: 'Venda para órgão público com estoque, financeiro e documento fiscal', keywords: 'pdv venda balcão cupom fiscal estoque órgão cliente nota email' },
   { label: 'Nova cobrança', to: '/admin/financeiro', description: 'Enviar cobrança oficial com nota fiscal, certidões e relatório', keywords: 'cobranca cobrança receber financeiro nota fiscal certidao relatório contrato cliente email pagarme checkout pix cartão' },
   { label: 'Contas bancárias', to: '/admin/financeiro/contas-bancarias', description: 'Gerenciar bancos, caixas, recebimentos e pagamentos', keywords: 'banco conta bancaria bancária pix saldo transferência transferencia' },
@@ -320,7 +322,7 @@ export const BluAppLayout: React.FC = () => {
     { title: 'Conta', labels: ['Configurações'] },
   ] : [
     { title: 'Essencial', labels: ['Dashboard', 'Oportunidades', 'CRM', 'Equipe', 'Licitações'] },
-    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'E-commerce', 'PDV Público'] },
+    { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'Serviços', 'E-commerce', 'PDV Público'] },
     { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
     { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
   ];

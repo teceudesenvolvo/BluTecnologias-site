@@ -1,6 +1,6 @@
 import {httpsCallable} from 'firebase/functions';
 import {functions} from '../../services/firebase';
-import type {EcommerceCatalogProduct,EcommercePublicCompany,EcommerceStore} from './ecommerceTypes';
+import type {EcommerceCatalogProduct,EcommercePublicCompany,EcommerceStore,EcommerceStoreCustomer} from './ecommerceTypes';
 
 const ecommerceApiEnabled = import.meta.env.VITE_ECOMMERCE_API_ENABLED !== 'false';
 const reservedSlugs = new Set([
@@ -47,4 +47,5 @@ export const ecommerceService = {
   publishProduct: (companyId:string,productId:string,published:boolean) => invoke({action:'update_product_channel',companyId,productId,published}),
   publicStore: (slug:string) => invoke<{redirectTo?:string;store?:EcommerceStore & {slug:string};products?:EcommerceCatalogProduct[]}>({action:'public_store',slug}),
   quoteDelivery: (slug:string,input:{postalCode:string;state:string;city:string;neighborhood:string;subtotalCents:number}) => invoke<{available:boolean;feeCents:number;estimatedDays:number;method:string;message:string}>({action:'quote_delivery',slug,...input}),
+  registerCustomer: (slug:string,customer:EcommerceStoreCustomer) => invoke<{customerId:string}>({action:'register_customer',slug,customer}),
 };

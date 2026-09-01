@@ -33,6 +33,18 @@ export interface EcommerceStore {
 
 export interface EcommerceCatalogProduct {id:string;name:string;type:string;active:boolean;priceCents:number;stockQuantity:number;images:string[];published:boolean;slug?:string;description?:string;category?:string;availableQuantity?:number;unit?:string}
 
+export interface EcommerceCustomerAddress {
+  postalCode:string; street:string; number:string; complement?:string;
+  neighborhood:string; city:string; state:string;
+}
+
+export interface EcommerceStoreCustomer {
+  id?:string; personType:'individual'|'company'; name:string; email:string;
+  phone:string; document:string; address:EcommerceCustomerAddress;
+  billingSameAsAddress:boolean; billingAddress:EcommerceCustomerAddress;
+  acceptedPrivacy:boolean;
+}
+
 export interface PaymentProvider {
   readonly name: string;
   createRecipient(input: unknown): Promise<unknown>;

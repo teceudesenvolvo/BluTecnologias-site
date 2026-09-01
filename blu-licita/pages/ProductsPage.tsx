@@ -35,6 +35,7 @@ type Product = {
   stockNotes?: string;
   lastStockUpdateAt?: string;
   images?: string[];
+  publicationStatus?: "draft" | "published";
 };
 
 type ProductFormValue = Omit<Product, "id">;
@@ -75,7 +76,8 @@ const defaultForm = (): ProductFormValue => ({
   pisPercent: 0,
   cofinsPercent: 0,
   notes: "",
-  active: true,
+  active: false,
+  publicationStatus: "draft",
   stockQuantity: 0,
   minStock: 0,
   stockLocation: "",
@@ -1003,6 +1005,18 @@ const ProductForm = ({
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState("");
   const isEditing = Boolean(initialValue);
+  const persist = async (mode: "draft" | "published") => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      if (mode === "published" && !form.name.trim()) throw new Error("Informe o nome antes de publicar.");
+      await save({ ...form, publicationStatus: mode, active: mode === "published" });
+    } catch (reason) {
+      setSaveError(reason instanceof Error ? reason.message : "Não foi possível salvar o produto.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const addImages = async (files?: FileList | null) => {
     if (!files?.length) return;
@@ -1081,15 +1095,7 @@ const ProductForm = ({
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            setSaving(true);
-            setSaveError("");
-            try {
-              await save(form);
-            } catch (reason) {
-              setSaveError(reason instanceof Error ? reason.message : "Não foi possível salvar o produto.");
-            } finally {
-              setSaving(false);
-            }
+            await persist("published");
           }}
           className="flex max-h-[calc(92vh-72px)] flex-col"
         >
@@ -1233,9 +1239,12 @@ const ProductForm = ({
             <button type="button" onClick={close} className="rounded-xl border px-4 py-2 font-bold">
               Cancelar
             </button>
+            <button type="button" formNoValidate disabled={saving} onClick={() => void persist("draft")} className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-2 font-bold text-blue-700 disabled:opacity-50">
+              Salvar rascunho
+            </button>
             <button disabled={saving} className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-bold text-white disabled:opacity-50">
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {saving ? "Salvando imagens..." : "Salvar"}
+              {saving ? "Salvando..." : "Publicar"}
             </button>
           </footer>
         </form>
