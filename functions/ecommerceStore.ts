@@ -146,13 +146,20 @@ export const ecommerceStore = functions.https.onCall(async (payload, context) =>
       phone: String(company.telefoneCelular || company.phone || ''),
       email: String(company.email || ''),
     };
-    const catalog = products.docs.filter((item) => item.data().salesChannels?.bluStore === true).map((item) => {
+    const catalogMode = ['products', 'services', 'both'].includes(storeData.catalogMode) ? storeData.catalogMode : 'both';
+    const catalog = products.docs.filter((item) => {
+      const value = item.data();
+      const isService = value.type === 'service';
+      if (catalogMode === 'products' && isService) return false;
+      if (catalogMode === 'services' && !isService) return false;
+      return value.salesChannels?.bluStore === true;
+    }).map((item) => {
       const value = item.data();
       const service = value.type === 'service';
       const definition:any = serviceByProduct.get(item.id);
       return {id: item.id, type:value.type || 'product', slug: value.publicSlug || publicProductSlug(value.name, item.id), name: value.name, description: value.description || value.notes || '', features:Array.isArray(value.features)?value.features.slice(0,30):[],sizes:Array.isArray(value.sizes)?value.sizes.slice(0,30):[],colors:Array.isArray(value.colors)?value.colors.slice(0,30):[],numbers:Array.isArray(value.numbers)?value.numbers.slice(0,30):[],relatedProductIds:Array.isArray(value.relatedProductIds)?value.relatedProductIds.slice(0,20):[],category: value.category || (service ? 'Serviços' : ''), priceCents: Number(value.salePriceCents || 0), images: Array.isArray(value.images) ? value.images.slice(0, 3) : [], availableQuantity: service ? (definition?.onlineBookingEnabled ? 999 : 0) : Math.max(0, Number(value.stockQuantity || 0) - Number(value.reservedQuantity || 0)), unit: value.unit || (service ? 'serv' : 'un'),service:definition?{definitionId:definition.definitionId,durationMinutes:Number(definition.durationMinutes||60),minimumAdvanceMinutes:Number(definition.minimumAdvanceMinutes||0),maximumAdvanceDays:Number(definition.maximumAdvanceDays||90),requiresConfirmation:Boolean(definition.requiresConfirmation),paymentMode:String(definition.paymentMode||'PAY_ON_SITE'),onlineBookingEnabled:Boolean(definition.onlineBookingEnabled)}:undefined};
     });
-    return {store: {id: store.id, slug: storeData.storeSlug, name: storeData.name || publicInfo.tradeName, description: storeData.description || '', headerMessage: storeData.headerMessage || '', logoUrl: company.logoUrl || storeData.logoUrl || '', publicInfo, theme: storeData.theme || {}, paymentMethods: storeData.paymentMethods || {}, shipping: storeData.shipping || {}, seo: storeData.seo || {}}, products: catalog};
+    return {store: {id: store.id, slug: storeData.storeSlug, name: storeData.name || publicInfo.tradeName, description: storeData.description || '', headerMessage: storeData.headerMessage || '', logoUrl: company.logoUrl || storeData.logoUrl || '', catalogMode, publicInfo, theme: storeData.theme || {}, paymentMethods: storeData.paymentMethods || {}, shipping: storeData.shipping || {}, seo: storeData.seo || {}}, products: catalog};
   }
 
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
@@ -197,7 +204,7 @@ export const ecommerceStore = functions.https.onCall(async (payload, context) =>
       const authEmail = String(context.auth?.token?.email || '').trim().toLowerCase();
       const requestedAdmin = input.administrator || {};
       const administrator = {userId: authEmail && authEmail === String(requestedAdmin.email || authEmail).trim().toLowerCase() ? uid : String(requestedAdmin.userId || ''), name:String(requestedAdmin.name || context.auth?.token?.name || authEmail || 'Administrador'), email:String(requestedAdmin.email || authEmail).trim().toLowerCase(), role:'ecommerce_admin', status:authEmail && authEmail === String(requestedAdmin.email || authEmail).trim().toLowerCase() ? 'active' : 'pending'};
-      tx.set(storeRef, {companyId, publicCompanyId:String(input.publicCompanyId || identity.id || ''), storeSlug: validation.slug, name: !requestedName || requestedName === 'Minha empresa' ? companyName : requestedName, description: String(input.description || ''), headerMessage:String(input.headerMessage || ''), logoUrl: String(identity.logoUrl || input.logoUrl || ''), administrator, onboarding:{completed:Boolean(input.onboarding?.completed),completedAt:input.onboarding?.completed ? (previous.onboarding?.completedAt || timestamp) : null}, status: ['draft','active','suspended'].includes(input.status) ? input.status : 'draft', paymentMethods: {pix: Boolean(input.paymentMethods?.pix), creditCard: Boolean(input.paymentMethods?.creditCard), boleto: Boolean(input.paymentMethods?.boleto)}, maxInstallments: Math.min(12, Math.max(1, Number(input.maxInstallments || 1))), shipping: normalizedShipping(input.shipping), theme: input.theme || {}, seo: input.seo || {}, recipient: previous.recipient || {provider:'pagarme',status:'not_started',onboardingStatus:'not_started'}, meta: previous.meta || {status:'not_connected'}, updatedAt: timestamp, updatedBy: uid, createdAt: previous.createdAt || timestamp, createdBy: previous.createdBy || uid}, {merge: true});
+      tx.set(storeRef, {companyId, publicCompanyId:String(input.publicCompanyId || identity.id || ''), storeSlug: validation.slug, name: !requestedName || requestedName === 'Minha empresa' ? companyName : requestedName, description: String(input.description || ''), headerMessage:String(input.headerMessage || ''), logoUrl: String(identity.logoUrl || input.logoUrl || ''), catalogMode:['products','services','both'].includes(input.catalogMode) ? input.catalogMode : 'both', administrator, onboarding:{completed:Boolean(input.onboarding?.completed),completedAt:input.onboarding?.completed ? (previous.onboarding?.completedAt || timestamp) : null}, status: ['draft','active','suspended'].includes(input.status) ? input.status : 'draft', paymentMethods: {pix: Boolean(input.paymentMethods?.pix), creditCard: Boolean(input.paymentMethods?.creditCard), boleto: Boolean(input.paymentMethods?.boleto)}, maxInstallments: Math.min(12, Math.max(1, Number(input.maxInstallments || 1))), shipping: normalizedShipping(input.shipping), theme: input.theme || {}, seo: input.seo || {}, recipient: previous.recipient || {provider:'pagarme',status:'not_started',onboardingStatus:'not_started'}, meta: previous.meta || {status:'not_connected'}, updatedAt: timestamp, updatedBy: uid, createdAt: previous.createdAt || timestamp, createdBy: previous.createdBy || uid}, {merge: true});
       if (administrator.status === 'pending' && administrator.email && administrator.email !== previous.administrator?.email) {
         const invitationId = `${companyId}_ecommerce_${administrator.email.replace(/[^a-z0-9]/g, '_')}`;
         tx.set(db().collection('teamInvitations').doc(invitationId), {email:administrator.email,name:administrator.name,role:'Administrador do E-commerce',userType:'ecommerce_admin',companyIds:[companyId],status:'pending',createdBy:uid,createdAt:timestamp,expiresAt:new Date(Date.now()+7*86400000).toISOString()}, {merge:true});
@@ -209,6 +216,12 @@ export const ecommerceStore = functions.https.onCall(async (payload, context) =>
   if (action === 'update_product_channel') {
     const productId = String(payload?.productId || ''); const productRef = db().collection('products').doc(productId); const snapshot = await productRef.get();
     if (!snapshot.exists || snapshot.data()?.companyId !== companyId) throw new functions.https.HttpsError('not-found', 'Produto não encontrado.');
+    const store = await db().collection('ecommerceStores').doc(companyId).get();
+    const catalogMode = store.exists && ['products', 'services', 'both'].includes(store.data()?.catalogMode) ? store.data()?.catalogMode : 'both';
+    const isService = snapshot.data()?.type === 'service';
+    if (payload?.published && ((catalogMode === 'products' && isService) || (catalogMode === 'services' && !isService))) {
+      throw new functions.https.HttpsError('failed-precondition', 'Este tipo de item não está habilitado para a loja.');
+    }
     const published = Boolean(payload?.published); const timestamp = now();
     await productRef.set({salesChannels: {...(snapshot.data()?.salesChannels || {}), bluStore: published}, publicSlug: snapshot.data()?.publicSlug || publicProductSlug(snapshot.data()?.name, productId), updatedAt: timestamp, updatedBy: uid}, {merge: true});
     await db().collection('salesChannelEvents').add({companyId, productId, channel:'blu_store', event:published?'PRODUCT_PUBLISHED':'PRODUCT_UNPUBLISHED', status:'pending', createdAt:timestamp, createdBy:uid});

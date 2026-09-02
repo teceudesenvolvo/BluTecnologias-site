@@ -41,12 +41,14 @@ type Product = {
   stockNotes?: string;
   lastStockUpdateAt?: string;
   images?: string[];
+  salesChannels?: { bluStore?: boolean };
   publicationStatus?: "draft" | "published";
 };
 
 type ProductFormValue = Omit<Product, "id">;
 type PageTab = "catalog" | "stock";
 type StockStatusFilter = "all" | "healthy" | "low" | "empty";
+type EcommerceCatalogMode = "products" | "services" | "both";
 
 const money = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((value || 0) / 100);
@@ -96,6 +98,7 @@ const defaultForm = (): ProductFormValue => ({
   stockNotes: "",
   lastStockUpdateAt: "",
   images: [],
+  salesChannels: { bluStore: false },
 });
 
 const MAX_PRODUCT_IMAGES = 3;
@@ -114,6 +117,7 @@ export const ProductsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [items, setItems] = React.useState<Product[]>([]);
   const [company, setCompany] = React.useState<Company | null>(null);
+  const [ecommerceCatalogMode, setEcommerceCatalogMode] = React.useState<EcommerceCatalogMode>("both");
   const [query, setQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [open, setOpen] = React.useState(false);
@@ -152,6 +156,9 @@ export const ProductsPage: React.FC = () => {
       if (snapshot?.exists()) {
         setCompany({ id: snapshot.id, ...(snapshot.data() as Omit<Company, "id">) });
       }
+      const storeSnapshot = await getDoc(doc(db, "ecommerceStores", user.companyId)).catch(() => null);
+      const mode = String(storeSnapshot?.data()?.catalogMode || "both");
+      setEcommerceCatalogMode(mode === "products" || mode === "services" || mode === "both" ? mode : "both");
     };
     void loadCompany();
   }, [user?.companyId]);
@@ -451,7 +458,15 @@ export const ProductsPage: React.FC = () => {
         imageUrls.push(image);
       }
     }
-    value = { ...value, barcode, images: imageUrls.slice(0, MAX_PRODUCT_IMAGES) };
+    value = {
+      ...value,
+      barcode,
+      images: imageUrls.slice(0, MAX_PRODUCT_IMAGES),
+      salesChannels: {
+        ...(value.salesChannels || {}),
+        bluStore: ecommerceCatalogMode !== "services" && value.salesChannels?.bluStore === true,
+      },
+    };
     if (editingItem) {
       await updateCompanyDoc("products", editingItem.id, user.id, value);
     } else {
@@ -799,6 +814,7 @@ export const ProductsPage: React.FC = () => {
         <ProductForm
           initialValue={editingItem}
           products={items}
+          ecommerceCatalogMode={ecommerceCatalogMode}
           close={() => {
             setOpen(false);
             setEditingItem(null);
@@ -1006,11 +1022,13 @@ const ProductImportModal = ({ close, importProducts }: { close: () => void; impo
 const ProductForm = ({
   initialValue,
   products,
+  ecommerceCatalogMode,
   close,
   save,
 }: {
   initialValue: Product | null;
   products: Product[];
+  ecommerceCatalogMode: EcommerceCatalogMode;
   close: () => void;
   save: (value: ProductFormValue) => Promise<void>;
 }) => {
@@ -1021,12 +1039,18 @@ const ProductForm = ({
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState("");
   const isEditing = Boolean(initialValue);
+  const ecommerceProductsEnabled = ecommerceCatalogMode !== "services";
   const persist = async (mode: "draft" | "published") => {
     setSaving(true);
     setSaveError("");
     try {
       if (mode === "published" && !form.name.trim()) throw new Error("Informe o nome antes de publicar.");
-      await save({ ...form, publicationStatus: mode, active: mode === "published" });
+      await save({
+        ...form,
+        publicationStatus: mode,
+        active: mode === "published",
+        salesChannels: { ...(form.salesChannels || {}), bluStore: ecommerceProductsEnabled && mode === "published" && form.salesChannels?.bluStore === true },
+      });
     } catch (reason) {
       setSaveError(reason instanceof Error ? reason.message : "Não foi possível salvar o produto.");
     } finally {
@@ -1149,6 +1173,11 @@ const ProductForm = ({
                 <input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} />
                 Ativo para propostas
               </label>
+              <label className={`flex items-center gap-2 rounded-xl p-3 text-sm font-bold md:col-span-2 ${ecommerceProductsEnabled ? "bg-blue-50 text-blue-800" : "bg-slate-50 text-slate-400"}`}>
+                <input type="checkbox" disabled={!ecommerceProductsEnabled} checked={ecommerceProductsEnabled && form.salesChannels?.bluStore === true} onChange={(event) => setForm({ ...form, salesChannels: { ...(form.salesChannels || {}), bluStore: event.target.checked } })} />
+                Publicar produto no e-commerce ao publicar
+              </label>
+              {!ecommerceProductsEnabled && <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-700 md:col-span-2">A loja está configurada para vender somente serviços. Este produto ficará apenas no ERP.</p>}
             </section>
             <section className="grid gap-4 rounded-2xl border bg-white p-4 md:col-span-2 md:grid-cols-4">
               <h3 className="font-bold md:col-span-4">Tributação gerencial</h3>
