@@ -47,6 +47,36 @@ function normalizedShipping(value = {}) {
 }
 exports.ecommerceStore = functions.https.onCall(async (payload, context) => {
     const action = String(payload?.action || '');
+    if (action === 'book_service') {
+        const requestedSlug = (0, ecommercePolicy_1.normalizeStoreSlug)(payload?.slug);
+        const slugDoc = await db().collection('storeSlugs').doc(requestedSlug).get();
+        const slugData = slugDoc.data() || {};
+        if (!slugDoc.exists || slugData.redirectTo)
+            throw new functions.https.HttpsError('not-found', 'Loja não encontrada.');
+        const store = await db().collection('ecommerceStores').doc(String(slugData.storeId || slugData.companyId)).get();
+        const storeData = store.data() || {};
+        if (!store.exists || storeData.status !== 'active')
+            throw new functions.https.HttpsError('not-found', 'Loja indisponível.');
+        const productId = String(payload?.productId || '');
+        const definitions = await db().collection('serviceDefinitions').where('companyId', '==', storeData.companyId).where('productId', '==', productId).limit(1).get();
+        const definition = definitions.docs[0];
+        const service = definition?.data() || {};
+        const product = await db().collection('products').doc(productId).get();
+        if (!definition || !product.exists || product.data()?.type !== 'service' || product.data()?.salesChannels?.bluStore !== true || !service.onlineBookingEnabled)
+            throw new functions.https.HttpsError('failed-precondition', 'Este serviço não aceita agendamento online.');
+        const date = String(payload?.date || '');
+        const startTime = String(payload?.startTime || '');
+        const name = String(payload?.name || '').trim();
+        const email = String(payload?.email || '').trim().toLowerCase();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime) || !name || !/^\S+@\S+\.\S+$/.test(email))
+            throw new functions.https.HttpsError('invalid-argument', 'Preencha nome, e-mail, data e horário.');
+        const appointment = db().collection('serviceAppointments').doc();
+        const paymentRequired = service.paymentMode !== 'PAY_ON_SITE';
+        const status = paymentRequired ? 'awaiting_payment' : service.requiresConfirmation ? 'requested' : 'confirmed';
+        await appointment.set({ companyId: storeData.companyId, storeId: store.id, source: 'ECOMMERCE', serviceId: definition.id, productId, title: String(product.data()?.name || 'Serviço'), clientName: name, clientEmail: email, clientPhone: String(payload?.phone || '').replace(/\D/g, '').slice(0, 13), notes: String(payload?.notes || '').trim().slice(0, 1000), date, startTime, durationMinutes: Number(service.durationMinutes || 60), priceCents: Number(product.data()?.salePriceCents || 0), paymentMode: String(service.paymentMode || 'PAY_ON_SITE'), paymentMethod: paymentRequired ? String(payload?.paymentMethod || 'pix') : 'pay_on_site', paymentStatus: paymentRequired ? 'pending' : 'pay_on_site', status, createdAt: now(), updatedAt: now() });
+        await db().collection('notifications').add({ companyId: storeData.companyId, type: 'SERVICE_BOOKING_REQUESTED', title: 'Novo agendamento pela loja', message: `${name} solicitou ${String(product.data()?.name || 'um serviço')} para ${date} às ${startTime}.`, entityType: 'serviceAppointments', entityId: appointment.id, read: false, createdAt: now() });
+        return { appointmentId: appointment.id, status };
+    }
     if (action === 'register_customer') {
         const requestedSlug = (0, ecommercePolicy_1.normalizeStoreSlug)(payload?.slug);
         const slugDoc = await db().collection('storeSlugs').doc(requestedSlug).get();
@@ -116,10 +146,12 @@ exports.ecommerceStore = functions.https.onCall(async (payload, context) => {
         const storeData = store.data() || {};
         if (!store.exists || storeData.status !== 'active' || storeData.companyId !== slugData.companyId)
             throw new functions.https.HttpsError('not-found', 'Loja indisponível.');
-        const [products, companySnapshot] = await Promise.all([
+        const [products, definitions, companySnapshot] = await Promise.all([
             db().collection('products').where('companyId', '==', storeData.companyId).where('active', '==', true).get(),
+            db().collection('serviceDefinitions').where('companyId', '==', storeData.companyId).where('active', '==', true).get(),
             db().collection('companies').doc(String(storeData.companyId)).get(),
         ]);
+        const serviceByProduct = new Map(definitions.docs.map((item) => [String(item.data().productId), { definitionId: item.id, ...item.data() }]));
         const company = await publicCompanyIdentity(String(storeData.companyId), companySnapshot.data() || {}, String(storeData.publicCompanyId || ''));
         const publicInfo = {
             legalName: String(company.razaoSocial || company.legalName || company.name || ''),
@@ -133,7 +165,8 @@ exports.ecommerceStore = functions.https.onCall(async (payload, context) => {
         const catalog = products.docs.filter((item) => item.data().salesChannels?.bluStore === true).map((item) => {
             const value = item.data();
             const service = value.type === 'service';
-            return { id: item.id, type: value.type || 'product', slug: value.publicSlug || (0, ecommercePolicy_1.publicProductSlug)(value.name, item.id), name: value.name, description: value.notes || '', category: value.category || (service ? 'Serviços' : ''), priceCents: Number(value.salePriceCents || 0), images: Array.isArray(value.images) ? value.images.slice(0, 3) : [], availableQuantity: service ? 999 : Math.max(0, Number(value.stockQuantity || 0) - Number(value.reservedQuantity || 0)), unit: value.unit || (service ? 'serv' : 'un') };
+            const definition = serviceByProduct.get(item.id);
+            return { id: item.id, type: value.type || 'product', slug: value.publicSlug || (0, ecommercePolicy_1.publicProductSlug)(value.name, item.id), name: value.name, description: value.description || value.notes || '', features: Array.isArray(value.features) ? value.features.slice(0, 30) : [], sizes: Array.isArray(value.sizes) ? value.sizes.slice(0, 30) : [], colors: Array.isArray(value.colors) ? value.colors.slice(0, 30) : [], numbers: Array.isArray(value.numbers) ? value.numbers.slice(0, 30) : [], relatedProductIds: Array.isArray(value.relatedProductIds) ? value.relatedProductIds.slice(0, 20) : [], category: value.category || (service ? 'Serviços' : ''), priceCents: Number(value.salePriceCents || 0), images: Array.isArray(value.images) ? value.images.slice(0, 3) : [], availableQuantity: service ? (definition?.onlineBookingEnabled ? 999 : 0) : Math.max(0, Number(value.stockQuantity || 0) - Number(value.reservedQuantity || 0)), unit: value.unit || (service ? 'serv' : 'un'), service: definition ? { definitionId: definition.definitionId, durationMinutes: Number(definition.durationMinutes || 60), minimumAdvanceMinutes: Number(definition.minimumAdvanceMinutes || 0), maximumAdvanceDays: Number(definition.maximumAdvanceDays || 90), requiresConfirmation: Boolean(definition.requiresConfirmation), paymentMode: String(definition.paymentMode || 'PAY_ON_SITE'), onlineBookingEnabled: Boolean(definition.onlineBookingEnabled) } : undefined };
         });
         return { store: { id: store.id, slug: storeData.storeSlug, name: storeData.name || publicInfo.tradeName, description: storeData.description || '', headerMessage: storeData.headerMessage || '', logoUrl: company.logoUrl || storeData.logoUrl || '', publicInfo, theme: storeData.theme || {}, paymentMethods: storeData.paymentMethods || {}, shipping: storeData.shipping || {}, seo: storeData.seo || {} }, products: catalog };
     }

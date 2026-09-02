@@ -28,6 +28,12 @@ type Product = {
   pisPercent?: number;
   cofinsPercent?: number;
   notes?: string;
+  description?: string;
+  features?: string[];
+  sizes?: string[];
+  colors?: string[];
+  numbers?: string[];
+  relatedProductIds?: string[];
   active: boolean;
   stockQuantity?: number;
   minStock?: number;
@@ -76,6 +82,12 @@ const defaultForm = (): ProductFormValue => ({
   pisPercent: 0,
   cofinsPercent: 0,
   notes: "",
+  description: "",
+  features: [],
+  sizes: [],
+  colors: [],
+  numbers: [],
+  relatedProductIds: [],
   active: false,
   publicationStatus: "draft",
   stockQuantity: 0,
@@ -122,7 +134,8 @@ export const ProductsPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      setItems(await listCompanyDocs<Product>("products", user.companyId));
+      const records = await listCompanyDocs<Product>("products", user.companyId);
+      setItems(records.filter((item) => (item.type || "product") === "product"));
     } finally {
       setLoading(false);
     }
@@ -508,9 +521,9 @@ export const ProductsPage: React.FC = () => {
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Catálogo comercial</p>
-          <h1 className="mt-2 text-3xl font-bold">Produtos e serviços</h1>
+          <h1 className="mt-2 text-3xl font-bold">Produtos</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Agora com gestão comercial e uma aba dedicada para controle de estoque dos itens físicos.
+            Catálogo físico, variações, conteúdo comercial e controle de estoque.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -525,7 +538,7 @@ export const ProductsPage: React.FC = () => {
             className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"
           >
             <Plus size={17} />
-            Novo item
+            Novo produto
           </button>
         </div>
       </header>
@@ -533,7 +546,7 @@ export const ProductsPage: React.FC = () => {
       <section className="grid gap-3 sm:grid-cols-4">
         <Metric label="Itens ativos" value={String(items.filter((item) => item.active).length)} />
         <Metric label="Produtos" value={String(items.filter((item) => (item.type || "product") === "product").length)} />
-        <Metric label="Serviços" value={String(items.filter((item) => item.type === "service").length)} />
+        <Metric label="Com imagens" value={String(items.filter((item) => item.images?.length).length)} />
         <Metric
           label="Margem média"
           value={`${Math.round(items.reduce((sum, item) => sum + (item.salePriceCents ? ((item.salePriceCents - item.costCents) / item.salePriceCents) * 100 : 0), 0) / Math.max(1, items.length))}%`}
@@ -785,6 +798,7 @@ export const ProductsPage: React.FC = () => {
       {open && (
         <ProductForm
           initialValue={editingItem}
+          products={items}
           close={() => {
             setOpen(false);
             setEditingItem(null);
@@ -991,10 +1005,12 @@ const ProductImportModal = ({ close, importProducts }: { close: () => void; impo
 
 const ProductForm = ({
   initialValue,
+  products,
   close,
   save,
 }: {
   initialValue: Product | null;
+  products: Product[];
   close: () => void;
   save: (value: ProductFormValue) => Promise<void>;
 }) => {
@@ -1087,7 +1103,7 @@ const ProductForm = ({
     <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/55 p-4">
       <section className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b p-5">
-          <h2 className="font-bold">{isEditing ? "Editar produto ou serviço" : "Novo produto ou serviço"}</h2>
+          <h2 className="font-bold">{isEditing ? "Editar produto" : "Novo produto"}</h2>
           <button onClick={close}>
             <X />
           </button>
@@ -1101,20 +1117,8 @@ const ProductForm = ({
         >
           <div className="grid flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-2">
             <section className="grid gap-4 rounded-2xl border bg-slate-50 p-4 md:col-span-2 md:grid-cols-4">
-              <label className="text-xs font-bold text-slate-600">
-                Tipo
-                <select
-                  value={form.type}
-                  onChange={(event) =>
-                    setForm({ ...form, type: event.target.value as Product["type"], unit: event.target.value === "service" ? "serv" : "un" })
-                  }
-                  className="mt-2 w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-normal"
-                >
-                  <option value="product">Produto</option>
-                  <option value="service">Serviço</option>
-                </select>
-              </label>
-              {form.type === "product" && (
+              <input type="hidden" value="product" />
+              {(
                 <label className="text-xs font-bold text-slate-600 md:col-span-2">
                   Código de barras (GTIN/EAN)
                   <div className="mt-2 flex gap-2">
@@ -1150,11 +1154,7 @@ const ProductForm = ({
               <h3 className="font-bold md:col-span-4">Tributação gerencial</h3>
               <Field label="Regime/regra tributária" value={form.taxRegime || ""} set={(v) => setForm({ ...form, taxRegime: v })} />
               <Field label="Código fiscal interno" value={form.taxCode || ""} set={(v) => setForm({ ...form, taxCode: v })} />
-              {form.type === "service" ? (
-                <Field label="Código de serviço / LC 116" value={form.serviceCode || ""} set={(v) => setForm({ ...form, serviceCode: v })} />
-              ) : (
-                <Field label="NCM" value={form.ncm || ""} set={(v) => setForm({ ...form, ncm: v })} />
-              )}
+              <Field label="NCM" value={form.ncm || ""} set={(v) => setForm({ ...form, ncm: v })} />
               <Field label="CFOP" value={form.cfop || ""} set={(v) => setForm({ ...form, cfop: v })} />
               <Field label="Impostos totais (%)" type="number" value={String(form.taxPercent)} set={(v) => setForm({ ...form, taxPercent: Number(v) })} />
               <Field label="ISS (%)" type="number" value={String(form.issPercent || 0)} set={(v) => setForm({ ...form, issPercent: Number(v) })} />
@@ -1181,6 +1181,26 @@ const ProductForm = ({
                 </label>
               </section>
             )}
+            <section className="grid gap-4 rounded-2xl border bg-white p-4 md:col-span-2 md:grid-cols-2">
+              <h3 className="font-bold md:col-span-2">Conteúdo da página do produto</h3>
+              <label className="text-xs font-bold text-slate-600 md:col-span-2">Descrição detalhada<textarea rows={5} value={form.description || ""} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-2 w-full rounded-xl border p-3 text-sm font-normal" placeholder="Benefícios, materiais, uso e informações importantes." /></label>
+              <ListField label="Características" value={form.features || []} set={(features) => setForm({ ...form, features })} placeholder="Ex.: Material resistente" />
+              <ListField label="Tamanhos" value={form.sizes || []} set={(sizes) => setForm({ ...form, sizes })} placeholder="P, M, G" />
+              <ListField label="Cores" value={form.colors || []} set={(colors) => setForm({ ...form, colors })} placeholder="Azul, Preto" />
+              <ListField label="Numerações" value={form.numbers || []} set={(numbers) => setForm({ ...form, numbers })} placeholder="36, 38, 40" />
+              <fieldset className="md:col-span-2">
+                <legend className="text-xs font-bold text-slate-600">Produtos relacionados</legend>
+                <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto rounded-xl border bg-slate-50 p-3 sm:grid-cols-2">
+                  {products.filter((item) => item.id !== initialValue?.id).map((item) => (
+                    <label key={item.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={(form.relatedProductIds || []).includes(item.id)} onChange={(event) => setForm({ ...form, relatedProductIds: event.target.checked ? [...(form.relatedProductIds || []), item.id] : (form.relatedProductIds || []).filter((id) => id !== item.id) })} />
+                      <span className="truncate">{item.name}</span>
+                    </label>
+                  ))}
+                  {!products.filter((item) => item.id !== initialValue?.id).length && <span className="text-xs text-slate-400">Cadastre outro produto para criar recomendações.</span>}
+                </div>
+              </fieldset>
+            </section>
             <label className="text-xs font-bold text-slate-600 md:col-span-2">
               Observações comerciais
               <textarea value={form.notes || ""} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="mt-2 w-full rounded-xl border p-3 text-sm font-normal" />
@@ -1343,6 +1363,19 @@ const TabButton = ({
     {icon}
     {children}
   </button>
+);
+
+const ListField = ({ label, value, set, placeholder }: { label: string; value: string[]; set: (value: string[]) => void; placeholder?: string }) => (
+  <label className="text-xs font-bold text-slate-600">
+    {label}
+    <input
+      value={value.join(", ")}
+      onChange={(event) => set(event.target.value.split(",").map((item) => item.trim()).filter(Boolean))}
+      placeholder={placeholder}
+      className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm font-normal"
+    />
+    <span className="mt-1 block text-[10px] font-normal text-slate-400">Separe as opções por vírgulas.</span>
+  </label>
 );
 
 const Field = ({

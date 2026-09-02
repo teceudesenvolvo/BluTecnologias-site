@@ -24,6 +24,7 @@ export interface EcommerceShippingSettings {
 export interface EcommerceStore {
   id?: string; companyId: string; publicCompanyId?:string; storeSlug: string; name: string; description?: string; logoUrl?: string; headerMessage?:string;
   publicInfo?: {legalName?:string;tradeName?:string;document?:string;city?:string;state?:string;phone?:string;email?:string};
+  catalogMode?: 'products'|'services'|'both';
   status: StoreStatus; paymentMethods: {pix:boolean;creditCard:boolean;boleto:boolean}; maxInstallments: number;
   recipient?: {provider:'pagarme';recipientId?:string;status:string;onboardingStatus:string};
   administrator?:EcommerceAdministrator;
@@ -31,7 +32,7 @@ export interface EcommerceStore {
   meta?: {status:string}; theme?: {primaryColor?:string;secondaryColor?:string;headerTextColor?:string}; shipping?: EcommerceShippingSettings; seo?: Record<string,unknown>;
 }
 
-export interface EcommerceCatalogProduct {id:string;name:string;type:string;active:boolean;priceCents:number;stockQuantity:number;images:string[];published:boolean;slug?:string;description?:string;category?:string;availableQuantity?:number;unit?:string}
+export interface EcommerceCatalogProduct {id:string;name:string;type:string;active:boolean;priceCents:number;stockQuantity:number;images:string[];published:boolean;slug?:string;description?:string;features?:string[];sizes?:string[];colors?:string[];numbers?:string[];relatedProductIds?:string[];category?:string;availableQuantity?:number;unit?:string;service?:{definitionId:string;durationMinutes:number;minimumAdvanceMinutes:number;maximumAdvanceDays:number;requiresConfirmation:boolean;paymentMode:string;onlineBookingEnabled:boolean}}
 
 export interface EcommerceCustomerAddress {
   postalCode:string; street:string; number:string; complement?:string;

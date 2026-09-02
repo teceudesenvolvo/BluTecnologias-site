@@ -48,4 +48,5 @@ export const ecommerceService = {
   publicStore: (slug:string) => invoke<{redirectTo?:string;store?:EcommerceStore & {slug:string};products?:EcommerceCatalogProduct[]}>({action:'public_store',slug}),
   quoteDelivery: (slug:string,input:{postalCode:string;state:string;city:string;neighborhood:string;subtotalCents:number}) => invoke<{available:boolean;feeCents:number;estimatedDays:number;method:string;message:string}>({action:'quote_delivery',slug,...input}),
   registerCustomer: (slug:string,customer:EcommerceStoreCustomer) => invoke<{customerId:string}>({action:'register_customer',slug,customer}),
+  bookService: (slug:string,input:{productId:string;date:string;startTime:string;name:string;email:string;phone:string;notes:string;paymentMethod:string}) => invoke<{appointmentId:string;status:string}>({action:'book_service',slug,...input}),
 };
