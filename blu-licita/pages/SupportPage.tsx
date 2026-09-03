@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle2, Headphones, LifeBuoy, Loader2, MessageCircle, Plus, Send, ShieldCheck, Sparkles } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronDown, CirclePlay, Compass, GraduationCap, Headphones, HelpCircle, LifeBuoy, Loader2, MessageCircle, Plus, Search, Send, ShieldCheck, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useBluAuth } from '../contexts/BluAuthContext';
 import { supportService, type NewSupportTicket, type SupportMessage, type SupportTicket, type SupportTicketCategory, type SupportTicketPriority, type SupportTicketStatus } from '../services/supportService';
 
@@ -28,6 +29,10 @@ const emptyTicket: NewSupportTicket = { subject: '', category: 'support', priori
 
 export const SupportPage: React.FC = () => {
   const { user } = useBluAuth();
+  const navigate = useNavigate();
+  const [section, setSection] = React.useState<'tickets' | 'faq' | 'academy'>('tickets');
+  const [faqSearch, setFaqSearch] = React.useState('');
+  const [openFaq, setOpenFaq] = React.useState<number | null>(0);
   const [tickets, setTickets] = React.useState<SupportTicket[]>([]);
   const [messages, setMessages] = React.useState<SupportMessage[]>([]);
   const [selectedId, setSelectedId] = React.useState('');
@@ -112,13 +117,18 @@ export const SupportPage: React.FC = () => {
     <div className="mx-auto max-w-[1600px] space-y-6">
       <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between dark:border-white/10 dark:bg-white/8">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600 dark:text-blue-300">Atendimento Blu</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight">Suporte, chamados e SAC</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-300">Abra chamados, converse com o suporte e acompanhe o histórico de atendimento da sua empresa em um só lugar.</p>
+          <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600 dark:text-blue-300">Aprenda e resolva</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight">Central de Ajuda</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-300">Encontre respostas, aprenda a usar a Blu, solicite suporte e acompanhe seus chamados em um só lugar.</p>
         </div>
-        <button onClick={() => setModalOpen(true)} className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20"><Plus size={17} />Novo chamado</button>
+        <div className="flex flex-wrap gap-2"><button onClick={() => { navigate('/admin/dashboard'); window.setTimeout(() => window.dispatchEvent(new Event('blu:start-tour')), 180); }} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black dark:border-white/10"><Compass size={17} />Refazer tour</button><button onClick={() => { setSection('tickets'); setModalOpen(true); }} className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20"><Plus size={17} />Novo chamado</button></div>
       </header>
 
+      <nav className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-white/8">
+        {([['tickets', 'Chamados', Headphones], ['faq', 'Perguntas frequentes', HelpCircle], ['academy', 'Academia Blu', GraduationCap]] as const).map(([value, label, Icon]) => <button key={value} onClick={() => setSection(value)} className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-black transition sm:text-sm ${section === value ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'}`}><Icon size={17}/><span className="hidden sm:inline">{label}</span></button>)}
+      </nav>
+
+      {section === 'tickets' && <>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Metric icon={<LifeBuoy />} label="Chamados abertos" value={String(tickets.filter((item) => item.status !== 'resolved').length)} />
         <Metric icon={<MessageCircle />} label="Aguardando suporte" value={String(tickets.filter((item) => item.status === 'waiting_support' || item.status === 'open').length)} />
@@ -196,6 +206,10 @@ export const SupportPage: React.FC = () => {
           )}
         </main>
       </section>
+      </>}
+
+      {section === 'faq' && <FaqSection search={faqSearch} setSearch={setFaqSearch} open={openFaq} setOpen={setOpenFaq} openTicket={() => { setSection('tickets'); setModalOpen(true); }} />}
+      {section === 'academy' && <AcademySection />}
 
       {modalOpen && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm">
@@ -240,3 +254,28 @@ const StatusBadge = ({ status }: { status: SupportTicketStatus }) => {
 const Input = ({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; type?: string }) => (
   <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{label}<input type={type} value={value} onChange={(event) => onChange(event.target.value)} required placeholder={placeholder} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-normal outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/8" /></label>
 );
+
+const faqs = [
+  ['Como cadastrar uma nova empresa?', 'Acesse Perfil, abra a seção Empresas e selecione “Adicionar empresa”. O limite de empresas depende do seu plano atual.'],
+  ['Como convidar alguém para a equipe?', 'Em Equipe, clique em “Adicionar membro”, informe o e-mail, escolha o perfil e configure as permissões necessárias.'],
+  ['Onde acompanho receitas e despesas?', 'O módulo Financeiro reúne fluxo de caixa, contas bancárias, cobranças, contas a pagar, DRE e relatórios por empresa.'],
+  ['Como publicar produtos ou serviços na loja?', 'Cadastre o item no módulo correspondente, habilite sua publicação no e-commerce e confira preço, imagens e disponibilidade antes de publicar.'],
+  ['Como alterar meu plano?', 'Abra Planos ou Assinatura no menu lateral para comparar limites, recursos e concluir o upgrade.'],
+  ['Meus dados ficam separados por empresa?', 'Sim. A empresa selecionada define o contexto das consultas e operações, respeitando suas permissões e o isolamento de dados.'],
+];
+
+const FaqSection = ({ search, setSearch, open, setOpen, openTicket }: { search: string; setSearch: (value: string) => void; open: number | null; setOpen: (value: number | null) => void; openTicket: () => void }) => {
+  const filtered = faqs.filter(([question, answer]) => `${question} ${answer}`.toLowerCase().includes(search.toLowerCase()));
+  return <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"><div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/8"><div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar uma dúvida..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5"/></div><div className="mt-5 divide-y divide-slate-100 dark:divide-white/10">{filtered.map(([question, answer]) => { const originalIndex = faqs.findIndex((item) => item[0] === question); const expanded = open === originalIndex; return <button key={question} onClick={() => setOpen(expanded ? null : originalIndex)} className="block w-full py-5 text-left"><span className="flex items-center justify-between gap-4 font-black">{question}<ChevronDown size={18} className={`shrink-0 transition ${expanded ? 'rotate-180' : ''}`}/></span>{expanded && <span className="mt-3 block text-sm leading-6 text-slate-500 dark:text-slate-300">{answer}</span>}</button>; })}{!filtered.length && <p className="py-12 text-center text-sm text-slate-400">Nenhuma resposta encontrada.</p>}</div></div><aside className="h-fit rounded-3xl bg-slate-950 p-6 text-white dark:bg-blue-600"><MessageCircle className="text-sky-300"/><h2 className="mt-5 text-xl font-black">Ainda precisa de ajuda?</h2><p className="mt-2 text-sm leading-6 text-slate-300 dark:text-blue-50">Abra um chamado com o contexto da sua dúvida e acompanhe a resposta dentro da Blu.</p><button onClick={openTicket} className="mt-5 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950">Solicitar suporte</button></aside></section>;
+};
+
+const courses = [
+  { title: 'Primeiros passos na Blu', lessons: 6, duration: '35 min', description: 'Empresa, equipe, permissões e navegação.' },
+  { title: 'Financeiro sem complicação', lessons: 8, duration: '52 min', description: 'Contas, cobranças, fluxo de caixa e DRE.' },
+  { title: 'Venda pelo PDV', lessons: 5, duration: '28 min', description: 'Caixa, clientes, pagamentos e comprovantes.' },
+  { title: 'E-commerce Blu', lessons: 7, duration: '46 min', description: 'Loja, catálogo, pagamentos e entregas.' },
+  { title: 'Gestão de serviços', lessons: 6, duration: '40 min', description: 'Agenda, profissionais, insumos e comissões.' },
+  { title: 'Contabilidade integrada', lessons: 5, duration: '32 min', description: 'Documentos, obrigações e fechamento.' },
+];
+
+const AcademySection = () => <section className="space-y-5"><div className="rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 p-7 text-white shadow-xl shadow-blue-600/15"><BookOpen size={28}/><p className="mt-5 text-xs font-black uppercase tracking-[.18em] text-blue-100">Academia Blu</p><h2 className="mt-2 text-3xl font-black tracking-tight">Aprenda no seu ritmo</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">Trilhas curtas e práticas para configurar a plataforma e aproveitar melhor cada módulo.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{courses.map((course, index) => <article key={course.title} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/8"><div className="flex items-center justify-between"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200"><CirclePlay size={21}/></span><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase text-slate-500 dark:bg-white/10 dark:text-slate-300">Trilha {index + 1}</span></div><h3 className="mt-5 text-lg font-black">{course.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">{course.description}</p><div className="mt-5 flex items-center justify-between text-xs font-bold text-slate-400"><span>{course.lessons} aulas</span><span>{course.duration}</span></div><button onClick={() => alert('As aulas desta trilha serão disponibilizadas em breve.')} className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black hover:border-blue-300 hover:text-blue-600 dark:border-white/10">Ver curso</button></article>)}</div></section>;

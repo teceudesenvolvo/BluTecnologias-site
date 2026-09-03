@@ -11,6 +11,7 @@ import { accessControlService, defaultAccessRoles, type AccessRole } from '../se
 import { billingClient, normalizeBillingStatus, type BillingSummary } from '../billing/services/billingClient';
 import { listCompanyDocs } from '../services/firestoreCompany';
 import { AccountantCompanySwitcher } from '../components/AccountantCompanySwitcher';
+import { FirstAccessTour } from '../components/FirstAccessTour';
 
 type StockAlert = { id: string; name: string; stockQuantity?: number; minStock?: number; sku?: string; barcode?: string; type?: string; active?: boolean };
 
@@ -35,7 +36,7 @@ const nav = [
   { label: 'Integrações', to: '/admin/integracoes', icon: CircleDollarSign },
   { label: 'Planos', to: '/admin/planos', icon: ShieldCheck },
   { label: 'Assinatura', to: '/admin/assinatura', icon: CreditCard },
-  { label: 'Suporte', to: '/admin/suporte', icon: Headphones },
+  { label: 'Ajuda', to: '/admin/suporte', icon: Headphones },
   { label: 'Configurações', to: '/admin/configuracoes', icon: Settings },
 ];
 
@@ -85,7 +86,7 @@ const quickFeatures = [
   { label: 'Gestão tributária', to: '/admin/financeiro/gestao-tributaria', description: 'Tributos, retenções, guias e estimativas gerenciais', keywords: 'tributo imposto iss inss irrf pis cofins csll icms ipi retenção' },
   { label: 'DRE Gerencial', to: '/admin/financeiro/dre-gerencial', description: 'Resultado gerencial, margem e orçado x realizado', keywords: 'dre resultado lucro margem gerencial competência caixa' },
   { label: 'Upload de documentos', to: '/admin/documentos', description: 'Cadastrar documentos, certidões e baixar ZIP', keywords: 'documento certidão certidao upload validade vencimento zip download' },
-  { label: 'Abrir chamado', to: '/admin/suporte', description: 'Chat com suporte, SAC e acompanhamento de chamados', keywords: 'suporte chamado chat sac atendimento ajuda problema ticket' },
+  { label: 'Central de ajuda', to: '/admin/suporte', description: 'Chamados, perguntas frequentes, cursos e suporte', keywords: 'suporte chamado chat sac atendimento ajuda problema ticket faq curso academia' },
   { label: 'Níveis de acesso', to: '/admin/configuracoes/niveis-acesso', description: 'Configurar permissões por tipo de usuário', keywords: 'permissão permissao acesso perfil usuário usuario tipo equipe admin' },
   { label: 'Minha assinatura', to: '/admin/assinatura', description: 'Plano atual, uso, cobranças e pagamentos', keywords: 'assinatura plano pagamento cobrança pagarme upgrade uso limite checkout pix cartão' },
   { label: 'Migração de dados', to: '/admin/migracao', description: 'Migrar dados do Firebase para o backend Blu', keywords: 'migração migracao firebase backend banco dados render postgres' },
@@ -393,7 +394,7 @@ export const BluAppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       {mobileOpen && <button aria-label="Fechar menu" className="fixed inset-0 z-40 bg-slate-950/35 lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 dark:border-white/10 dark:bg-slate-950 ${collapsed ? 'w-[76px]' : 'w-[248px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside data-tour="navigation" className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 dark:border-white/10 dark:bg-slate-950 ${collapsed ? 'w-[76px]' : 'w-[248px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="flex h-[72px] items-center justify-between border-b border-slate-100 px-5 dark:border-white/10">
           <BluLogo compact={collapsed} />
           <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-white/10" onClick={() => setMobileOpen(false)}><X size={19} /></button>
@@ -423,8 +424,8 @@ export const BluAppLayout: React.FC = () => {
         <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-7 dark:border-white/10 dark:bg-slate-950/90">
           <button className="rounded-xl border border-slate-200 p-2 text-slate-600 lg:hidden dark:border-white/10 dark:text-slate-300" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="min-w-0"><h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1><p className="hidden text-xs text-slate-400 sm:block">{new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}</p></div>
-          {isAccountant && !location.pathname.startsWith('/admin/contador/empresas/') ? <AccountantCompanySwitcher/> : !isAccountant && memberships.length > 1 && <select aria-label="Empresa atual" value={user?.companyId || ''} onChange={(event) => void switchCompany(event.target.value)} className="hidden max-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold lg:block dark:border-white/10 dark:bg-slate-900">{memberships.map((membership) => <option key={membership.id} value={membership.companyId}>{membership.companyName}</option>)}</select>}
-          <div className="relative ml-auto hidden w-full max-w-[420px] md:block" onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}>
+          <div data-tour="company">{isAccountant && !location.pathname.startsWith('/admin/contador/empresas/') ? <AccountantCompanySwitcher/> : !isAccountant && memberships.length > 1 && <select aria-label="Empresa atual" value={user?.companyId || ''} onChange={(event) => void switchCompany(event.target.value)} className="hidden max-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold lg:block dark:border-white/10 dark:bg-slate-900">{memberships.map((membership) => <option key={membership.id} value={membership.companyId}>{membership.companyName}</option>)}</select>}</div>
+          <div data-tour="search" className="relative ml-auto hidden w-full max-w-[420px] md:block" onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}>
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/8">
               <Search size={17} className="text-slate-400"/>
               <input
@@ -459,9 +460,9 @@ export const BluAppLayout: React.FC = () => {
             )}
           </div>
           <button onClick={()=>setDarkMode((value)=>!value)} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label={darkMode?'Mudar para tema claro':'Mudar para tema escuro'} title={darkMode?'Tema claro':'Tema escuro'}>{darkMode?<Sun size={19}/>:<Moon size={19}/>}</button>
-          <button className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Ajuda"><HelpCircle size={19}/></button>
+          <button onClick={() => navigate('/admin/suporte')} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Central de ajuda" title="Central de ajuda"><HelpCircle size={19}/></button>
           <div className="relative">
-            <button onClick={()=>setNotificationOpen((value)=>!value)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Notificações">
+            <button data-tour="notifications" onClick={()=>setNotificationOpen((value)=>!value)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Notificações">
               <Bell size={19}/>{unreadNotificationsCount>0&&<span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{unreadNotificationsCount}</span>}
             </button>
             {notificationOpen&&<div className="fixed right-4 top-16 z-50 w-[min(420px,92vw)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950 dark:shadow-black/40">
@@ -491,6 +492,7 @@ export const BluAppLayout: React.FC = () => {
               </div>}
           </div>
           <button
+            data-tour="profile"
             onClick={() => navigate('/admin/perfil')}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
             aria-label="Meu perfil"
@@ -499,7 +501,7 @@ export const BluAppLayout: React.FC = () => {
             {initials}
           </button>
         </header>
-        <main className="p-4 md:p-7">
+        <main data-tour="dashboard" className="p-4 md:p-7">
           {!isFreeBillingPlan&&['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
             {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Regularize o plano para continuar usando a Blu.'}
             <button onClick={()=>navigate('/admin/assinatura')} className="ml-3 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">Atualizar pagamento</button>
@@ -507,6 +509,7 @@ export const BluAppLayout: React.FC = () => {
           {billingRestricted ? <div className="mx-auto max-w-2xl rounded-3xl border border-rose-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso temporariamente bloqueado</h2><p className="mt-2 text-sm text-slate-500">O pagamento está em atraso acima do período de tolerância. Seus dados estão preservados; regularize a assinatura para continuar usando a Blu.</p><button onClick={()=>navigate('/admin/assinatura')} className="mt-5 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Atualizar pagamento</button></div> : currentPageAllowed ? <Outlet /> : <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Recurso não disponível</h2><p className="mt-2 text-sm text-slate-500">Este módulo não está liberado no plano atual ou nas permissões do seu usuário.</p><div className="mt-5 flex justify-center gap-2"><button onClick={()=>navigate('/admin/dashboard')} className="rounded-xl border px-4 py-3 text-sm font-bold">Voltar ao dashboard</button><button onClick={()=>navigate('/admin/planos')} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Ver planos</button></div></div>}
         </main>
       </div>
+      <FirstAccessTour userId={user?.id || user?.email || 'admin'} enabled={hasFullAdminNavigation && location.pathname === '/admin/dashboard'} />
     </div>
   );
 };
