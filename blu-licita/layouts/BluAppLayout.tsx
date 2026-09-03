@@ -225,19 +225,33 @@ export const BluAppLayout: React.FC = () => {
   const { user, memberships, switchCompany } = useBluAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentRole = accessControlService.roleFor(user?.role, accessRoles);
-  const canAccessPath = (pathname: string) => {
-    const key = accessControlService.pageKeyFromPath(pathname);
-    if (!key) return true;
-    return currentRole.pages.includes(key);
-  };
   const readCachedUser = () => {
     try { return JSON.parse(window.localStorage.getItem('blu-licita:user') || 'null') as { email?: string } | null; }
     catch { return null; }
   };
-  const platformAdminEmail = String(user?.email || auth.currentUser?.email || readCachedUser()?.email || '').toLowerCase();
-  const isBluPlatformStaff = platformAdminEmail === 'admin@blutecnologias.com.br' || String(user?.companyId || '').toLowerCase() === 'blu-platform' || /blu/i.test(String(user?.role || ''));
-  const isAccountant = String(user?.role || '').toLowerCase() === 'contador';
+  const authenticatedEmails = [
+    user?.email,
+    auth.currentUser?.email,
+    readCachedUser()?.email,
+  ]
+    .map((email) => String(email || '').trim().toLowerCase())
+    .filter(Boolean);
+  const platformAdminEmail = authenticatedEmails[0] || '';
+  const isBluRoot = authenticatedEmails.includes('admin@blutecnologias.com.br');
+  const currentRole = accessControlService.roleFor(user?.role, accessRoles);
+  const normalizedUserRole = String(user?.role || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const activeMembership = memberships.find((item) => item.companyId === user?.companyId && item.status === 'active');
+  const normalizedMembershipRole = String(activeMembership?.role || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const isBluPlatformStaff = isBluRoot || String(user?.companyId || '').toLowerCase() === 'blu-platform' || /blu/i.test(String(user?.role || ''));
+  const administrativeRoles = ['owner', 'admin', 'proprietario', 'administrador', 'gestor'];
+  const hasFullAdminNavigation = isBluPlatformStaff || administrativeRoles.some((role) => normalizedUserRole.includes(role) || normalizedMembershipRole.includes(role));
+  const canAccessPath = (pathname: string) => {
+    if (hasFullAdminNavigation) return true;
+    const key = accessControlService.pageKeyFromPath(pathname);
+    if (!key) return true;
+    return currentRole.pages.includes(key);
+  };
+  const isAccountant = !hasFullAdminNavigation && normalizedUserRole === 'contador';
   const accountantNavigation = accountantNav(user?.companyId || memberships.find((item) => item.status === 'active')?.companyId || 'selecionar');
   const accountantCanSee = (label: string) => {
     const permissions = user?.permissions || {};
@@ -256,7 +270,15 @@ export const BluAppLayout: React.FC = () => {
     if (label === 'Exportações') return permissions.accountingExports?.view === true;
     return false;
   };
-  const visibleNav = isAccountant ? accountantNavigation.filter((item) => accountantCanSee(item.label)) : [...nav.filter((item) => canAccessPath(item.to) && (platformAdminEmail === 'admin@blutecnologias.com.br' || item.label !== 'Integrações')), ...(isBluPlatformStaff ? platformAdminNav : [])];
+  const visibleNav = isAccountant
+    ? accountantNavigation.filter((item) => accountantCanSee(item.label))
+    : [
+        ...nav.filter((item) =>
+          (isBluPlatformStaff || canAccessPath(item.to)) &&
+          (isBluRoot || item.label !== 'Integrações'),
+        ),
+        ...(isBluPlatformStaff ? platformAdminNav : []),
+      ];
   const title = [...nav, ...platformAdminNav, ...accountantNavigation].sort((a,b) => b.to.length - a.to.length).find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
   const currentPageAllowed = canAccessPath(location.pathname);
   const subscriptionStatus = normalizeBillingStatus(billing?.subscription?.status || billing?.subscription?.accessStatus || '');
@@ -326,7 +348,10 @@ export const BluAppLayout: React.FC = () => {
     { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
     { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
   ];
-  const navByLabel = new Map([...nav, ...platformAdminNav, ...accountantNavigation].map((item) => [item.label, item] as const));
+  const navigationForCurrentProfile = isAccountant
+    ? accountantNavigation
+    : [...nav, ...platformAdminNav];
+  const navByLabel = new Map(navigationForCurrentProfile.map((item) => [item.label, item] as const));
   const renderNavItem = ({ label, to, icon: Icon }: (typeof nav)[number]) => (
     <NavLink key={to} to={to} end={to === '/admin/contador'} onClick={() => setMobileOpen(false)} title={collapsed ? label : undefined} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-[#0877ff] shadow-sm dark:border dark:border-blue-300/20 dark:bg-blue-500/[0.18] dark:text-blue-100 dark:shadow-blue-950/20' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-100'} ${collapsed ? 'justify-center' : ''}`}>
       <Icon size={18} strokeWidth={1.9} />
