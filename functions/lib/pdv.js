@@ -305,14 +305,39 @@ exports.completePublicSale = functions.https.onCall(async (payload, context) => 
     const member = requestedCompanyId ? await companyMembership(context.auth.uid, requestedCompanyId) : await membership(context.auth.uid);
     const items = Array.isArray(payload?.items) ? payload.items.slice(0, 100) : [];
     const clientId = String(payload?.clientId || '');
+    const anonymousCustomer = payload?.anonymousCustomer === true;
     const key = String(payload?.idempotencyKey || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 120);
     const requestedSaleId = String(payload?.saleId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 120);
-    if (!clientId || !key || !items.length)
+    if ((!clientId && !anonymousCustomer) || !key || !items.length)
         throw new functions.https.HttpsError('invalid-argument', 'Cliente, itens e chave da operação são obrigatórios.');
     const firestore = admin.firestore();
+    const serviceSale = String(payload?.saleChannel || '') === 'service_pos';
+    const serviceDefinitions = serviceSale
+        ? await firestore.collection('serviceDefinitions').where('companyId', '==', member.companyId).get()
+        : null;
+    const definitionsByProduct = new Map((serviceDefinitions?.docs || []).map(snapshot => [String(snapshot.data().productId || ''), { id: snapshot.id, ...snapshot.data() }]));
+    const ingredientRequirements = new Map();
+    if (serviceSale)
+        items.forEach((item) => {
+            const definition = definitionsByProduct.get(String(item.productId || ''));
+            if (!definition)
+                throw new functions.https.HttpsError('failed-precondition', 'Um serviço da venda não possui configuração operacional.');
+            const multiplier = Number(item.quantityMilli || 0) / 1000;
+            (Array.isArray(definition.ingredients) ? definition.ingredients : []).forEach((ingredient) => {
+                const productId = String(ingredient.productId || '');
+                if (!productId)
+                    return;
+                const current = ingredientRequirements.get(productId) || { name: String(ingredient.name || ''), unit: String(ingredient.unit || 'un'), quantity: 0, serviceIds: new Set() };
+                current.quantity += Number(ingredient.quantity || 0) * multiplier;
+                current.serviceIds.add(definition.id);
+                ingredientRequirements.set(productId, current);
+            });
+        });
+    const ingredientEntries = [...ingredientRequirements.entries()];
+    const ingredientRefs = ingredientEntries.map(([productId]) => firestore.collection('products').doc(productId));
     const saleRef = requestedSaleId ? firestore.collection('pointOfSaleSales').doc(requestedSaleId) : firestore.collection('pointOfSaleSales').doc();
     const marker = firestore.collection('idempotencyKeys').doc(`${member.companyId}_pdv_${key}`);
-    const clientRef = firestore.collection('clients').doc(clientId);
+    const clientRef = clientId ? firestore.collection('clients').doc(clientId) : null;
     const registerId = String(payload?.registerId || '');
     if (!registerId)
         throw new functions.https.HttpsError('failed-precondition', 'Abra o caixa antes de concluir uma venda.');
@@ -326,16 +351,19 @@ exports.completePublicSale = functions.https.onCall(async (payload, context) => 
         if (markerSnap.exists)
             return String(markerSnap.data()?.entityId || '');
         const reads = await Promise.all([
-            tx.get(clientRef),
+            ...(clientRef ? [tx.get(clientRef)] : []),
             tx.get(registerRef),
             ...productRefs.map(ref => tx.get(ref)),
+            ...ingredientRefs.map(ref => tx.get(ref)),
             ...(paymentIntentRef ? [tx.get(paymentIntentRef)] : []),
         ]);
-        const clientSnap = reads[0];
-        const registerSnap = reads[1];
-        const productSnaps = reads.slice(2, 2 + productRefs.length);
-        const paymentIntentSnap = paymentIntentRef ? reads[2 + productRefs.length] : null;
-        if (!clientSnap.exists || clientSnap.data()?.companyId !== member.companyId)
+        const clientOffset = clientRef ? 1 : 0;
+        const clientSnap = clientRef ? reads[0] : null;
+        const registerSnap = reads[clientOffset];
+        const productSnaps = reads.slice(clientOffset + 1, clientOffset + 1 + productRefs.length);
+        const ingredientSnaps = reads.slice(clientOffset + 1 + productRefs.length, clientOffset + 1 + productRefs.length + ingredientRefs.length);
+        const paymentIntentSnap = paymentIntentRef ? reads[clientOffset + 1 + productRefs.length + ingredientRefs.length] : null;
+        if (clientSnap && (!clientSnap.exists || clientSnap.data()?.companyId !== member.companyId))
             throw new functions.https.HttpsError('not-found', 'Cliente ou órgão não encontrado.');
         if (!registerSnap.exists || registerSnap.data()?.companyId !== member.companyId || registerSnap.data()?.operatorId !== context.auth.uid || registerSnap.data()?.status !== 'open')
             throw new functions.https.HttpsError('failed-precondition', 'O caixa deste usuário não está aberto.');
@@ -345,6 +373,10 @@ exports.completePublicSale = functions.https.onCall(async (payload, context) => 
             const snap = productSnaps[index], product = snap.data();
             if (!snap.exists || product?.companyId !== member.companyId)
                 throw new functions.https.HttpsError('not-found', 'Um produto não foi encontrado.');
+            if (serviceSale && product?.type !== 'service')
+                throw new functions.https.HttpsError('invalid-argument', 'O PDV de Serviços aceita somente itens do catálogo de serviços.');
+            if (!serviceSale && product?.type === 'service')
+                throw new functions.https.HttpsError('invalid-argument', 'Use o PDV de Serviços para vender este item.');
             const quantityMilli = Number(item.quantityMilli), unitPriceCents = Number(item.unitPriceCents);
             if (!Number.isSafeInteger(quantityMilli) || quantityMilli <= 0 || !Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0)
                 throw new functions.https.HttpsError('invalid-argument', 'Quantidade ou preço inválido.');
@@ -359,10 +391,23 @@ exports.completePublicSale = functions.https.onCall(async (payload, context) => 
             }
             return { productId: snap.id, name: String(product.name || ''), barcode: String(product.barcode || ''), sku: String(product.sku || ''), quantityMilli, unit: String(product.unit || 'un'), unitPriceCents, totalCents, taxPercent: Number(product.taxPercent || 0), taxCents, ncm: String(product.ncm || ''), cfop: String(product.cfop || '') };
         });
+        if (serviceSale)
+            ingredientSnaps.forEach((snapshot, index) => {
+                const [productId, requirement] = ingredientEntries[index];
+                const product = snapshot.data();
+                if (!snapshot.exists || product?.companyId !== member.companyId)
+                    throw new functions.https.HttpsError('failed-precondition', `Insumo ${requirement.name || productId} não encontrado.`);
+                const current = Number(product.stockQuantity || 0);
+                if (current < requirement.quantity)
+                    throw new functions.https.HttpsError('failed-precondition', `Estoque insuficiente de ${requirement.name || product.name}. Disponível: ${current} ${requirement.unit}.`);
+                tx.set(snapshot.ref, { stockQuantity: current - requirement.quantity, lastStockUpdateAt: now, updatedAt: now, updatedBy: context.auth.uid }, { merge: true });
+                tx.set(firestore.collection('stockMovements').doc(), { companyId: member.companyId, productId: snapshot.id, productName: String(product.name || requirement.name), type: 'service_pos_consumption', quantity: -requirement.quantity, unit: requirement.unit || product.unit || 'un', serviceIds: [...requirement.serviceIds], saleId: saleRef.id, createdAt: now, createdBy: context.auth.uid });
+            });
         const discount = Number(payload?.discountCents || 0);
         if (!Number.isSafeInteger(discount) || discount < 0 || discount > gross)
             throw new functions.https.HttpsError('invalid-argument', 'O desconto informado é inválido.');
-        const net = gross - discount, client = clientSnap.data();
+        const net = gross - discount;
+        const client = clientSnap?.data() || { name: String(payload?.customerName || 'Consumidor final').trim().slice(0, 160) || 'Consumidor final' };
         let paid = paymentMethod === 'cash' ? true : Boolean(payload?.paid);
         if (paymentMethod === 'pix') {
             if (!paymentIntentRef || !paymentIntentSnap?.exists)
@@ -390,7 +435,7 @@ exports.completePublicSale = functions.https.onCall(async (payload, context) => 
         if (!Number.isSafeInteger(installments) || installments < 1 || installments > 12)
             throw new functions.https.HttpsError('invalid-argument', 'Quantidade de parcelas inválida.');
         const saleNumber = String(payload?.number || `PDV-${Date.now()}`), issueDate = String(payload?.issueDate || now.slice(0, 10));
-        const common = { companyId: member.companyId, registerId, operatorId: context.auth.uid, operatorName: String(registerSnap.data()?.operatorName || context.auth.token.email || 'Operador'), saleId: saleRef.id, saleNumber, clientId, clientName: String(client.razaoSocial || client.name || ''), clientDocument: String(client.cnpj || client.organizationCnpj || ''), contractId: String(payload?.contractId || ''), contractName: String(payload?.contractName || ''), grossAmountCents: gross, discountCents: discount, taxAmountCents: taxes, netAmountCents: net, paymentMethod, paymentIntentId, cashReceivedCents, changeCents, cardType, installments, paymentCapture: paymentMethod === 'card' ? 'pinpad_pending' : paymentMethod === 'pix' ? 'pagarme_pix' : 'manual', issueDate, items: normalized, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid };
+        const common = { companyId: member.companyId, registerId, operatorId: context.auth.uid, operatorName: String(registerSnap.data()?.operatorName || context.auth.token.email || 'Operador'), saleId: saleRef.id, saleNumber, saleChannel: serviceSale ? 'service_pos' : 'commerce_pos', clientId, anonymousCustomer, clientName: String(client.razaoSocial || client.name || 'Consumidor final'), clientDocument: String(client.cnpj || client.organizationCnpj || ''), contractId: clientId ? String(payload?.contractId || '') : '', contractName: clientId ? String(payload?.contractName || '') : '', grossAmountCents: gross, discountCents: discount, taxAmountCents: taxes, netAmountCents: net, paymentMethod, paymentIntentId, cashReceivedCents, changeCents, cardType, installments, paymentCapture: paymentMethod === 'card' ? 'pinpad_pending' : paymentMethod === 'pix' ? 'pagarme_pix' : 'manual', issueDate, items: normalized, createdAt: now, updatedAt: now, createdBy: context.auth.uid, updatedBy: context.auth.uid };
         tx.set(saleRef, { ...common, status: paid ? 'completed' : 'pending', notes: String(payload?.notes || ''), fiscalRequested: Boolean(payload?.fiscalRequested), emailRequested: Boolean(payload?.sendEmail) });
         const movement = firestore.collection('financialTransactions').doc();
         tx.set(movement, { ...common, kind: 'income', description: `Venda ${saleNumber} - ${common.clientName}`, date: issueDate, dueDate: String(payload?.dueDate || issueDate), competence: issueDate.slice(0, 7), status: paid ? 'received' : 'pending', settledAmountCents: paid ? net : 0, balanceAmountCents: paid ? 0 : net, originType: 'pointOfSale', originId: saleRef.id, dreImpact: true, reconciled: false, version: 1 });

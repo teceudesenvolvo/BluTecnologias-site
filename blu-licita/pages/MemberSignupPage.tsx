@@ -4,12 +4,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { teamService } from '../services/teamService';
 import { platformTeamService } from '../services/platformTeamService';
 import { BluLogo } from '../components/BluLogo';
+import { useFeedbackMessage } from '../components/GlobalFeedback';
 
 export const MemberSignupPage: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  useFeedbackMessage(error);
   const [form, setForm] = React.useState({ name: '', email: '', password: '', confirm: '' });
   const token = params.get('token') || '';
   const invitedEmail = params.get('email') || '';

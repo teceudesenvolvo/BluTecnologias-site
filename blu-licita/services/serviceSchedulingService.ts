@@ -1,7 +1,7 @@
 import {httpsCallable} from 'firebase/functions';
 import {functions} from '../../services/firebase';
 
-export type ServiceSection='overview'|'catalog'|'schedule'|'appointments'|'professionals'|'resources'|'clients'|'packages'|'commissions'|'reports'|'settings';
+export type ServiceSection='overview'|'pos'|'catalog'|'schedule'|'appointments'|'professionals'|'resources'|'clients'|'packages'|'commissions'|'reports'|'settings';
 export type ServiceLocation={id:string;name:string;code?:string;timezone:string;active:boolean;address?:Record<string,string>};
 export type ServiceCategory={id:string;name:string;description?:string;parentId?:string;active:boolean;displayOrder?:number};
 export type ServiceIngredient={productId:string;name:string;quantity:number;unit:string};

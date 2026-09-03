@@ -5,6 +5,7 @@ import { BluLogo } from '../components/BluLogo';
 import { partnerService } from '../services/partnerService';
 import { lookupCnpjData } from '../../services/cnpjLookup';
 import { useBluAuth } from '../contexts/BluAuthContext';
+import { useFeedbackMessage } from '../components/GlobalFeedback';
 
 const steps = ['Dados pessoais', 'Dados comerciais', 'Dados bancários', 'Conferência'];
 
@@ -52,6 +53,7 @@ export const PartnerSignupPage: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [lookupLoading, setLookupLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  useFeedbackMessage(error);
   const [copied, setCopied] = React.useState(false);
   const [form, setForm] = React.useState({
     partnerType: 'pj',

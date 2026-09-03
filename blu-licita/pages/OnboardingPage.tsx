@@ -7,6 +7,7 @@ import { billingClient, formatCents, type BillingPlanView } from '../billing/ser
 import { lookupCnpjData } from '../../services/cnpjLookup';
 import { lookupCepData } from '../../services/cepLookup';
 import { defaultVisiblePublicPlans } from '../services/publicPlanCatalog';
+import { useFeedbackMessage } from '../components/GlobalFeedback';
 
 const goalsByBusinessType = {
   comercio: ['Vender no PDV', 'Criar minha loja online', 'Controlar produtos e estoque', 'Organizar compras e fornecedores', 'Melhorar o financeiro', 'Integrar meu contador'],
@@ -44,6 +45,7 @@ export const OnboardingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [companyLookupLoading, setCompanyLookupLoading] = useState(false);
   const [error, setError] = useState('');
+  useFeedbackMessage(error);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'boleto' | 'debit_card'>('credit_card');
   const [userForm, setUserForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [companyForm, setCompanyForm] = useState({

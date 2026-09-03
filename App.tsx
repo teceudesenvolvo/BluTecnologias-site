@@ -23,6 +23,7 @@ import { PlansPage } from './blu-licita/billing/pages/PlansPage';
 import { OnboardingPage } from './blu-licita/pages/OnboardingPage';
 import { PartnerProgramPage } from './pages/PartnerProgramPage';
 import { PublicStorePage } from './blu-licita/ecommerce/PublicStorePage';
+import { GlobalFeedback } from './blu-licita/components/GlobalFeedback';
 
 // Com Login
 import { BluRoutes } from './blu-licita/routes/BluRoutes';
@@ -43,6 +44,7 @@ const AppContent: React.FC = () => {
 
   return (
       <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>
+        <GlobalFeedback />
         {!hideNavbar && <Navbar />}
         <main className="flex-grow">
           <Routes>
