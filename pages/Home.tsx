@@ -4,12 +4,18 @@ import {
   ArrowRight,
   Brain,
   BriefcaseBusiness,
+  CalendarDays,
+  Calculator,
   CheckCircle2,
   ChevronDown,
   Clock3,
   FileCheck2,
   FileText,
+  Boxes,
   Instagram,
+  Package,
+  ReceiptText,
+  ShoppingCart,
   Linkedin,
   Menu,
   MessageCircle,
@@ -18,11 +24,14 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Store,
   Sun,
+  TrendingUp,
+  Users,
+  WalletCards,
   X,
 } from 'lucide-react';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
-import DashboardImage from '../assets/blu-dashboard-home.png';
 
 const pain = [
   ['Documentos espalhados', FileText],
@@ -41,38 +50,25 @@ const benefits = [
   'Mais tempo para crescer',
 ];
 
+const platformModules = [
+  ['Venda em todos os canais', 'PDV com caixa, loja online, pagamentos e pedidos no mesmo estoque.', ShoppingCart],
+  ['Operação de serviços', 'Agenda, profissionais, recursos, pacotes, comissões e consumo de insumos.', CalendarDays],
+  ['Financeiro conectado', 'Contas, cobranças, fluxo de caixa, conciliação, DRE e visão por empresa.', ReceiptText],
+  ['Estoque inteligente', 'Produtos, variações, imagens, alertas, entradas, saídas e inventário.', Package],
+  ['Contabilidade integrada', 'Contador multiempresa, documentos, obrigações, fechamentos e exportações.', Calculator],
+  ['Vendas para o governo', 'Oportunidades, orçamentos, contratos, certidões e execução comercial.', BriefcaseBusiness],
+] as const;
+
 const aiInsights = [
   'A Blu percebeu uma queda no fluxo de caixa.',
   'A Blu encontrou contratos próximos do vencimento.',
   'A Blu identificou clientes inadimplentes.',
 ];
 
-const testimonials = [
-  {
-    name: 'Marina Duarte',
-    company: 'Distribuidora Nordeste',
-    role: 'Diretora Comercial',
-    result: 'Reduziu horas de controle manual e ganhou clareza sobre contratos e recebimentos.',
-    photo: 'MD',
-  },
-  {
-    name: 'Rafael Monte',
-    company: 'Gráfica Prime',
-    role: 'Sócio administrador',
-    result: 'Organizou documentos, prazos e propostas em uma única rotina de trabalho.',
-    photo: 'RM',
-  },
-  {
-    name: 'Clara Bezerra',
-    company: 'Lavoro Serviços',
-    role: 'Gestora financeira',
-    result: 'Passou a acompanhar cobranças, contratos e vencimentos sem depender de planilhas.',
-    photo: 'CB',
-  },
-];
-
 const faqs = [
-  ['A Blu é só para licitações?', 'Não. A Blu acompanha a operação completa: oportunidades, contratos, documentos, financeiro, cobranças e recebimentos.'],
+  ['A Blu serve para comércio e para serviços?', 'Sim. Na contratação você escolhe sua jornada e vê somente os planos, módulos e recursos adequados ao seu tipo de operação.'],
+  ['Consigo começar com uma empresa e crescer depois?', 'Sim. Os planos definem limites de empresas, usuários e módulos. Você pode fazer upgrade quando sua operação precisar.'],
+  ['O financeiro conversa com vendas e serviços?', 'Sim. Pedidos, cobranças, contratos, agendamentos e demais operações alimentam a mesma gestão financeira, evitando cadastros paralelos.'],
   ['Preciso instalar alguma coisa?', 'Não. A Blu funciona online, no navegador, com uma experiência moderna em desktop, tablet e celular.'],
   ['O teste grátis exige cartão?', 'A proposta comercial é oferecer 7 dias gratuitos para conhecer a plataforma antes de contratar.'],
   ['Meus dados ficam seguros?', 'A Blu foi desenhada com autenticação, isolamento por empresa e controles de acesso para equipes.'],
@@ -103,17 +99,17 @@ export const Home: React.FC = () => {
         <section className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] max-w-7xl flex-col items-center px-5 pb-16 pt-24 text-center md:pt-32">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3 py-2 text-xs font-bold text-blue-700 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/8 dark:text-blue-200">
             <Sparkles size={14} />
-            Da oportunidade ao pagamento
+            Gestão conectada para comércio e serviços
           </div>
           <h1 className="mt-7 max-w-5xl text-balance text-5xl font-black tracking-[-0.06em] text-slate-950 md:text-7xl lg:text-8xl dark:text-white">
-            Enquanto você administra sua empresa...
-            <span className="block bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent">A Blu trabalha por você.</span>
+            Sua empresa inteira em uma só operação.
+            <span className="block bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 bg-clip-text text-transparent">Venda mais. Controle melhor.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-balance text-lg leading-8 text-slate-600 md:text-xl dark:text-slate-300">
-            Organize processos, documentos, contratos e informações em um único lugar utilizando Inteligência Artificial.
+            Unifique vendas, serviços, estoque, agenda, financeiro, e-commerce e contabilidade. Menos sistemas desconectados, mais clareza para decidir e crescer.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link to="/admin/onboarding" className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-7 text-sm font-black text-white shadow-2xl shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-500">
+            <Link to="/planos" className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-7 text-sm font-black text-white shadow-2xl shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-500">
               Experimentar gratuitamente por 7 dias
               <ArrowRight className="transition group-hover:translate-x-1" size={17} />
             </Link>
@@ -124,11 +120,30 @@ export const Home: React.FC = () => {
               Agendar demonstração
             </Link>
           </div>
-          <DeviceMockup />
+          <SalesOutcomePanel />
+        </section>
+
+        <section className="relative z-10 border-y border-slate-200/70 bg-white/60 px-5 py-7 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mx-auto grid max-w-7xl gap-5 text-center sm:grid-cols-2 lg:grid-cols-4">
+            {['7 dias para experimentar', 'Configuração guiada', 'Dados isolados por empresa', 'Upgrade conforme você cresce'].map((item) => <p key={item} className="flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[.12em] text-slate-500 dark:text-slate-300"><CheckCircle2 size={15} className="text-emerald-500" />{item}</p>)}
+          </div>
+        </section>
+
+        <section id="segmentos" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
+          <StoryTitle eyebrow="Feita para sua operação" title="Escolha sua jornada. Ative apenas o que sua empresa precisa." />
+          <div className="mt-12 grid gap-5 lg:grid-cols-2">
+            <SegmentCard title="Comércio" description="Para lojas, distribuidoras e empresas que vendem produtos em múltiplos canais." items={['PDV e controle de caixa', 'Produtos, variações e estoque', 'E-commerce e entregas', 'Compras, vendas e financeiro']} to="/planos?tipo=comercio" />
+            <SegmentCard title="Serviços" description="Para negócios que vendem tempo, especialidade e atendimento organizado." items={['Agenda e agendamentos', 'Profissionais e comissões', 'Pacotes, recursos e insumos', 'Contratação online e financeiro']} to="/planos?tipo=servicos" />
+          </div>
+        </section>
+
+        <section id="plataforma" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
+          <StoryTitle eyebrow="Plataforma completa" title="Do primeiro cliente ao fechamento contábil." />
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{platformModules.map(([title,description,Icon])=><article key={title} className={`${liquidCard} p-6`}><span className="relative z-10 grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white"><Icon size={19}/></span><h3 className="relative z-10 mt-8 text-xl font-black">{title}</h3><p className="relative z-10 mt-3 text-sm leading-7 text-slate-500 dark:text-slate-300">{description}</p></article>)}</div>
         </section>
 
         <section id="problema" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
-          <StoryTitle eyebrow="O problema" title="Sua empresa cresce. Mas a gestão fica cada vez mais complicada." />
+          <StoryTitle eyebrow="Reconhece essa rotina?" title="Sua empresa cresce, mas as informações continuam espalhadas." />
           <div className="mt-12 grid gap-3 md:grid-cols-5">
             {pain.map(([label, Icon]) => (
               <article key={label as string} className={`${liquidCard} group p-5 transition hover:-translate-y-1`}>
@@ -142,7 +157,7 @@ export const Home: React.FC = () => {
         </section>
 
         <section className="relative z-10 mx-auto max-w-7xl px-5 py-24">
-          <StoryTitle eyebrow="Transformação" title="De uma operação reativa para uma empresa organizada." />
+          <StoryTitle eyebrow="A mudança na prática" title="Da correria para uma operação previsível e conectada." />
           <div className="mt-12 grid gap-5 lg:grid-cols-2">
             <BeforeAfter title="Antes" muted items={['Arquivos em pastas diferentes', 'Contratos sem acompanhamento', 'Cobranças lembradas tarde demais', 'Decisões baseadas em sensação']} />
             <BeforeAfter title="Depois" items={['Tudo conectado em um único lugar', 'Prazos e contratos visíveis', 'Alertas antes do problema aparecer', 'Decisões com dados claros']} />
@@ -214,21 +229,20 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
-        <section className="relative z-10 mx-auto max-w-7xl px-5 py-24">
-          <StoryTitle eyebrow="Depoimentos" title="Empresas que trocaram confusão por clareza." />
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {testimonials.map((item) => (
-              <article key={item.name} className={`${liquidCard} p-6`}>
-                <div className="relative z-10 flex items-center gap-3">
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-400 text-sm font-black text-white">{item.photo}</span>
-                  <div>
-                    <h3 className="font-black">{item.name}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{item.role} · {item.company}</p>
-                  </div>
-                </div>
-                <p className="relative z-10 mt-8 text-lg font-bold leading-8 text-slate-700 dark:text-slate-200">“{item.result}”</p>
-              </article>
-            ))}
+        <section id="planos" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
+          <div className={`${liquidPanel} grid gap-10 p-7 md:p-12 lg:grid-cols-[1.1fr_.9fr] lg:items-center`}>
+            <div className="relative z-10">
+              <p className="text-xs font-black uppercase tracking-[.22em] text-blue-600 dark:text-blue-300">Planos que acompanham seu momento</p>
+              <h2 className="mt-4 text-4xl font-black tracking-[-.05em] md:text-6xl">Pague pelo que sua operação realmente usa.</h2>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">Escolha entre Comércio ou Serviços, compare os módulos liberados e comece pelo plano adequado ao tamanho da sua equipe.</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/planos?tipo=comercio" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-slate-950 px-6 text-sm font-black text-white transition hover:bg-blue-600 dark:bg-white dark:text-slate-950"><Store size={17}/>Planos para comércio</Link>
+                <Link to="/planos?tipo=servicos" className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/70 px-6 text-sm font-black text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-white/10 dark:bg-white/10 dark:text-white"><CalendarDays size={17}/>Planos para serviços</Link>
+              </div>
+            </div>
+            <div className="relative z-10 grid gap-3">
+              {['Módulos definidos por plano', 'Limites transparentes de usuários e empresas', 'Evolução sem trocar de sistema', 'Contador integrado à operação'].map((item)=><p key={item} className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/55 p-4 text-sm font-bold shadow-sm dark:border-white/10 dark:bg-white/8"><CheckCircle2 size={17} className="shrink-0 text-emerald-500"/>{item}</p>)}
+            </div>
           </div>
         </section>
 
@@ -251,9 +265,9 @@ export const Home: React.FC = () => {
           <div className={`${liquidPanel} rounded-[3rem] px-6 py-16`}>
             <p className="relative z-10 text-xs font-black uppercase tracking-[.22em] text-blue-600 dark:text-blue-300">Comece agora</p>
             <h2 className="relative z-10 mx-auto mt-5 max-w-4xl text-balance text-4xl font-black tracking-[-0.05em] md:text-6xl">Sua empresa merece trabalhar com inteligência.</h2>
-            <p className="relative z-10 mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500 dark:text-slate-300">Experimente gratuitamente e veja como é administrar processos, contratos, documentos e financeiro com a Blu ao seu lado.</p>
-            <Link to="/admin/onboarding" className="relative z-10 mt-9 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-7 text-sm font-black text-white shadow-2xl shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-500">
-              Experimentar gratuitamente
+            <p className="relative z-10 mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500 dark:text-slate-300">Escolha sua jornada, compare os planos e comece a organizar sua empresa hoje.</p>
+            <Link to="/planos" className="relative z-10 mt-9 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-7 text-sm font-black text-white shadow-2xl shadow-blue-600/25 transition hover:-translate-y-0.5 hover:bg-blue-500">
+              Escolher meu plano
               <ArrowRight size={17} />
             </Link>
           </div>
@@ -268,12 +282,13 @@ export const Home: React.FC = () => {
 const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDark: (value: boolean) => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void }) => (
   <header className="fixed inset-x-0 top-0 z-50 px-4 py-4">
     <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-3xl border border-white/70 bg-white/72 px-4 py-3 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/65">
-      <Link to="/" className="flex items-center gap-3">
+      <Link to="/empresas" className="flex items-center gap-3">
         <img src={Logo} alt="Blu" className="h-10 w-10 rounded-2xl object-contain" />
         <span className="text-sm font-black tracking-tight">Blu</span>
       </Link>
       <div className="hidden items-center gap-7 text-sm font-bold text-slate-600 md:flex dark:text-slate-300">
-        <Link to="/products" className="hover:text-blue-600">Soluções</Link>
+        <button onClick={() => scrollToSection('segmentos')} className="hover:text-blue-600">Segmentos</button>
+        <button onClick={() => scrollToSection('plataforma')} className="hover:text-blue-600">Funcionalidades</button>
         <button onClick={() => scrollToSection('problema')} className="hover:text-blue-600">Produto</button>
         <button onClick={() => scrollToSection('ia')} className="hover:text-blue-600">IA</button>
         <Link to="/parceria" className="hover:text-blue-600">Parceria</Link>
@@ -284,7 +299,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
           {dark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
         <Link to="/admin/login" className="rounded-full border border-slate-200 bg-white/60 px-5 py-3 text-xs font-black text-slate-700 transition hover:border-blue-200 hover:text-blue-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">Entrar no sistema</Link>
-        <Link to="/admin/onboarding" className="rounded-full bg-slate-950 px-5 py-3 text-xs font-black text-white transition hover:bg-blue-600 dark:bg-white dark:text-slate-950">Teste grátis</Link>
+        <Link to="/planos" className="rounded-full bg-slate-950 px-5 py-3 text-xs font-black text-white transition hover:bg-blue-600 dark:bg-white dark:text-slate-950">Ver planos</Link>
       </div>
       <button onClick={() => setMenuOpen(!menuOpen)} className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white/70 md:hidden dark:border-white/10 dark:bg-white/10">
         {menuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -293,7 +308,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
     {menuOpen && (
       <div className="mx-auto mt-2 max-w-7xl rounded-3xl border border-white/70 bg-white/90 p-4 shadow-xl backdrop-blur-2xl md:hidden dark:border-white/10 dark:bg-slate-950/90">
         <div className="grid gap-2 text-sm font-bold">
-          <Link to="/admin/onboarding" className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-white">Experimentar gratuitamente</Link>
+          <Link to="/planos" className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-white">Escolher jornada e plano</Link>
           <Link to="/admin/login" className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-blue-700 dark:border-blue-300/20 dark:bg-blue-500/10 dark:text-blue-200">Entrar no sistema</Link>
           <Link to="/products" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Soluções para órgãos públicos</Link>
           <Link to="/parceria" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Programa de parceria</Link>
@@ -304,41 +319,61 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
   </header>
 );
 
-const DeviceMockup = () => (
-  <div className="relative mt-20 w-full max-w-6xl">
-    <div className="absolute inset-x-10 top-10 h-48 rounded-full bg-blue-500/20 blur-3xl" />
-    <div className={`${liquidPanel} relative mx-auto rounded-[2.2rem] p-3`}>
-      <div className="relative z-10 overflow-hidden rounded-[1.7rem] border border-white/70 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 dark:border-white/10">
-        <div className="flex h-10 items-center gap-2 border-b border-white/10 bg-white/8 px-4">
-          <span className="h-3 w-3 rounded-full bg-red-400" />
-          <span className="h-3 w-3 rounded-full bg-amber-300" />
-          <span className="h-3 w-3 rounded-full bg-emerald-400" />
+const SalesOutcomePanel = () => {
+  const outcomes = [
+    ['Venda', 'PDV, loja online e pedidos', Store],
+    ['Operação', 'Estoque, agenda e equipe', Boxes],
+    ['Gestão', 'Financeiro e indicadores', TrendingUp],
+    ['Decisão', 'Alertas e visão do negócio', Brain],
+  ] as const;
+
+  return (
+    <div className="relative mt-20 w-full max-w-6xl text-left">
+      <div className="absolute inset-x-16 top-8 h-64 rounded-full bg-blue-500/20 blur-3xl" />
+      <div className={`${liquidPanel} relative grid gap-7 p-6 md:p-9 lg:grid-cols-[.78fr_1.22fr] lg:items-stretch`}>
+        <div className="relative z-10 flex flex-col justify-between rounded-[2rem] bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 p-7 text-white shadow-2xl shadow-blue-600/20 md:p-9">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[.2em] text-blue-100">Uma operação. Uma visão.</p>
+            <h2 className="mt-5 text-4xl font-black tracking-[-.05em] md:text-5xl">Tudo conversa dentro da Blu.</h2>
+            <p className="mt-5 max-w-md text-sm leading-7 text-blue-50">A venda atualiza o estoque. O serviço atualiza a agenda. A cobrança atualiza o financeiro. Você acompanha o negócio sem reconstruir informações.</p>
+          </div>
+          <div className="mt-10 grid grid-cols-2 gap-3">
+            <p className="rounded-2xl bg-white/12 p-4 text-xs font-bold backdrop-blur-xl"><Users size={18} className="mb-4"/>Equipe trabalhando com permissões</p>
+            <p className="rounded-2xl bg-white/12 p-4 text-xs font-bold backdrop-blur-xl"><WalletCards size={18} className="mb-4"/>Financeiro ligado à operação</p>
+          </div>
         </div>
-        <img src={DashboardImage} alt="Dashboard executivo da Blu aberto no sistema" className="h-[260px] w-full object-cover object-left-top md:h-[520px]" />
+        <div className="relative z-10 grid gap-3 sm:grid-cols-2">
+          {outcomes.map(([title, description, Icon], index) => (
+            <article key={title} className="group rounded-[1.75rem] border border-white/80 bg-white/62 p-6 shadow-sm backdrop-blur-xl transition hover:-translate-y-1 hover:border-blue-200 dark:border-white/10 dark:bg-white/8">
+              <div className="flex items-start justify-between gap-4">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200"><Icon size={19}/></span>
+                <span className="text-xs font-black text-slate-300">0{index + 1}</span>
+              </div>
+              <h3 className="mt-10 text-xl font-black">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">{description}</p>
+            </article>
+          ))}
+        </div>
       </div>
     </div>
-    <div className="relative z-10 mx-auto mt-5 grid max-w-4xl gap-3 md:grid-cols-3">
-      <MiniSignal title="Recebimentos" value="R$ 47 mil" description="Valores a receber visíveis no painel" />
-      <MiniSignal title="Contratos" value="3 vencendo" description="Alertas antes dos prazos críticos" />
-      <MiniSignal title="Operação" value="1 lugar" description="Oportunidades, documentos e financeiro" />
-    </div>
-  </div>
-);
-
-const MiniSignal = ({ title, value, description }: { title: string; value: string; description: string }) => (
-  <article className={`${liquidCard} p-4 text-left`}>
-    <BriefcaseBusiness className="relative z-10 text-blue-600" size={18} />
-    <p className="relative z-10 mt-5 text-[10px] font-black uppercase tracking-[.18em] text-blue-600 dark:text-blue-200">{title}</p>
-    <p className="relative z-10 mt-2 text-xl font-black">{value}</p>
-    <p className="relative z-10 mt-1 text-xs leading-5 text-slate-500 dark:text-slate-300">{description}</p>
-  </article>
-);
+  );
+};
 
 const StoryTitle = ({ eyebrow, title, center = false }: { eyebrow: string; title: string; center?: boolean }) => (
   <div className={center ? 'text-center' : ''}>
     <p className="text-xs font-black uppercase tracking-[.22em] text-blue-600 dark:text-blue-300">{eyebrow}</p>
     <h2 className={`mt-4 max-w-4xl text-balance text-4xl font-black tracking-[-0.05em] md:text-6xl ${center ? 'mx-auto' : ''}`}>{title}</h2>
   </div>
+);
+
+const SegmentCard = ({ title, description, items, to }: { title: string; description: string; items: string[]; to: string }) => (
+  <article className={`${liquidPanel} group p-7 md:p-9`}>
+    <p className="relative z-10 text-xs font-black uppercase tracking-[.2em] text-blue-600 dark:text-blue-200">Empresa de {title.toLowerCase()}</p>
+    <h3 className="relative z-10 mt-4 text-4xl font-black tracking-[-.04em]">{title}</h3>
+    <p className="relative z-10 mt-4 max-w-xl text-sm leading-7 text-slate-500 dark:text-slate-300">{description}</p>
+    <div className="relative z-10 mt-7 grid gap-3 sm:grid-cols-2">{items.map(item=><p key={item} className="flex items-center gap-2 text-sm font-bold"><CheckCircle2 size={16} className="text-emerald-600"/>{item}</p>)}</div>
+    <Link to={to} className="relative z-10 mt-9 inline-flex items-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-black text-white transition group-hover:bg-blue-600 dark:bg-white dark:text-slate-950">Ver planos para {title.toLowerCase()}<ArrowRight size={16}/></Link>
+  </article>
 );
 
 const BeforeAfter = ({ title, items, muted = false }: { title: string; items: string[]; muted?: boolean }) => (

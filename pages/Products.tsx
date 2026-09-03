@@ -1,103 +1,33 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { initialSoftwares } from '../services/mockData';
-import { LayoutDashboard, Landmark, Smartphone, ChevronRight, GraduationCap, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, GraduationCap, Landmark, LayoutDashboard, Menu, ShieldCheck, Smartphone, Sparkles, X } from 'lucide-react';
+import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
+
+const icons: Record<string, React.ElementType> = { LayoutDashboard, Landmark, Smartphone, GraduationCap, Sparkles };
 
 export const Products: React.FC = () => {
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'LayoutDashboard': return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
-      case 'Landmark': return <Landmark className="w-full h-full" strokeWidth={1} />;
-      case 'Smartphone': return <Smartphone className="w-full h-full" strokeWidth={1} />;
-      case 'GraduationCap': return <GraduationCap className="w-full h-full" strokeWidth={1} />;
-      case 'Sparkles': return <Sparkles className="w-full h-full" strokeWidth={1} />;
-      default: return <LayoutDashboard className="w-full h-full" strokeWidth={1} />;
-    }
-  };
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  return <main className="min-h-screen overflow-hidden bg-[#f5f8fc] text-slate-950">
+    <header className="fixed inset-x-0 top-0 z-50 px-4 py-4"><nav className="mx-auto flex max-w-7xl items-center justify-between rounded-3xl border border-white/80 bg-white/80 px-4 py-3 shadow-lg shadow-slate-900/5 backdrop-blur-2xl">
+      <Link to="/" className="flex items-center gap-3"><img src={Logo} alt="Blu" className="h-10 w-10 rounded-2xl object-contain"/><div><b className="block text-sm">Blu GovTech</b><span className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">Governo digital</span></div></Link>
+      <div className="hidden items-center gap-7 text-sm font-bold text-slate-600 md:flex"><a href="#solucoes">Soluções</a><a href="#diferenciais">Diferenciais</a><Link to="/blog">Conteúdos</Link></div>
+      <div className="hidden gap-2 md:flex"><Link to="/empresas" className="rounded-full px-5 py-3 text-xs font-black text-slate-600">Para empresas</Link><Link to="/contact" className="rounded-full bg-blue-600 px-5 py-3 text-xs font-black text-white">Falar com especialista</Link></div>
+      <button className="grid h-10 w-10 place-items-center rounded-full border md:hidden" onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X size={18}/>:<Menu size={18}/>}</button>
+    </nav>{menuOpen&&<div className="mx-auto mt-2 grid max-w-7xl gap-2 rounded-3xl bg-white p-4 shadow-xl md:hidden"><a href="#solucoes" className="rounded-xl p-3 font-bold">Soluções</a><Link to="/empresas" className="rounded-xl p-3 font-bold">Para empresas</Link><Link to="/contact" className="rounded-xl bg-blue-600 p-3 text-center font-bold text-white">Falar com especialista</Link></div>}</header>
 
-  return (
-    <div className="min-h-screen bg-white pt-20 font-sans text-slate-900">
-      {/* Header Section */}
-      <section className="pt-20 pb-16 px-6 text-center">
-        <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
-          Soluções que transformam.
-        </h1>
-        <p className="text-2xl md:text-3xl text-slate-500 font-medium max-w-3xl mx-auto">
-          Tecnologia desenhada para a gestão pública moderna.
-        </p>
-      </section>
+    <section className="relative bg-[#06152d] px-5 pb-28 pt-40 text-white"><div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(8,119,255,.34),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(34,211,238,.18),transparent_30%)]"/><div className="relative mx-auto max-w-7xl">
+      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-cyan-200"><Landmark size={14}/>Tecnologia para o setor público</span>
+      <h1 className="mt-7 max-w-5xl text-balance text-5xl font-black tracking-[-.06em] md:text-7xl lg:text-8xl">Serviços públicos mais simples. Gestão mais inteligente.</h1>
+      <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">Soluções integradas para prefeituras, câmaras e instituições públicas digitalizarem atendimento, educação, legislativo e governança.</p>
+      <div className="mt-9 flex flex-col gap-3 sm:flex-row"><Link to="/contact" className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-blue-500 px-7 text-sm font-black shadow-xl shadow-blue-500/25">Agendar apresentação<ArrowRight size={17}/></Link><a href="#solucoes" className="inline-flex h-14 items-center justify-center rounded-full border border-white/15 bg-white/5 px-7 text-sm font-black">Explorar soluções</a></div>
+    </div></section>
 
-      {/* Main Products Grid */}
-      <section className="px-6 pb-32">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {initialSoftwares.map((software, index) => {
-             const isLarge = index === 0; // First item large
-             return (
-              <div 
-                key={software.id} 
-                className={`group relative overflow-hidden rounded-[2.5rem] bg-slate-50 hover:bg-slate-100 transition-colors duration-500 ${isLarge ? 'md:col-span-2 aspect-[2/1]' : 'aspect-square'} flex flex-col items-center justify-between p-10 text-center`}
-              >
-                <div className="z-10 flex flex-col items-center">
-                  <h2 className="text-3xl md:text-5xl font-bold mb-4">{software.nome_produto}</h2>
-                  <p className="text-lg md:text-xl text-slate-500 max-w-lg mb-6">{software.descricao_venda}</p>
-                  <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
-                    <Link to={`/products/${software.id}`} className="text-blue-600 hover:underline flex items-center gap-1 font-medium">
-                      Saiba mais <ChevronRight size={16} />
-                    </Link>
-                    <Link to="/contact" className="text-blue-600 hover:underline flex items-center gap-1 font-medium cursor-pointer">
-                      Agendar Demo <ChevronRight size={16} />
-                    </Link>
-                  </div>
-                </div>
+    <section id="solucoes" className="mx-auto max-w-7xl px-5 py-24"><div className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.22em] text-blue-600">Ecossistema Blu</p><h2 className="mt-4 text-4xl font-black tracking-[-.045em] md:text-6xl">Uma plataforma para cada desafio da gestão pública.</h2></div>
+      <div className="mt-12 grid gap-5 lg:grid-cols-2">{initialSoftwares.filter((software)=>software.id !== '5').map((software,index)=>{const Icon=icons[software.icone_3d]||LayoutDashboard;return <article key={software.id} className={`group relative overflow-hidden rounded-[2.2rem] border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${index===0?'lg:col-span-2 lg:grid lg:grid-cols-[1.1fr_.9fr] lg:items-center lg:p-10':''}`}><div><span className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-blue-600"><Icon size={23}/></span><h3 className="mt-7 text-3xl font-black tracking-tight">{software.nome_produto}</h3><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-500">{software.descricao_venda}</p><div className="mt-6 flex flex-wrap gap-2">{software.features.map(feature=><span key={feature} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{feature}</span>)}</div><div className="mt-8 flex gap-4"><Link to={`/products/${software.id}`} className="inline-flex items-center gap-2 font-black text-blue-600">Conhecer solução<ArrowRight size={16}/></Link><Link to="/contact" className="font-black text-slate-500">Solicitar demonstração</Link></div></div>{index===0&&<div className="mt-10 grid min-h-64 place-items-center rounded-[2rem] bg-gradient-to-br from-blue-600 to-cyan-400 text-white lg:mt-0"><Icon size={120} strokeWidth={.8}/></div>}</article>})}</div>
+    </section>
 
-                {/* Abstract Visual Representation */}
-                <div className={`relative ${isLarge ? 'w-64 h-64 md:w-96 md:h-96' : 'w-48 h-48'} text-slate-200 group-hover:scale-105 transition-transform duration-700 ease-out`}>
-                   {getIcon(software.icone_3d)}
-                </div>
-                
-                {/* Clickable Area */}
-                <Link to={`/products/${software.id}`} className="absolute inset-0 z-0" aria-label={`Ver ${software.nome_produto}`} />
-              </div>
-             );
-          })}
-
-          {/* Extra "Coming Soon" or "Contact" Card */}
-          <div className="md:col-span-2 group relative overflow-hidden rounded-[2.5rem] bg-blue-600 text-white aspect-[2/1] flex flex-col items-center justify-center p-10 text-center">
-             <h2 className="text-3xl md:text-5xl font-bold mb-6">Blu Ecosystem</h2>
-             <p className="text-blue-100 text-xl mb-8 max-w-2xl">Uma plataforma única para conectar prefeitura, câmara e cidadãos com eficiência e transparência.</p>
-             <Link to="/contact" className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-blue-50 transition-colors">
-               Falar com um Especialista
-             </Link>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Comparison / Why Blu Section */}
-      <section className="py-32 bg-slate-50">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-16">Por que escolher a Blu?</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-             <div>
-               <div className="text-5xl font-bold text-blue-600 mb-4">100%</div>
-               <h3 className="text-xl font-bold mb-2">Em Nuvem</h3>
-               <p className="text-slate-500">Acesse de qualquer lugar, sem instalações complexas.</p>
-             </div>
-             <div>
-               <div className="text-5xl font-bold text-blue-600 mb-4">24/7</div>
-               <h3 className="text-xl font-bold mb-2">Suporte</h3>
-               <p className="text-slate-500">Equipe especializada pronta para atender sua prefeitura.</p>
-             </div>
-             <div>
-               <div className="text-5xl font-bold text-blue-600 mb-4">LGPD</div>
-               <h3 className="text-xl font-bold mb-2">Compliance</h3>
-               <p className="text-slate-500">Segurança de dados e conformidade total com a lei.</p>
-             </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+    <section id="diferenciais" className="bg-white px-5 py-24"><div className="mx-auto max-w-7xl"><div className="grid gap-5 md:grid-cols-3">{[['Implantação acompanhada','Nossa equipe conduz configuração, treinamento e entrada em operação.'],['Segurança e conformidade','Arquitetura em nuvem, controle de acesso e proteção de dados.'],['Experiência do cidadão','Interfaces simples, responsivas e acessíveis em qualquer dispositivo.']].map(([title,text])=><article key={title} className="rounded-[2rem] border border-slate-200 p-7"><ShieldCheck className="text-blue-600"/><h3 className="mt-8 text-xl font-black">{title}</h3><p className="mt-3 text-sm leading-7 text-slate-500">{text}</p></article>)}</div></div></section>
+    <section className="px-5 py-24"><div className="mx-auto max-w-6xl rounded-[3rem] bg-[#06152d] px-6 py-16 text-center text-white md:px-14"><CheckCircle2 className="mx-auto text-cyan-300" size={34}/><h2 className="mx-auto mt-6 max-w-4xl text-4xl font-black tracking-[-.05em] md:text-6xl">Vamos construir o próximo serviço público digital?</h2><p className="mx-auto mt-5 max-w-2xl text-slate-300">Conte o desafio do seu órgão. A Blu apresenta a combinação certa de tecnologia, implantação e suporte.</p><Link to="/contact" className="mt-9 inline-flex h-14 items-center gap-2 rounded-full bg-blue-500 px-7 text-sm font-black">Falar com especialista<ArrowRight size={17}/></Link></div></section>
+  </main>;
 };

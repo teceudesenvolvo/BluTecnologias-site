@@ -60,6 +60,13 @@ const planLimitLabels: Record<string, string> = {
   bankAccounts: 'Contas bancárias',
 };
 
+const planModuleOptions = [
+  ['dashboard','Dashboard'],['opportunities','Oportunidades'],['crm','CRM'],['team','Equipe'],['bids','Licitações'],
+  ['clients','Clientes'],['contracts','Contratos'],['budgets','Orçamentos'],['orders','Ordens'],['products','Produtos'],
+  ['services','Serviços'],['ecommerce','E-commerce'],['pos','PDV'],['finance','Financeiro'],['documents','Documentos'],
+  ['calendar','Calendário'],['reports','Relatórios'],['integrations','Integrações'],['accounting','Contador'],['automations','Automações'],['api','API'],
+] as const;
+
 const emptyPlan = (): PublicPlanDoc => ({
   id: `plan-${Date.now()}`,
   name: 'Novo plano',
@@ -69,6 +76,11 @@ const emptyPlan = (): PublicPlanDoc => ({
   billingInterval: 'month',
   intervalCount: 1,
   trialDays: 7,
+  businessTypes: ['comercio'],
+  modules: ['dashboard', 'crm', 'clients', 'products', 'services', 'finance', 'documents', 'calendar', 'reports'],
+  featuresByBusinessType: { comercio: [], servicos: [] },
+  recommended: false,
+  badge: '',
   billingType: 'prepaid',
   cycles: null,
   startAt: null,
@@ -391,6 +403,9 @@ export const BluHqPage: React.FC = () => {
   const openPlanEditor = (plan: PublicPlanDoc) => {
     setPlanForm({
       ...plan,
+      businessTypes: [plan.businessTypes?.[0] || 'comercio'],
+      modules: plan.modules || [],
+      featuresByBusinessType: plan.featuresByBusinessType || { comercio: [], servicos: [] },
       limits: {
         companies: plan.limits?.companies ?? null,
         activeContracts: plan.limits?.activeContracts ?? null,
@@ -410,6 +425,14 @@ export const BluHqPage: React.FC = () => {
 
   const savePlan = async () => {
     if (!planForm) return;
+    if (planForm.businessTypes?.length !== 1) {
+      setError('Selecione se este plano pertence à jornada de Comércio ou de Serviços.');
+      return;
+    }
+    if (!planForm.modules?.length) {
+      setError('Selecione ao menos um módulo que será liberado por este plano.');
+      return;
+    }
     setPublicPlansSaving(true);
     try {
       await savePublicPlan(planForm);
@@ -700,6 +723,11 @@ export const BluHqPage: React.FC = () => {
                   </div>
                   <p className="mt-5 text-3xl font-black text-slate-900 dark:text-white">{formatCurrency(plan.priceInCents)}</p>
                   <p className="mt-1 text-xs font-bold uppercase tracking-[.18em] text-slate-400">{plan.billingInterval === 'year' ? 'Cobrança anual' : 'Cobrança mensal'} · {plan.trialDays || 0} dia(s) de teste</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(plan.businessTypes || []).map((type)=><Badge key={type} tone="blue">{type === 'comercio' ? 'Comércio' : 'Serviços'}</Badge>)}
+                    {plan.recommended&&<Badge tone="emerald">Recomendado</Badge>}
+                    {plan.badge&&<span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">{plan.badge}</span>}
+                  </div>
                   <div className="mt-4 grid gap-2 text-sm text-slate-600 dark:text-slate-200 md:grid-cols-2">
                     <p>Empresas: <b>{plan.limits.companies ?? '∞'}</b></p>
                     <p>Usuários: <b>{plan.limits.users ?? '∞'}</b></p>
@@ -708,6 +736,7 @@ export const BluHqPage: React.FC = () => {
                     <p>Contas: <b>{plan.limits.bankAccounts ?? '∞'}</b></p>
                     <p>API: <b>{plan.limits.apiRequests === null ? 'Ilimitada' : plan.limits.apiRequests}</b></p>
                   </div>
+                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-300"><b>{plan.modules?.length || 0}</b> módulos configurados · <b>{plan.featuresByBusinessType?.comercio?.length || 0}</b> destaques de comércio · <b>{plan.featuresByBusinessType?.servicos?.length || 0}</b> destaques de serviços</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button onClick={() => openPlanEditor(plan)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-100 dark:hover:bg-white/[0.08]">
                       <Edit3 size={15} />
@@ -1320,6 +1349,7 @@ export const BluHqPage: React.FC = () => {
               <Field label="Início em" value={planForm.startAt || ''} onChange={(value) => updatePlanForm({ startAt: value || null })} />
               <Field label="Dias de teste" value={String(planForm.trialDays)} onChange={(value) => updatePlanForm({ trialDays: Number(value || 0) })} />
               <Field label="Ordem de exibição" value={String(planForm.displayOrder ?? 0)} onChange={(value) => updatePlanForm({ displayOrder: Number(value || 0) })} />
+              <Field label="Selo comercial" value={planForm.badge || ''} onChange={(value) => updatePlanForm({ badge: value })} />
             </section>
             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]">
@@ -1330,6 +1360,25 @@ export const BluHqPage: React.FC = () => {
                 <span className="block text-[10px] font-black uppercase tracking-[.18em] text-slate-400">Publicar no cadastro</span>
                 <input type="checkbox" checked={Boolean(planForm.public)} onChange={(event) => updatePlanForm({ public: event.target.checked })} className="mt-3 h-5 w-5" />
               </label>
+              <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold dark:border-white/10 dark:bg-white/[0.04]">
+                <span className="block text-[10px] font-black uppercase tracking-[.18em] text-slate-400">Plano recomendado</span>
+                <input type="checkbox" checked={Boolean(planForm.recommended)} onChange={(event) => updatePlanForm({ recommended: event.target.checked })} className="mt-3 h-5 w-5" />
+              </label>
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Tipo de empresa do plano</h3>
+              <p className="mt-1 text-xs text-slate-500">Cada plano pertence a uma única jornada comercial.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">{([['comercio','Comércio'],['servicos','Serviços']] as const).map(([value,label])=>{const selected=(planForm.businessTypes||[])[0]===value;return <button key={value} type="button" onClick={()=>updatePlanForm({businessTypes:[value]})} className={`rounded-2xl border px-4 py-3 text-left text-sm font-bold ${selected?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 bg-white'}`}>{label}</button>})}</div>
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div><h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Funcionalidades comerciais</h3><p className="mt-1 text-xs text-slate-500">Uma funcionalidade por linha. Estes textos aparecem nos cards públicos.</p></div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {([((planForm.businessTypes||[])[0] || 'comercio')] as const).map(type=><label key={type} className="text-xs font-black uppercase tracking-[.15em] text-slate-500 md:col-span-2">{type === 'comercio' ? 'Para comércio' : 'Para serviços'}<textarea rows={7} value={(planForm.featuresByBusinessType?.[type]||[]).join('\n')} onChange={event=>updatePlanForm({featuresByBusinessType:{comercio:planForm.featuresByBusinessType?.comercio||[],servicos:planForm.featuresByBusinessType?.servicos||[],[type]:event.target.value.split('\n').map(item=>item.trim()).filter(Boolean)}})} className="mt-2 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-normal normal-case tracking-normal outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900"/></label>)}
+              </div>
+            </section>
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Módulos liberados</h3><p className="mt-1 text-xs text-slate-500">Controla o menu e bloqueia acesso direto às rotas não contratadas.</p></div><button type="button" onClick={()=>updatePlanForm({modules:(planForm.modules||[]).includes('*')?[]:['*']})} className="rounded-xl border bg-white px-3 py-2 text-xs font-black">{(planForm.modules||[]).includes('*')?'Remover acesso total':'Liberar todos'}</button></div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{planModuleOptions.map(([value,label])=>{const all=(planForm.modules||[]).includes('*');const selected=all||(planForm.modules||[]).includes(value);return <button key={value} type="button" disabled={all} onClick={()=>updatePlanForm({modules:selected?(planForm.modules||[]).filter(item=>item!==value):[...(planForm.modules||[]),value]})} className={`rounded-xl border px-3 py-2.5 text-left text-xs font-bold disabled:opacity-60 ${selected?'border-blue-400 bg-blue-50 text-blue-700':'border-slate-200 bg-white text-slate-600'}`}>{label}</button>})}</div>
             </section>
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
               <h3 className="text-sm font-black uppercase tracking-[.18em] text-slate-400">Métodos de pagamento</h3>

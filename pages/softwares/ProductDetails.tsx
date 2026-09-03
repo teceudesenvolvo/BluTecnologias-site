@@ -18,7 +18,7 @@ import {
 
 export const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const product = initialSoftwares.find(p => p.id === id);
+  const product = initialSoftwares.find(p => p.id === id && p.id !== '5');
 
   useEffect(() => {
     window.scrollTo(0, 0);

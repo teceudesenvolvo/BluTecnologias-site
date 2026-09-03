@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Banknote, Building2, Check, CheckCircle2, CreditCard, Loader2, PartyPopper, ReceiptText, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Banknote, Building2, CalendarDays, Check, CheckCircle2, CreditCard, Loader2, PartyPopper, ReceiptText, ShieldCheck, ShoppingCart, Sparkles, UserRound } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
@@ -8,7 +8,10 @@ import { lookupCnpjData } from '../../services/cnpjLookup';
 import { lookupCepData } from '../../services/cepLookup';
 import { defaultVisiblePublicPlans } from '../services/publicPlanCatalog';
 
-const goals = ['Encontrar oportunidades melhores', 'Analisar editais com IA', 'Organizar documentos', 'Controlar contratos', 'Cobrar órgãos públicos', 'Acompanhar fluxo de caixa'];
+const goalsByBusinessType = {
+  comercio: ['Vender no PDV', 'Criar minha loja online', 'Controlar produtos e estoque', 'Organizar compras e fornecedores', 'Melhorar o financeiro', 'Integrar meu contador'],
+  servicos: ['Organizar minha agenda', 'Receber agendamentos online', 'Gerir profissionais e comissões', 'Controlar insumos e recursos', 'Melhorar o financeiro', 'Integrar meu contador'],
+};
 
 const onlyDigits = (value: string) => value.replace(/\D/g, '');
 const maskCnpj = (value: string) => {
@@ -31,6 +34,8 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', required = 
 
 export const OnboardingPage: React.FC = () => {
   const [params] = useSearchParams();
+  const requestedBusinessType = params.get('tipo') === 'servicos' ? 'servicos' : 'comercio';
+  const [businessType, setBusinessType] = useState<'comercio'|'servicos'>(requestedBusinessType);
   const [step, setStep] = useState(1);
   const [plan, setPlan] = useState('');
   const [publicPlans, setPublicPlans] = useState<BillingPlanView[]>([]);
@@ -45,7 +50,7 @@ export const OnboardingPage: React.FC = () => {
     legalName: '',
     tradeName: '',
     document: '',
-    segment: '',
+    segment: requestedBusinessType === 'servicos' ? 'Serviços' : 'Comércio',
     companySize: '',
     companyLegalNature: '',
     city: '',
@@ -62,7 +67,13 @@ export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const partnerCode = params.get('ref') || '';
   const preferredPlan = params.get('plano') || params.get('plan') || '';
-  const selectablePlans = useMemo(() => publicPlans.filter(isVisibleSignupPlan), [publicPlans]);
+  const selectablePlans = useMemo(
+    () => publicPlans.filter((item) =>
+      isVisibleSignupPlan(item) &&
+      (!item.businessTypes?.length || item.businessTypes.includes(businessType))
+    ),
+    [publicPlans, businessType],
+  );
   const currentPlan = useMemo(() => selectablePlans.find((item) => item.id === plan) || selectablePlans[0] || null, [plan, selectablePlans]);
   const isBillingTestPlan = plan === 'test-1-real';
   const isFreePlan = Number(currentPlan?.priceInCents || 0) <= 0;
@@ -90,6 +101,15 @@ export const OnboardingPage: React.FC = () => {
       })
       .finally(() => setPlansLoading(false));
   }, [preferredPlan]);
+
+  React.useEffect(() => {
+    if (!selectablePlans.length) return;
+    setPlan((current) => {
+      if (selectablePlans.some((item) => item.id === current || item.slug === current)) return current;
+      const preferred = selectablePlans.find((item) => item.id === preferredPlan || item.slug === preferredPlan);
+      return preferred?.id || selectablePlans[0].id;
+    });
+  }, [preferredPlan, selectablePlans]);
 
   const next = () => {
     setError('');
@@ -214,9 +234,9 @@ export const OnboardingPage: React.FC = () => {
         <aside className="hidden rounded-[2rem] border border-white/70 bg-white/65 p-8 shadow-sm backdrop-blur-2xl lg:block">
           <p className="text-xs font-black uppercase tracking-[.22em] text-blue-600">Teste gratuito Blu</p>
           <h1 className="mt-5 text-5xl font-black tracking-[-0.06em]">Comece em 7 dias. Contrate quando fizer sentido.</h1>
-          <p className="mt-5 text-sm leading-7 text-slate-500">A jornada foi pensada para o dono da empresa: escolha a capacidade, cadastre sua empresa e entre direto no painel para organizar oportunidades, contratos, documentos e cobranças.</p>
+          <p className="mt-5 text-sm leading-7 text-slate-500">Escolha o tipo da operação, selecione o plano, cadastre sua empresa e entre em um ambiente preparado para comércio ou serviços.</p>
           <div className="mt-10 grid gap-3">
-            {['Sem cartão no cadastro', 'Todos os módulos liberados', 'Capacidade definida pelo plano', 'Pagamento confirmado por checkout seguro'].map((item) => (
+            {['Sem cartão no cadastro', 'Módulos adequados ao seu plano', 'Jornada para comércio ou serviços', 'Pagamento confirmado por checkout seguro'].map((item) => (
               <p key={item} className="flex items-center gap-3 text-sm font-bold"><CheckCircle2 size={17} className="text-emerald-600" />{item}</p>
             ))}
           </div>
@@ -236,7 +256,11 @@ export const OnboardingPage: React.FC = () => {
 
             {step === 1 && (
               <>
-                <StepTitle icon={<Sparkles />} title="Escolha seu plano para o teste" description="Todos os planos possuem as funcionalidades da Blu. O que muda é a capacidade operacional." />
+                <StepTitle icon={<Sparkles />} title="Configure sua jornada" description="Escolha o tipo da empresa e o plano que libera os recursos adequados para sua operação." />
+                <div className="mt-7 grid grid-cols-2 rounded-2xl bg-slate-100 p-1.5">
+                  <button type="button" onClick={()=>{setBusinessType('comercio');setSelectedGoals([]);setCompanyForm(current=>({...current,segment:'Comércio'}));}} className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black ${businessType==='comercio'?'bg-white text-blue-700 shadow-sm':'text-slate-500'}`}><ShoppingCart size={17}/>Comércio</button>
+                  <button type="button" onClick={()=>{setBusinessType('servicos');setSelectedGoals([]);setCompanyForm(current=>({...current,segment:'Serviços'}));}} className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-black ${businessType==='servicos'?'bg-white text-blue-700 shadow-sm':'text-slate-500'}`}><CalendarDays size={17}/>Serviços</button>
+                </div>
                 {plansLoading ? (
                   <div className="mt-7 grid min-h-[200px] place-items-center rounded-3xl border border-slate-200 bg-slate-50">
                     <Loader2 className="animate-spin text-blue-600" size={20} />
@@ -248,7 +272,7 @@ export const OnboardingPage: React.FC = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="text-xl font-black">{item.name.replace('Plano ', '')}</h3>
-                          <p className="mt-1 text-sm text-slate-500">{item.description || 'Capacidade configurável para empresas que vendem ao governo.'}</p>
+                      <p className="mt-1 text-sm text-slate-500">{item.description || `Recursos e capacidade para empresas de ${businessType === 'comercio' ? 'comércio' : 'serviços'}.`}</p>
                         </div>
                         {plan === item.id && <Check className="text-blue-600" />}
                       </div>
@@ -295,7 +319,7 @@ export const OnboardingPage: React.FC = () => {
                   </label>
                   <Field label="Razão social" value={companyForm.legalName} onChange={(value) => setCompanyForm({ ...companyForm, legalName: value })} placeholder="Distribuidora Nordeste Ltda." />
                   <Field label="Nome fantasia" value={companyForm.tradeName} onChange={(value) => setCompanyForm({ ...companyForm, tradeName: value })} placeholder="Distribuidora Nordeste" required={false} />
-                  <Field label="Segmento" value={companyForm.segment} onChange={(value) => setCompanyForm({ ...companyForm, segment: value })} placeholder="Produtos, serviços, tecnologia..." required={false} />
+                  <Field label="Tipo de operação" value={companyForm.segment} onChange={(value) => setCompanyForm({ ...companyForm, segment: value })} placeholder="Comércio ou Serviços" required={false} />
                   <Field label="Porte" value={companyForm.companySize} onChange={(value) => setCompanyForm({ ...companyForm, companySize: value })} placeholder="ME, EPP, LTDA..." required={false} />
                   <Field label="Natureza jurídica" value={companyForm.companyLegalNature} onChange={(value) => setCompanyForm({ ...companyForm, companyLegalNature: value })} placeholder="Sociedade Empresária Limitada" required={false} />
                   <Field label="Cidade" value={companyForm.city} onChange={(value) => setCompanyForm({ ...companyForm, city: value })} placeholder="Fortaleza" required={false} />
@@ -311,7 +335,7 @@ export const OnboardingPage: React.FC = () => {
                 <div className="mt-7">
                   <p className="text-sm font-semibold text-slate-700">O que você quer melhorar primeiro?</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    {goals.map((goal) => {
+                    {goalsByBusinessType[businessType].map((goal) => {
                       const active = selectedGoals.includes(goal);
                       return <button key={goal} type="button" onClick={() => setSelectedGoals(active ? selectedGoals.filter((item) => item !== goal) : [...selectedGoals, goal])} className={`flex items-center gap-3 rounded-2xl border p-4 text-left text-sm font-semibold transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300'}`}><span className={`grid h-5 w-5 place-items-center rounded-md border ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'}`}>{active && <Check size={13} />}</span>{goal}</button>;
                     })}

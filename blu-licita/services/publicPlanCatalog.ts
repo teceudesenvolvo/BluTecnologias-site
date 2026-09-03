@@ -11,6 +11,11 @@ export type PublicPlanDoc = {
   billingInterval: 'month' | 'year';
   intervalCount?: number;
   trialDays: number;
+  businessTypes?: Array<'comercio' | 'servicos'>;
+  modules?: string[];
+  featuresByBusinessType?: { comercio: string[]; servicos: string[] };
+  recommended?: boolean;
+  badge?: string;
   billingType?: 'prepaid' | 'postpaid' | 'exact_day';
   cycles?: number | null;
   startAt?: string | null;
@@ -50,7 +55,7 @@ const toPublicPlanDoc = (item: (typeof subscriptionPlans)[number], index: number
   const monthlyPrice = (() => {
     switch (item.key) {
       case 'essential':
-        return 19700;
+        return 14999;
       case 'professional':
         return 49700;
       case 'performance':
@@ -71,6 +76,11 @@ const toPublicPlanDoc = (item: (typeof subscriptionPlans)[number], index: number
     billingInterval: 'month',
     intervalCount: 1,
     trialDays: item.key === 'test-1-real' ? 0 : 7,
+    businessTypes: ['comercio', 'servicos'],
+    modules: item.modules,
+    featuresByBusinessType: item.featuresByBusinessType,
+    recommended: item.key === 'professional',
+    badge: item.key === 'professional' ? 'Mais escolhido' : item.key === 'performance' ? 'Operação avançada' : 'Comece aqui',
     billingType: 'prepaid',
     cycles: null,
     startAt: null,

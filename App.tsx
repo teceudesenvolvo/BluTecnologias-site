@@ -5,6 +5,7 @@ import { Footer } from './components/Footer';
 
 // Sem Login
 import { Home } from './pages/Home';
+import { AudienceGateway } from './pages/AudienceGateway';
 import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
 
@@ -30,10 +31,10 @@ import { BluRoutes } from './blu-licita/routes/BluRoutes';
 const AppContent: React.FC = () => {
   const location = useLocation();
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
-  const isLanding = location.pathname === '/';
+  const isLanding = location.pathname === '/' || location.pathname === '/empresas';
   const firstSegment = location.pathname.split('/').filter(Boolean)[0] || '';
   const institutionalRoots = new Set([
-    'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products',
+    'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products', 'empresas',
     'privacy', 'admin', 'blu',
   ]);
   const isStorefront = Boolean(firstSegment) && !institutionalRoots.has(firstSegment);
@@ -46,7 +47,8 @@ const AppContent: React.FC = () => {
         <main className="flex-grow">
           <Routes>
             {/* Sem Login */}
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<AudienceGateway />} />
+            <Route path="/empresas" element={<Home />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />

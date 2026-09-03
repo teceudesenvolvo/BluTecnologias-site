@@ -257,6 +257,11 @@ export type BillingPlanView = {
   billingInterval: string;
   intervalCount?: number;
   trialDays: number;
+  businessTypes?: Array<'comercio' | 'servicos'>;
+  modules?: string[];
+  featuresByBusinessType?: { comercio: string[]; servicos: string[] };
+  recommended?: boolean;
+  badge?: string;
   billingType?: 'prepaid' | 'postpaid' | 'exact_day';
   cycles?: number | null;
   startAt?: string | null;

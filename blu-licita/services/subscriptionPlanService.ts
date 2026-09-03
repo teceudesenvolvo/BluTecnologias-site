@@ -25,6 +25,8 @@ export type SubscriptionPlan = {
   key: PlanKey;
   name: string;
   subtitle: string;
+  modules: string[];
+  featuresByBusinessType: { comercio: string[]; servicos: string[] };
   limits: PlanLimits;
 };
 
@@ -42,7 +44,12 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   {
     key: "essential",
     name: "Plano Essencial",
-    subtitle: "Ideal para empresas iniciando no mercado público.",
+    subtitle: "Para estruturar a rotina essencial de comércio ou serviços.",
+    modules: ["dashboard", "crm", "clients", "products", "services", "finance", "documents", "calendar", "reports"],
+    featuresByBusinessType: {
+      comercio: ["Vendas e clientes", "Produtos e estoque", "Financeiro essencial", "PDV com 1 caixa"],
+      servicos: ["Clientes e serviços", "Agenda e agendamentos", "Financeiro essencial", "1 profissional"],
+    },
     limits: {
       companies: 1,
       activeContracts: 10,
@@ -64,7 +71,12 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   {
     key: "professional",
     name: "Plano Profissional",
-    subtitle: "Ideal para empresas em crescimento.",
+    subtitle: "Para empresas em crescimento que querem vender em mais canais.",
+    modules: ["dashboard", "opportunities", "crm", "team", "bids", "clients", "contracts", "budgets", "orders", "products", "services", "ecommerce", "pos", "finance", "documents", "calendar", "reports"],
+    featuresByBusinessType: {
+      comercio: ["Tudo do Essencial", "E-commerce Blu", "Compras e fornecedores", "DRE e conciliação", "Equipe e permissões"],
+      servicos: ["Tudo do Essencial", "Contratação online", "Pacotes e comissões", "Recursos e insumos", "Equipe e permissões"],
+    },
     limits: {
       companies: 3,
       activeContracts: 30,
@@ -86,11 +98,16 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   {
     key: "performance",
     name: "Plano Performance",
-    subtitle: "Ideal para empresas com grande volume de contratos.",
+    subtitle: "Para operações avançadas, multiempresa e orientadas por dados.",
+    modules: ["dashboard", "opportunities", "crm", "team", "bids", "clients", "contracts", "budgets", "orders", "products", "services", "ecommerce", "pos", "finance", "documents", "calendar", "reports", "integrations", "accounting", "automations", "api"],
+    featuresByBusinessType: {
+      comercio: ["Tudo do Profissional", "Multiempresa", "Automações e API", "Contador integrado", "Auditoria avançada"],
+      servicos: ["Tudo do Profissional", "Multiempresa", "Automações e API", "Contador integrado", "Auditoria avançada"],
+    },
     limits: {
-      companies: 5,
-      activeContracts: 90,
-      users: 10,
+      companies: 10,
+      activeContracts: 300,
+      users: 20,
       storageGb: 10,
       favoriteOpportunities: unlimited,
       documents: unlimited,
@@ -109,6 +126,8 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     key: "enterprise",
     name: "Plano Enterprise",
     subtitle: "Sob consulta. Sem limitações.",
+    modules: ["*"],
+    featuresByBusinessType: { comercio: ["Todos os módulos", "Limites personalizados", "Implantação assistida"], servicos: ["Todos os módulos", "Limites personalizados", "Implantação assistida"] },
     limits: {
       companies: unlimited,
       activeContracts: unlimited,
@@ -131,6 +150,8 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     key: "test-1-real",
     name: "Plano Teste Blu",
     subtitle: "Validação da jornada com cobrança simbólica de R$ 1,00. Sem período grátis.",
+    modules: ["dashboard", "crm", "clients", "products", "services", "finance", "documents", "calendar", "reports"],
+    featuresByBusinessType: { comercio: ["Jornada comercial de teste"], servicos: ["Jornada de serviços de teste"] },
     limits: {
       companies: 1,
       activeContracts: 1,

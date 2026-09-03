@@ -45,6 +45,14 @@ const platformAdminNav = [
   { label: 'Migração', to: '/admin/migracao', icon: Database },
 ];
 
+const planModuleByPath: Record<string, string> = {
+  '/admin/dashboard': 'dashboard', '/admin/oportunidades': 'opportunities', '/admin/crm': 'crm', '/admin/equipe': 'team',
+  '/admin/licitacoes': 'bids', '/admin/clientes': 'clients', '/admin/contratos': 'contracts', '/admin/orcamentos': 'budgets',
+  '/admin/ordens': 'orders', '/admin/produtos': 'products', '/admin/servicos': 'services', '/admin/ecommerce': 'ecommerce',
+  '/admin/pdv': 'pos', '/admin/financeiro': 'finance', '/admin/documentos': 'documents', '/admin/calendario': 'calendar',
+  '/admin/relatorios': 'reports', '/admin/integracoes': 'integrations',
+};
+
 const accountantNav = (companyId: string) => [
   { label: 'Dashboard Contábil', to: '/admin/contador', icon: LayoutDashboard },
   { label: 'Meus Clientes', to: '/admin/empresas', icon: BriefcaseBusiness },
@@ -270,17 +278,25 @@ export const BluAppLayout: React.FC = () => {
     if (label === 'Exportações') return permissions.accountingExports?.view === true;
     return false;
   };
+  const planAllowsPath = (pathname: string) => {
+    if (isBluPlatformStaff) return true;
+    const modules = billing?.plan?.modules;
+    if (!Array.isArray(modules) || !modules.length || modules.includes('*')) return true;
+    const matchedPath = Object.keys(planModuleByPath).sort((a,b)=>b.length-a.length).find((path)=>pathname === path || pathname.startsWith(`${path}/`));
+    const module = matchedPath ? planModuleByPath[matchedPath] : undefined;
+    return !module || modules.includes(module);
+  };
   const visibleNav = isAccountant
     ? accountantNavigation.filter((item) => accountantCanSee(item.label))
     : [
         ...nav.filter((item) =>
-          (isBluPlatformStaff || canAccessPath(item.to)) &&
+          (isBluPlatformStaff || canAccessPath(item.to)) && planAllowsPath(item.to) &&
           (isBluRoot || item.label !== 'Integrações'),
         ),
         ...(isBluPlatformStaff ? platformAdminNav : []),
       ];
   const title = [...nav, ...platformAdminNav, ...accountantNavigation].sort((a,b) => b.to.length - a.to.length).find((item) => location.pathname.startsWith(item.to))?.label || 'Visão Geral';
-  const currentPageAllowed = canAccessPath(location.pathname);
+  const currentPageAllowed = canAccessPath(location.pathname) && planAllowsPath(location.pathname);
   const subscriptionStatus = normalizeBillingStatus(billing?.subscription?.status || billing?.subscription?.accessStatus || '');
   const isFreeBillingPlan = Boolean(billing?.plan) && Number(billing?.plan?.priceInCents || 0) <= 0;
   const billingRestricted = !isFreeBillingPlan && ['PAYMENT_PENDING', 'SUSPENDED'].includes(subscriptionStatus) && !location.pathname.startsWith('/admin/assinatura') && !location.pathname.startsWith('/admin/planos') && !location.pathname.startsWith('/admin/assinatura/checkout') && !location.pathname.startsWith('/admin/assinatura/retorno');
@@ -488,7 +504,7 @@ export const BluAppLayout: React.FC = () => {
             {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Regularize o plano para continuar usando a Blu.'}
             <button onClick={()=>navigate('/admin/assinatura')} className="ml-3 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">Atualizar pagamento</button>
           </div>}
-          {billingRestricted ? <div className="mx-auto max-w-2xl rounded-3xl border border-rose-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso temporariamente bloqueado</h2><p className="mt-2 text-sm text-slate-500">O pagamento está em atraso acima do período de tolerância. Seus dados estão preservados; regularize a assinatura para continuar usando a Blu.</p><button onClick={()=>navigate('/admin/assinatura')} className="mt-5 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Atualizar pagamento</button></div> : currentPageAllowed ? <Outlet /> : <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso restrito</h2><p className="mt-2 text-sm text-slate-500">Seu tipo de usuário não possui permissão para acessar esta página. Solicite ajuste em Configurações › Níveis de acesso.</p><button onClick={()=>navigate('/admin/dashboard')} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Voltar ao dashboard</button></div>}
+          {billingRestricted ? <div className="mx-auto max-w-2xl rounded-3xl border border-rose-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Acesso temporariamente bloqueado</h2><p className="mt-2 text-sm text-slate-500">O pagamento está em atraso acima do período de tolerância. Seus dados estão preservados; regularize a assinatura para continuar usando a Blu.</p><button onClick={()=>navigate('/admin/assinatura')} className="mt-5 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Atualizar pagamento</button></div> : currentPageAllowed ? <Outlet /> : <div className="mx-auto max-w-2xl rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-sm"><h2 className="text-2xl font-bold">Recurso não disponível</h2><p className="mt-2 text-sm text-slate-500">Este módulo não está liberado no plano atual ou nas permissões do seu usuário.</p><div className="mt-5 flex justify-center gap-2"><button onClick={()=>navigate('/admin/dashboard')} className="rounded-xl border px-4 py-3 text-sm font-bold">Voltar ao dashboard</button><button onClick={()=>navigate('/admin/planos')} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Ver planos</button></div></div>}
         </main>
       </div>
     </div>

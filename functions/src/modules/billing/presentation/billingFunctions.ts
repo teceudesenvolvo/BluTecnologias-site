@@ -245,6 +245,23 @@ export const billingAdminPlans = functions.https.onRequest((req, res) => {
         billingInterval: String(plan.billingInterval || 'month'),
         intervalCount: Number.isFinite(Number(plan.intervalCount)) ? Number(plan.intervalCount) : 1,
         trialDays: Number(plan.trialDays || 0),
+        businessTypes: (Array.isArray(plan.businessTypes) ? plan.businessTypes : ['comercio'])
+          .map((item: unknown) => String(item).toLowerCase())
+          .filter((item: string) => ['comercio', 'servicos'].includes(item))
+          .slice(0, 1),
+        modules: [...new Set(
+          (Array.isArray(plan.modules) ? plan.modules : [])
+            .map((item: unknown) => String(item).trim())
+            .filter(Boolean),
+        )],
+        featuresByBusinessType: {
+          comercio: (Array.isArray(plan?.featuresByBusinessType?.comercio) ? plan.featuresByBusinessType.comercio : [])
+            .map((item: unknown) => String(item).trim()).filter(Boolean),
+          servicos: (Array.isArray(plan?.featuresByBusinessType?.servicos) ? plan.featuresByBusinessType.servicos : [])
+            .map((item: unknown) => String(item).trim()).filter(Boolean),
+        },
+        recommended: plan.recommended === true,
+        badge: String(plan.badge || '').trim().slice(0, 60),
         billingType: String(plan.billingType || 'prepaid'),
         cycles: plan.cycles === null ? null : Number.isFinite(Number(plan.cycles)) ? Number(plan.cycles) : null,
         startAt: plan.startAt || null,
