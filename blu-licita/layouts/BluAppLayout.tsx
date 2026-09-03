@@ -37,6 +37,7 @@ const nav = [
   { label: 'Planos', to: '/admin/planos', icon: ShieldCheck },
   { label: 'Assinatura', to: '/admin/assinatura', icon: CreditCard },
   { label: 'Ajuda', to: '/admin/suporte', icon: Headphones },
+  { label: 'Indique e ganhe', to: '/admin/indicacoes', icon: Users },
   { label: 'Configurações', to: '/admin/configuracoes', icon: Settings },
 ];
 
@@ -363,7 +364,7 @@ export const BluAppLayout: React.FC = () => {
     { title: 'Essencial', labels: ['Dashboard', 'Oportunidades', 'CRM', 'Equipe', 'Licitações'] },
     { title: 'Operação', labels: ['Clientes', 'Contratos', 'Orçamentos', 'Ordens', 'Produtos', 'Serviços', 'E-commerce', 'PDV Público'] },
     { title: 'Gestão', labels: ['Financeiro', 'Documentos', 'Calendário', 'Relatórios'] },
-    { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Suporte', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
+    { title: 'Plataforma Blu', labels: ['Integrações', 'Planos', 'Assinatura', 'Indique e ganhe', 'Ajuda', 'Configurações', 'Novidades', 'Blu HQ', 'Migração'] },
   ];
   const navigationForCurrentProfile = isAccountant
     ? accountantNavigation

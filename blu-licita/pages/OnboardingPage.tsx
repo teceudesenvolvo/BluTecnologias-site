@@ -203,7 +203,7 @@ export const OnboardingPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals, partnerCode });
+      await createTrialAccount({ plan, user: userForm, company: companyForm, goals: selectedGoals, partnerCode, customerReferralCode: params.get('indicacao') || '' });
       if (!isFreePlan && plan === 'test-1-real') {
         navigate('/admin/assinatura/checkout', {
           state: {

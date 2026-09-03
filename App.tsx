@@ -41,7 +41,7 @@ const AppContent: React.FC = () => {
   ]);
   const isStorefront = Boolean(firstSegment) && !institutionalRoots.has(firstSegment);
   const hideFooter = location.pathname === '/login' || isSystem || isLanding || isStorefront;
-  const hideNavbar = location.pathname === '/login' || isSystem || isLanding || isStorefront;
+  const hideNavbar = location.pathname === '/login' || location.pathname === '/products' || isSystem || isLanding || isStorefront;
 
   return (
       <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>

@@ -73,7 +73,7 @@ export const PlansPage: React.FC = () => {
 
   const checkout = async (plan: BillingPlanView, paymentMethod: BillingPaymentMethod) => {
     if (!isLoggedIn) {
-      navigate(`/admin/onboarding?tipo=${businessType}`);
+      navigate(`/admin/onboarding?tipo=${businessType}&indicacao=${encodeURIComponent(searchParams.get('indicacao') || '')}`);
       return;
     }
     const profile = await getBillingCheckoutProfileStatus();
@@ -107,7 +107,7 @@ export const PlansPage: React.FC = () => {
 
   const askPaymentMethod = (plan: BillingPlanView) => {
     if (!isLoggedIn) {
-      navigate(`/admin/onboarding?plan=${encodeURIComponent(plan.id)}&tipo=${businessType}`);
+      navigate(`/admin/onboarding?plan=${encodeURIComponent(plan.id)}&tipo=${businessType}&indicacao=${encodeURIComponent(searchParams.get('indicacao') || '')}`);
       return;
     }
     if (plan.slug === "enterprise") {

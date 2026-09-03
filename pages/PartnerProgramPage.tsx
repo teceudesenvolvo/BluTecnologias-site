@@ -54,9 +54,8 @@ export const PartnerProgramPage: React.FC = () => {
 
       <header className="sticky top-0 z-30 border-b border-white/70 bg-white/72 px-5 py-4 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/65">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" aria-label="Blu" className="flex items-center">
             <img src={Logo} alt="Blu" className="h-10 w-10 rounded-2xl object-contain" />
-            <span className="text-sm font-black tracking-tight">Blu</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link

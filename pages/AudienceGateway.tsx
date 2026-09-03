@@ -32,9 +32,8 @@ export const AudienceGateway: React.FC = () => (
   <main className="relative min-h-screen overflow-hidden bg-[#030712] px-4 py-5 text-white sm:px-6">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(14,165,233,.22),transparent_38%)]" />
     <header className="relative z-10 mx-auto flex max-w-[1500px] items-center justify-between py-3">
-      <Link to="/" className="flex items-center gap-3">
+      <Link to="/" aria-label="Blu" className="flex items-center">
         <img src={Logo} alt="Blu" className="h-11 w-11 rounded-2xl object-contain" />
-        <div><p className="font-black tracking-tight">Blu Tecnologias</p><p className="text-[10px] font-bold uppercase tracking-[.22em] text-slate-400">Tecnologia que conecta</p></div>
       </Link>
       <Link to="/admin/login" className="rounded-full border border-white/15 bg-white/5 px-5 py-3 text-xs font-black backdrop-blur-xl transition hover:bg-white/10">Entrar</Link>
     </header>

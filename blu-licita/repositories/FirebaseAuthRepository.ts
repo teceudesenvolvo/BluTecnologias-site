@@ -102,6 +102,7 @@ export class FirebaseAuthRepository implements AuthRepository {
       accessStatus: subscriptionStatus,
       onboardingGoals: input.goals || [],
       referredByPartnerCode: input.partnerCode || '',
+      customerReferralCode: input.customerReferralCode || '',
       createdBy: credential.user.uid,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),

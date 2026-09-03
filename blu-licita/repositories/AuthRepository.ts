@@ -1,5 +1,6 @@
 import type { BluUser } from '../types';
 export interface TrialSignupInput {
+  customerReferralCode?: string;
   plan: string;
   user: {
     name: string;

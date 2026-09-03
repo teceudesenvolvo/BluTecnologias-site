@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } fr
 import { BluAuthProvider, useBluAuth } from "../contexts/BluAuthContext";
 import { BluAppLayout } from "../layouts/BluAppLayout";
 import { DashboardPage } from "../pages/DashboardPage";
+import { CustomerReferralsPage } from "../pages/CustomerReferralsPage";
 import { BluLoginPage } from "../pages/LoginPage";
 import { ModulePlaceholderPage } from "../pages/ModulePlaceholderPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
@@ -262,6 +263,7 @@ export const BluRoutes: React.FC = () => (
       <Route path="cadastro-membro" element={<MemberSignupPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="indicacoes" element={<CustomerReferralsPage />} />
         <Route path="planos" element={<PlansPage />} />
         <Route path="assinatura" element={<SubscriptionPage />} />
         <Route path="assinatura/checkout" element={<BillingCheckoutPage />} />

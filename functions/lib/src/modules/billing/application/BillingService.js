@@ -147,7 +147,10 @@ class BillingService {
             throw billingTypes_1.billingErrors.invalidPlanChange(`Complete o endereço da empresa principal em Perfil antes de pagar: ${missingAddressFields.join(', ')}.`);
         }
         const baseAmountInCents = Number(plan.priceInCents || 0);
-        const discountPercent = Math.max(0, Number(rootCompany.billingDiscountPercent || 0));
+        const referralSnapshot = await admin.firestore().collection('customerReferrals').where('companyId', '==', input.companyId).get();
+        const closedReferrals = referralSnapshot.docs.filter(doc => doc.data().status === 'closed').length;
+        const referralDiscount = closedReferrals && plan.billingInterval === 'month' ? Math.min(100, closedReferrals + 4) : 0;
+        const discountPercent = Math.min(100, Math.max(referralDiscount, Number(rootCompany.billingDiscountPercent || 0)));
         const discountFixedInCents = Math.max(0, Number(rootCompany.billingDiscountCents || 0));
         const percentageDiscountInCents = Math.round(baseAmountInCents * (discountPercent / 100));
         const amountInCents = Math.max(0, baseAmountInCents - discountFixedInCents - percentageDiscountInCents);

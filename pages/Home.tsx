@@ -282,9 +282,8 @@ export const Home: React.FC = () => {
 const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDark: (value: boolean) => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void }) => (
   <header className="fixed inset-x-0 top-0 z-50 px-4 py-4">
     <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-3xl border border-white/70 bg-white/72 px-4 py-3 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/65">
-      <Link to="/empresas" className="flex items-center gap-3">
+      <Link to="/empresas" aria-label="Blu" className="flex items-center">
         <img src={Logo} alt="Blu" className="h-10 w-10 rounded-2xl object-contain" />
-        <span className="text-sm font-black tracking-tight">Blu</span>
       </Link>
       <div className="hidden items-center gap-7 text-sm font-bold text-slate-600 md:flex dark:text-slate-300">
         <button onClick={() => scrollToSection('segmentos')} className="hover:text-blue-600">Segmentos</button>
