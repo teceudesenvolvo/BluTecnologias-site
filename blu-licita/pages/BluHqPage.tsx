@@ -123,6 +123,7 @@ export const BluHqPage: React.FC = () => {
   const [publicPlansSaving, setPublicPlansSaving] = React.useState(false);
   const [planEditorOpen, setPlanEditorOpen] = React.useState(false);
   const [planForm, setPlanForm] = React.useState<PublicPlanDoc | null>(null);
+  const [planSegment, setPlanSegment] = React.useState<'comercio' | 'servicos' | 'revisar'>('comercio');
   const [gatewayLoading, setGatewayLoading] = React.useState(true);
   const [gatewaySaving, setGatewaySaving] = React.useState(false);
   const [deletingUserId, setDeletingUserId] = React.useState('');
@@ -700,18 +701,25 @@ export const BluHqPage: React.FC = () => {
                 <button onClick={seedPlans} disabled={publicPlansSaving} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-100 dark:hover:bg-white/[0.08]">
                   {publicPlansSaving ? 'Sincronizando...' : 'Sincronizar planos padrão'}
                 </button>
-                <button onClick={() => { setPlanForm(emptyPlan()); setPlanEditorOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-blue-500">
+                <button onClick={() => { setPlanForm({ ...emptyPlan(), businessTypes: [planSegment === 'servicos' ? 'servicos' : 'comercio'] }); setPlanEditorOpen(true); }} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-sm hover:bg-blue-500">
                   <Plus size={16} />
-                  Novo plano
+                  Novo plano {planSegment === 'servicos' ? 'de serviços' : 'de comércio'}
                 </button>
               </div>
             </div>
+            <div role="tablist" aria-label="Segmento dos planos" className="mt-5 flex flex-wrap gap-2">
+              {([['comercio', 'Planos para Comércio'], ['servicos', 'Planos para Serviços'], ['revisar', 'Sem segmento único']] as const).map(([segment, label]) => {
+                const count = publicPlans.filter(plan => segment === 'revisar' ? plan.businessTypes?.length !== 1 : plan.businessTypes?.length === 1 && plan.businessTypes[0] === segment).length;
+                return <button key={segment} role="tab" aria-selected={planSegment === segment} onClick={() => setPlanSegment(segment)} className={`rounded-2xl border px-4 py-3 text-sm font-bold ${planSegment === segment ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>{label} <span className="ml-2 opacity-70">({count})</span></button>;
+              })}
+            </div>
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-300">{planSegment === 'revisar' ? 'Planos antigos sem segmento definido ou associados aos dois públicos. Edite para definir um segmento, sem alterar automaticamente assinaturas existentes.' : `Gerencie preços, limites e módulos exclusivos dos planos para ${planSegment === 'servicos' ? 'serviços' : 'comércio'}.`}</p>
             <div className="mt-5 grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {publicPlansLoading ? (
                 <div className="grid min-h-[180px] place-items-center rounded-3xl border border-dashed border-slate-300 dark:border-white/10">
                   <Loader2 className="animate-spin text-blue-600" />
                 </div>
-              ) : publicPlans.length ? publicPlans.map((plan) => (
+              ) : publicPlans.filter(plan => planSegment === 'revisar' ? plan.businessTypes?.length !== 1 : plan.businessTypes?.length === 1 && plan.businessTypes[0] === planSegment).length ? publicPlans.filter(plan => planSegment === 'revisar' ? plan.businessTypes?.length !== 1 : plan.businessTypes?.length === 1 && plan.businessTypes[0] === planSegment).map((plan) => (
                 <article key={plan.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.04]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -761,7 +769,7 @@ export const BluHqPage: React.FC = () => {
                 </article>
               )) : (
                 <div className="rounded-3xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
-                  Nenhum plano configurado ainda. Use “Sincronizar planos padrão” para criar a base comercial.
+                  Nenhum plano nesta categoria. Selecione outro segmento ou crie um novo plano.
                 </div>
               )}
             </div>

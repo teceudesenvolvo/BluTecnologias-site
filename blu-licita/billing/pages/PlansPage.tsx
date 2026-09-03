@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOptionalBluAuth } from "../../contexts/BluAuthContext";
 import { billingClient, getBillingCheckoutProfileStatus, type BillingPlanView, formatCents } from "../services/billingClient";
 import { PaymentMethodModal, type BillingPaymentMethod } from "../components/PaymentMethodModal";
+import { presentPlanModule } from "../services/planModulePresentation";
 
 const limitLabel = (key: string, value: number | null | undefined) => {
   if (value === null || value === undefined) return "Ilimitado";
@@ -190,7 +191,7 @@ export const PlansPage: React.FC = () => {
                 ].map(([key, label]) => <p key={key} className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-600" /> <b>{limitLabel(key, plan.limits?.[key])}</b> {label}</p>)}
               </div>
               <p className="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500"><Building2 size={15}/>Configuração inicial para empresa de {businessType === 'comercio' ? 'comércio' : 'serviços'}</p>
-              <details className="mt-3 rounded-xl border border-slate-200 px-4 py-3 text-sm"><summary className="cursor-pointer font-black text-slate-700">Ver todos os módulos incluídos</summary><div className="mt-3 flex flex-wrap gap-2">{(plan.modules || []).map(module=><span key={module} className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{module === '*' ? 'Todos os módulos' : module}</span>)}</div></details>
+              <details className="mt-3 rounded-xl border border-slate-200 px-4 py-3 text-sm"><summary className="cursor-pointer font-black text-slate-700">Conheça os módulos incluídos</summary><ul className="mt-4 space-y-4">{(plan.modules || []).map(module => { const item = presentPlanModule(module); return <li key={module} className="flex items-start gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0 text-blue-600"/><div><p className="font-bold text-slate-800">{item.title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p></div></li>; })}</ul></details>
               <button onClick={() => askPaymentMethod(plan)} disabled={checkoutLoading === plan.id} className="mt-7 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 disabled:opacity-60">
                 {checkoutLoading === plan.id ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />}
                 {plan.slug === 'enterprise' ? 'Falar com Blu' : plan.slug === 'test-1-real' ? 'Gerar pagamento de teste' : isLoggedIn ? 'Fazer upgrade' : 'Começar teste grátis'}
