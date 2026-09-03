@@ -5,6 +5,7 @@ import { Footer } from './components/Footer';
 
 // Sem Login
 import { Home } from './pages/Home';
+import { BusinessLanding } from './pages/BusinessLanding';
 import { AudienceGateway } from './pages/AudienceGateway';
 import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
@@ -32,7 +33,7 @@ import { BluRoutes } from './blu-licita/routes/BluRoutes';
 const AppContent: React.FC = () => {
   const location = useLocation();
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
-  const isLanding = location.pathname === '/' || location.pathname === '/empresas';
+  const isLanding = location.pathname === '/' || location.pathname === '/empresas' || location.pathname.startsWith('/empresas/');
   const firstSegment = location.pathname.split('/').filter(Boolean)[0] || '';
   const institutionalRoots = new Set([
     'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products', 'empresas',
@@ -51,6 +52,8 @@ const AppContent: React.FC = () => {
             {/* Sem Login */}
             <Route path="/" element={<AudienceGateway />} />
             <Route path="/empresas" element={<Home />} />
+            <Route path="/empresas/comercio" element={<BusinessLanding type="comercio" />} />
+            <Route path="/empresas/servicos" element={<BusinessLanding type="servicos" />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />

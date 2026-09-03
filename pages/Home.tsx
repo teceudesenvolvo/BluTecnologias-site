@@ -132,8 +132,8 @@ export const Home: React.FC = () => {
         <section id="segmentos" className="relative z-10 mx-auto max-w-7xl px-5 py-24">
           <StoryTitle eyebrow="Feita para sua operação" title="Escolha sua jornada. Ative apenas o que sua empresa precisa." />
           <div className="mt-12 grid gap-5 lg:grid-cols-2">
-            <SegmentCard title="Comércio" description="Para lojas, distribuidoras e empresas que vendem produtos em múltiplos canais." items={['PDV e controle de caixa', 'Produtos, variações e estoque', 'E-commerce e entregas', 'Compras, vendas e financeiro']} to="/planos?tipo=comercio" />
-            <SegmentCard title="Serviços" description="Para negócios que vendem tempo, especialidade e atendimento organizado." items={['Agenda e agendamentos', 'Profissionais e comissões', 'Pacotes, recursos e insumos', 'Contratação online e financeiro']} to="/planos?tipo=servicos" />
+            <SegmentCard title="Comércio" description="Para lojas, distribuidoras e empresas que vendem produtos em múltiplos canais." items={['PDV e controle de caixa', 'Produtos, variações e estoque', 'E-commerce e entregas', 'Compras, vendas e financeiro']} to="/empresas/comercio" />
+            <SegmentCard title="Serviços" description="Para negócios que vendem tempo, especialidade e atendimento organizado." items={['Agenda e agendamentos', 'Profissionais e comissões', 'Pacotes, recursos e insumos', 'Contratação online e financeiro']} to="/empresas/servicos" />
           </div>
         </section>
 
