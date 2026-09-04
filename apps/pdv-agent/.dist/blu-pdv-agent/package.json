@@ -1,0 +1,18 @@
+{
+  "name": "@blu/pdv-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Blu PDV Local Agent for printers and local peripherals.",
+  "type": "module",
+  "bin": {
+    "blu-pdv-agent": "./src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "build": "node scripts/build-package.js",
+    "package": "node scripts/build-package.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

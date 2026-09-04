@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, CreditCard, Database, FileText, Headphones, HelpCircle, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck, ShoppingCart, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
+import { BarChart3, Bell, BriefcaseBusiness, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Contact, CreditCard, Database, FileText, FolderOpen, Headphones, HelpCircle, Landmark, LayoutDashboard, ListTodo, Megaphone, Menu, Moon, Package, PlugZap, ReceiptText, Search, Settings, ShieldCheck, ShoppingBag, Store, Sun, Target, UserRoundCog, Users, WalletCards, X } from 'lucide-react';
 import { auth, certificateService, onAuthStateChanged, type Certificate } from '../../services/firebase';
 import { BluLogo } from '../components/BluLogo';
 import { useBluAuth } from '../contexts/BluAuthContext';
@@ -21,23 +21,23 @@ const nav = [
   { label: 'CRM', to: '/admin/crm', icon: Users },
   { label: 'Equipe', to: '/admin/equipe', icon: UserRoundCog },
   { label: 'Licitações', to: '/admin/licitacoes', icon: ClipboardCheck },
-  { label: 'Clientes', to: '/admin/clientes', icon: Users },
+  { label: 'Clientes', to: '/admin/clientes', icon: Contact },
   { label: 'Contratos', to: '/admin/contratos', icon: BriefcaseBusiness },
-  { label: 'Orçamentos', to: '/admin/orcamentos', icon: CircleDollarSign },
+  { label: 'Orçamentos', to: '/admin/orcamentos', icon: ReceiptText },
   { label: 'Ordens', to: '/admin/ordens', icon: ListTodo },
   { label: 'Produtos', to: '/admin/produtos', icon: Package },
-  { label: 'Serviços', to: '/admin/servicos', icon: CalendarDays },
-  { label: 'E-commerce', to: '/admin/ecommerce', icon: ShoppingCart },
-  { label: 'PDV Público', to: '/admin/pdv', icon: ShoppingCart },
+  { label: 'Serviços', to: '/admin/servicos', icon: CalendarCheck },
+  { label: 'E-commerce', to: '/admin/ecommerce', icon: Store },
+  { label: 'PDV Público', to: '/admin/pdv', icon: ShoppingBag },
   { label: 'Financeiro', to: '/admin/financeiro', icon: WalletCards },
   { label: 'Documentos', to: '/admin/documentos', icon: FileText },
   { label: 'Calendário', to: '/admin/calendario', icon: CalendarDays },
   { label: 'Relatórios', to: '/admin/relatorios', icon: BarChart3 },
-  { label: 'Integrações', to: '/admin/integracoes', icon: CircleDollarSign },
+  { label: 'Integrações', to: '/admin/integracoes', icon: PlugZap },
   { label: 'Planos', to: '/admin/planos', icon: ShieldCheck },
   { label: 'Assinatura', to: '/admin/assinatura', icon: CreditCard },
   { label: 'Ajuda', to: '/admin/suporte', icon: Headphones },
-  { label: 'Indique e ganhe', to: '/admin/indicacoes', icon: Users },
+  { label: 'Indique e ganhe', to: '/admin/indicacoes', icon: Landmark },
   { label: 'Configurações', to: '/admin/configuracoes', icon: Settings },
 ];
 
@@ -69,7 +69,7 @@ const accountantNav = (companyId: string) => [
   { label: 'Pendências', to: `/admin/contador/empresas/${companyId}/pendencias`, icon: ListTodo },
   { label: 'Solicitações', to: `/admin/contador/empresas/${companyId}/solicitacoes`, icon: Headphones },
   { label: 'Relatórios', to: `/admin/contador/empresas/${companyId}/relatorios`, icon: BarChart3 },
-  { label: 'Exportações', to: `/admin/contador/empresas/${companyId}/exportacoes`, icon: Database },
+  { label: 'Exportações', to: `/admin/contador/empresas/${companyId}/exportacoes`, icon: FolderOpen },
   { label: 'Configurações', to: '/admin/configuracoes', icon: Settings },
 ];
 
@@ -235,6 +235,12 @@ export const BluAppLayout: React.FC = () => {
   const { user, memberships, switchCompany } = useBluAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isPdvRoute = location.pathname === '/admin/pdv' || location.pathname.startsWith('/admin/servicos/pos');
+  const [pdvFocusMode, setPdvFocusMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('blu:pdv:focus-mode') === 'true';
+  });
+  const hideChromeForPdv = isPdvRoute && pdvFocusMode;
   const readCachedUser = () => {
     try { return JSON.parse(window.localStorage.getItem('blu-licita:user') || 'null') as { email?: string } | null; }
     catch { return null; }
@@ -385,6 +391,7 @@ export const BluAppLayout: React.FC = () => {
   useEffect(()=>{if(!user||!firebaseUid)return;billingClient.summary().then(setBilling).catch(()=>setBilling(null))},[user,firebaseUid]);
   useEffect(()=>{const read=()=>{setAuthDisplayName(auth.currentUser?.displayName||'');setFirebaseUid(auth.currentUser?.uid||'')};read();const unsubscribe=onAuthStateChanged(auth,()=>read());window.addEventListener('blu:profile-updated',read);return()=>{unsubscribe();window.removeEventListener('blu:profile-updated',read)}},[]);
   useEffect(()=>{document.documentElement.classList.toggle('dark',darkMode);window.localStorage.setItem('blu-theme',darkMode?'dark':'light')},[darkMode]);
+  useEffect(()=>{const read=()=>setPdvFocusMode(window.localStorage.getItem('blu:pdv:focus-mode')==='true');window.addEventListener('blu:pdv-focus-mode-changed',read);return()=>window.removeEventListener('blu:pdv-focus-mode-changed',read)},[]);
   useEffect(()=>{const listener=(event:KeyboardEvent)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();searchInputRef.current?.focus();setSearchOpen(true)}};window.addEventListener('keydown',listener);return()=>window.removeEventListener('keydown',listener)},[]);
 
   const rawUserName = String(authDisplayName || user?.name || '').trim();
@@ -394,8 +401,8 @@ export const BluAppLayout: React.FC = () => {
   const initials = footerUserName.split(/\s+/).filter(Boolean).slice(0,2).map((item)=>item[0]?.toUpperCase()).join('') || 'U';
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-      {mobileOpen && <button aria-label="Fechar menu" className="fixed inset-0 z-40 bg-slate-950/35 lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside data-tour="navigation" className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 dark:border-white/10 dark:bg-slate-950 ${collapsed ? 'w-[76px]' : 'w-[248px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      {!hideChromeForPdv && mobileOpen && <button aria-label="Fechar menu" className="fixed inset-0 z-40 bg-slate-950/35 lg:hidden" onClick={() => setMobileOpen(false)} />}
+      {!hideChromeForPdv && <aside data-tour="navigation" className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 dark:border-white/10 dark:bg-slate-950 ${collapsed ? 'w-[76px]' : 'w-[248px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="flex h-[72px] items-center justify-between border-b border-slate-100 px-5 dark:border-white/10">
           <BluLogo compact={collapsed} />
           <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-white/10" onClick={() => setMobileOpen(false)}><X size={19} /></button>
@@ -420,10 +427,10 @@ export const BluAppLayout: React.FC = () => {
           </button>
         </div>
         <button onClick={() => setCollapsed((value) => !value)} className="absolute -right-3 top-[86px] hidden h-6 w-6 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm lg:grid dark:border-white/10 dark:bg-slate-900 dark:text-slate-300" aria-label="Recolher menu">{collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}</button>
-      </aside>
-      <div className={`transition-all duration-200 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-[248px]'}`}>
-        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-7 dark:border-white/10 dark:bg-slate-950/90">
-          <button className="rounded-xl border border-slate-200 p-2 text-slate-600 lg:hidden dark:border-white/10 dark:text-slate-300" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
+      </aside>}
+      <div className={`transition-all duration-200 ${hideChromeForPdv ? '' : collapsed ? 'lg:pl-[76px]' : 'lg:pl-[248px]'}`}>
+        {!hideChromeForPdv && <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-7 dark:border-white/10 dark:bg-slate-950/90">
+          <button data-tour="mobile-menu" className="rounded-xl border border-slate-200 p-2 text-slate-600 lg:hidden dark:border-white/10 dark:text-slate-300" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="min-w-0"><h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1><p className="hidden text-xs text-slate-400 sm:block">{new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}</p></div>
           <div data-tour="company">{isAccountant && !location.pathname.startsWith('/admin/contador/empresas/') ? <AccountantCompanySwitcher/> : !isAccountant && memberships.length > 1 && <select aria-label="Empresa atual" value={user?.companyId || ''} onChange={(event) => void switchCompany(event.target.value)} className="hidden max-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold lg:block dark:border-white/10 dark:bg-slate-900">{memberships.map((membership) => <option key={membership.id} value={membership.companyId}>{membership.companyName}</option>)}</select>}</div>
           <div data-tour="search" className="relative ml-auto hidden w-full max-w-[420px] md:block" onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}>
@@ -501,7 +508,7 @@ export const BluAppLayout: React.FC = () => {
           >
             {initials}
           </button>
-        </header>
+        </header>}
         <main data-tour="dashboard" className="p-4 md:p-7">
           {!isFreeBillingPlan&&['PAST_DUE','GRACE_PERIOD','PAYMENT_PENDING','SUSPENDED'].includes(subscriptionStatus)&&<div className={`mb-4 rounded-2xl border p-4 text-sm font-semibold ${subscriptionStatus==='SUSPENDED'?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>
             {subscriptionStatus==='SUSPENDED'?'Assinatura suspensa por atraso. Regularize o pagamento para voltar a realizar alterações no sistema.':'Pagamento pendente. Regularize o plano para continuar usando a Blu.'}

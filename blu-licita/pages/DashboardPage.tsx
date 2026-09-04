@@ -76,7 +76,7 @@ export const DashboardPage: React.FC = () => {
           <h2 className="mt-2 text-3xl font-bold tracking-[-.035em] text-slate-950 dark:text-white">Bem-vindo à Blu</h2>
           <p className="mt-2 text-base text-slate-500 dark:text-slate-300">Sua operação com o governo em um único lugar.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2 sm:flex sm:flex-wrap">
           <button
             onClick={() => navigate('/admin/relatorios')}
             className="rounded-xl border border-white/65 bg-white/70 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/8 dark:text-slate-100"
@@ -92,18 +92,18 @@ export const DashboardPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {data.metrics.map((metric, index) => {
           const Icon = icons[index];
           return (
-            <article key={metric.label} className={`group rounded-2xl p-4 transition hover:-translate-y-0.5 hover:border-blue-200 md:p-5 ${glass}`}>
+            <article key={metric.label} className={`group min-w-0 rounded-2xl p-4 transition hover:-translate-y-0.5 hover:border-blue-200 md:p-5 ${glass}`}>
               <div className="flex items-center justify-between">
                 <span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[metric.tone] || tones.blue}`}>
                   <Icon size={18} />
                 </span>
                 <ChevronRight size={16} className="text-slate-300 transition group-hover:translate-x-0.5 dark:text-slate-500" />
               </div>
-              <p className="mt-5 text-2xl font-bold tracking-tight text-slate-950 md:text-[28px] dark:text-white">{metric.value}</p>
+              <p className="mt-5 break-words text-2xl font-bold tracking-tight text-slate-950 md:text-[28px] dark:text-white">{metric.value}</p>
               <p className="mt-1 text-xs font-medium text-slate-500 md:text-sm dark:text-slate-300">{metric.label}</p>
               <p
                 className={`mt-3 text-[11px] font-semibold ${

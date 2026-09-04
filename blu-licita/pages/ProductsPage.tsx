@@ -6,6 +6,7 @@ import { httpsCallable } from "firebase/functions";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { createCompanyDoc, deleteCompanyDoc, listCompanyDocs, updateCompanyDoc } from "../services/firestoreCompany";
 import { db, functions, storageService, type Company } from "../../services/firebase";
+import { convertDataUrlToWebp, fileToWebpDataUrl } from "../utils/imageCompression";
 
 type Product = {
   id: string;
@@ -103,14 +104,6 @@ const defaultForm = (): ProductFormValue => ({
 
 const MAX_PRODUCT_IMAGES = 3;
 const MAX_PRODUCT_IMAGE_SIZE = 2 * 1024 * 1024;
-
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 
 export const ProductsPage: React.FC = () => {
   const { user } = useBluAuth();
@@ -444,13 +437,11 @@ export const ProductsPage: React.FC = () => {
     const imageUrls: string[] = [];
     for (const image of value.images || []) {
       if (image.startsWith("data:")) {
-        const [meta, data] = image.split(",");
-        const mimeType = meta.match(/data:(.*?);base64/)?.[1] || "image/jpeg";
-        const extension = mimeType.split("/")[1] || "jpg";
+        const webp = await convertDataUrlToWebp(image);
         const uploaded = await storageService.uploadBase64(
-          data,
-          `products/${user.companyId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`,
-          mimeType,
+          webp.base64,
+          `products/${user.companyId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${webp.extension}`,
+          webp.mimeType,
         );
         if (!uploaded) throw new Error("Não foi possível salvar uma das imagens no Storage. Verifique sua conexão e tente novamente.");
         imageUrls.push(uploaded);
@@ -1074,9 +1065,9 @@ const ProductForm = ({
       return;
     }
     try {
-      const dataUrls = await Promise.all(accepted.map((file) => fileToDataUrl(file)));
+      const dataUrls = await Promise.all(accepted.map((file) => fileToWebpDataUrl(file)));
       setForm((current) => ({ ...current, images: [...(current.images || []), ...dataUrls].slice(0, MAX_PRODUCT_IMAGES) }));
-      setImageMessage(`${Math.min(accepted.length, remainingSlots)} imagem(ns) pronta(s) para salvar.`);
+      setImageMessage(`${Math.min(accepted.length, remainingSlots)} imagem(ns) convertida(s) para WebP e pronta(s) para salvar.`);
     } catch {
       setImageMessage("Não foi possível carregar as imagens selecionadas.");
     }

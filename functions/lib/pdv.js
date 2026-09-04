@@ -189,6 +189,23 @@ const posPaymentStatus = (order) => {
     const value = String(charge.status || order.status || transaction.status || '').toLowerCase();
     return ['paid', 'captured', 'succeeded'].includes(value) ? 'paid' : ['failed', 'canceled', 'cancelled'].includes(value) ? 'failed' : 'pending';
 };
+const companyRecipientProfile = (companyId, company) => ({
+    companyId,
+    provider: 'pagarme',
+    legalName: String(company.razaoSocial || company.legalName || company.name || '').trim(),
+    tradeName: String(company.nomeFantasia || company.tradeName || company.name || '').trim(),
+    document: String(company.cnpj || company.document || company.organizationCnpj || '').replace(/\D/g, ''),
+    email: String(company.email || company.companyEmail || '').trim().toLowerCase(),
+    phone: String(company.telefoneCelular || company.phone || company.telefoneFixo || '').replace(/\D/g, ''),
+    address: {
+        street: String(company.logradouro || company.street || company.address || '').trim(),
+        number: String(company.numero || company.number || '').trim(),
+        neighborhood: String(company.bairro || company.neighborhood || '').trim(),
+        city: String(company.municipio || company.city || '').trim(),
+        state: String(company.uf || company.state || '').trim().toUpperCase(),
+        zipCode: String(company.cep || company.zipCode || company.zip_code || '').replace(/\D/g, ''),
+    },
+});
 exports.createPointOfSalePayment = functions.https.onCall(async (payload, context) => {
     if (!context.auth)
         throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.');
@@ -197,14 +214,15 @@ exports.createPointOfSalePayment = functions.https.onCall(async (payload, contex
     if (String(payload?.paymentMethod || '') !== 'pix')
         throw new functions.https.HttpsError('invalid-argument', 'Este fluxo aceita somente Pix.');
     const items = Array.isArray(payload?.items) ? payload.items.slice(0, 100) : [], clientId = String(payload?.clientId || '');
-    if (!items.length || !clientId)
-        throw new functions.https.HttpsError('invalid-argument', 'Informe cliente e itens.');
+    const anonymousCustomer = payload?.anonymousCustomer === true;
+    if (!items.length || (!clientId && !anonymousCustomer))
+        throw new functions.https.HttpsError('invalid-argument', 'Informe itens e cliente ou use Consumidor final.');
     const firestore = admin.firestore();
     const [companySnap, clientSnap, providerSnap, ...productSnaps] = await Promise.all([
-        firestore.collection('companies').doc(companyId).get(), firestore.collection('clients').doc(clientId).get(), firestore.collection('billingProviders').doc('pagarme').get(),
+        firestore.collection('companies').doc(companyId).get(), clientId ? firestore.collection('clients').doc(clientId).get() : Promise.resolve(null), firestore.collection('billingProviders').doc('pagarme').get(),
         ...items.map((item) => firestore.collection('products').doc(String(item.productId || '')).get()),
     ]);
-    if (!companySnap.exists || !clientSnap.exists || clientSnap.data()?.companyId !== companyId)
+    if (!companySnap.exists || (clientId && (!clientSnap?.exists || clientSnap.data()?.companyId !== companyId)))
         throw new functions.https.HttpsError('not-found', 'Empresa ou cliente não encontrado.');
     let gross = 0;
     const orderItems = items.map((item, index) => {
@@ -220,7 +238,7 @@ exports.createPointOfSalePayment = functions.https.onCall(async (payload, contex
     const discount = Number(payload?.discountCents || 0), total = gross - discount;
     if (!Number.isSafeInteger(discount) || discount < 0 || total <= 0)
         throw new functions.https.HttpsError('invalid-argument', 'Valor da venda inválido.');
-    const provider = providerSnap.data() || {}, company = companySnap.data() || {}, client = clientSnap.data() || {};
+    const provider = providerSnap.data() || {}, company = companySnap.data() || {}, client = clientSnap?.data() || {};
     const companyRecipientId = String(company.pagarmeRecipientId || company.paymentRecipientId || '').trim(), bluRecipientId = String(provider.bluRecipientId || provider.defaultRecipientId || '').trim();
     if (!companyRecipientId || !bluRecipientId)
         throw new functions.https.HttpsError('failed-precondition', 'Cadastre os recebedores Pagar.me da empresa e da Blu antes de usar o split.');
@@ -230,16 +248,25 @@ exports.createPointOfSalePayment = functions.https.onCall(async (payload, contex
     if (companyAmount <= 0)
         throw new functions.https.HttpsError('failed-precondition', 'O valor da venda é insuficiente para aplicar o split.');
     const intentRef = firestore.collection('pointOfSalePaymentIntents').doc(), document = String(client.cnpj || client.organizationCnpj || client.document || '').replace(/\D/g, '');
+    const fallbackDocument = String(company.cnpj || company.document || company.organizationCnpj || '').replace(/\D/g, '').slice(0, 14);
+    const customerDocument = document || fallbackDocument;
+    const customerEmail = String(client.financialContact || client.email || company.email || context.auth.token.email || 'cliente@blutecnologias.com.br').trim();
+    const customerName = String(client.razaoSocial || client.name || payload?.customerName || 'Consumidor final').trim().slice(0, 120) || 'Consumidor final';
+    const customer = { name: customerName, email: customerEmail };
+    if (customerDocument) {
+        customer.type = customerDocument.length === 14 ? 'company' : 'individual';
+        customer.document = customerDocument;
+    }
     const order = await pagarmeRequest('/orders', 'POST', {
         code: `blu-pos-${intentRef.id}`.slice(0, 52), items: orderItems,
-        customer: { name: String(client.razaoSocial || client.name || 'Cliente'), email: String(client.financialContact || client.email || ''), type: document.length === 14 ? 'company' : 'individual', document },
+        customer,
         payments: [{ payment_method: 'pix', pix: { expires_in: 900, additional_information: [{ name: 'Venda', value: String(payload?.saleNumber || intentRef.id) }] }, split: [
                     { type: 'flat', amount: companyAmount, recipient_id: companyRecipientId, options: { liable: true, charge_processing_fee: true, charge_remainder_fee: true } },
                     ...(bluAmount > 0 ? [{ type: 'flat', amount: bluAmount, recipient_id: bluRecipientId, options: { liable: false, charge_processing_fee: false, charge_remainder_fee: false } }] : []),
                 ] }], closed: true, metadata: { blu_pos_intent_id: intentRef.id, company_id: companyId },
     });
     const transaction = order.charges?.[0]?.last_transaction || {}, now = new Date().toISOString();
-    const value = { companyId, clientId, registerId: String(payload?.registerId || ''), saleNumber: String(payload?.saleNumber || ''), amountCents: total, bluFeeCents: bluAmount, companyAmountCents: companyAmount, feeBps, provider: 'pagarme', providerOrderId: String(order.id || ''), providerChargeId: String(order.charges?.[0]?.id || ''), status: posPaymentStatus(order), qrCode: String(transaction.qr_code || ''), qrCodeUrl: String(transaction.qr_code_url || ''), expiresAt: transaction.expires_at || null, createdAt: now, updatedAt: now, createdBy: context.auth.uid };
+    const value = { companyId, clientId, anonymousCustomer, customerName, customerDocument: document, registerId: String(payload?.registerId || ''), saleNumber: String(payload?.saleNumber || ''), amountCents: total, bluFeeCents: bluAmount, companyAmountCents: companyAmount, feeBps, provider: 'pagarme', providerOrderId: String(order.id || ''), providerChargeId: String(order.charges?.[0]?.id || ''), status: posPaymentStatus(order), qrCode: String(transaction.qr_code || ''), qrCodeUrl: String(transaction.qr_code_url || ''), expiresAt: transaction.expires_at || null, createdAt: now, updatedAt: now, createdBy: context.auth.uid };
     await intentRef.set(value);
     return { id: intentRef.id, status: value.status, qrCode: value.qrCode, qrCodeUrl: value.qrCodeUrl, expiresAt: value.expiresAt, amountCents: total, bluFeeCents: bluAmount };
 });
@@ -274,12 +301,36 @@ exports.managePointOfSalePaymentSettings = functions.https.onCall(async (payload
         tefProvider: String(company.posPayments?.tef?.provider || ''),
         tefTerminalId: String(company.posPayments?.tef?.terminalId || ''),
         tefStatus: String(company.posPayments?.tef?.status || 'awaiting_homologation'),
+        recipientStatus: String(company.posPayments?.pix?.recipientStatus || company.pagarmeRecipientStatus || 'not_started'),
         canManage,
     };
     if (String(payload?.action || 'get') === 'get')
         return current;
     if (!canManage)
         throw new functions.https.HttpsError('permission-denied', 'Somente o administrador da empresa pode alterar os meios de pagamento do PDV.');
+    if (String(payload?.action || '') === 'prepare_recipient') {
+        const timestamp = new Date().toISOString();
+        const profile = companyRecipientProfile(companyId, company);
+        const missing = [
+            ['document', profile.document],
+            ['legalName', profile.legalName],
+            ['email', profile.email],
+            ['phone', profile.phone],
+            ['address.zipCode', profile.address.zipCode],
+            ['address.city', profile.address.city],
+            ['address.state', profile.address.state],
+        ].filter(([, value]) => !String(value || '').trim()).map(([key]) => key);
+        const existingRecipientId = current.pagarmeRecipientId;
+        const status = existingRecipientId ? 'ready' : missing.length ? 'profile_incomplete' : 'ready_for_onboarding';
+        const recipient = { ...profile, recipientId: existingRecipientId, status, onboardingStatus: status, missingFields: missing, updatedAt: timestamp, updatedBy: context.auth.uid, createdAt: timestamp };
+        await admin.firestore().runTransaction(async (tx) => {
+            tx.set(admin.firestore().collection('paymentRecipients').doc(`${companyId}_pagarme`), recipient, { merge: true });
+            tx.set(companyRef, { pagarmeRecipientStatus: status, posPayments: { pix: { enabled: Boolean(existingRecipientId), provider: 'pagarme', recipientStatus: status }, tef: current.tefEnabled ? { enabled: current.tefEnabled, provider: current.tefProvider, terminalId: current.tefTerminalId, status: current.tefStatus } : company.posPayments?.tef || {} }, updatedAt: timestamp, updatedBy: context.auth.uid }, { merge: true });
+            tx.set(admin.firestore().collection('ecommerceStores').doc(companyId), { recipient: { provider: 'pagarme', recipientId: existingRecipientId, status, onboardingStatus: status, missingFields: missing, updatedAt: timestamp }, updatedAt: timestamp, updatedBy: context.auth.uid }, { merge: true });
+            tx.set(admin.firestore().collection('financialAuditLogs').doc(), { companyId, action: 'preparePagarmeRecipient', entityType: 'paymentRecipient', entityId: `${companyId}_pagarme`, userId: context.auth.uid, createdAt: timestamp, after: recipient });
+        });
+        return { ...current, recipientStatus: status };
+    }
     const value = payload?.value || {}, now = new Date().toISOString();
     const next = {
         pagarmeRecipientId: String(value.pagarmeRecipientId || '').trim().slice(0, 120),
@@ -287,11 +338,13 @@ exports.managePointOfSalePaymentSettings = functions.https.onCall(async (payload
         tefProvider: String(value.tefProvider || '').trim().slice(0, 80),
         tefTerminalId: String(value.tefTerminalId || '').trim().slice(0, 120),
         tefStatus: 'awaiting_homologation',
+        recipientStatus: current.recipientStatus,
         canManage: true,
     };
     await companyRef.set({
         pagarmeRecipientId: next.pagarmeRecipientId,
-        posPayments: { pix: { enabled: Boolean(next.pagarmeRecipientId), provider: 'pagarme' }, tef: { enabled: next.tefEnabled, provider: next.tefProvider, terminalId: next.tefTerminalId, status: next.tefStatus } },
+        pagarmeRecipientStatus: next.pagarmeRecipientId ? 'ready' : next.recipientStatus,
+        posPayments: { pix: { enabled: Boolean(next.pagarmeRecipientId), provider: 'pagarme', recipientStatus: next.pagarmeRecipientId ? 'ready' : next.recipientStatus }, tef: { enabled: next.tefEnabled, provider: next.tefProvider, terminalId: next.tefTerminalId, status: next.tefStatus } },
         updatedAt: now,
         updatedBy: context.auth.uid,
     }, { merge: true });
