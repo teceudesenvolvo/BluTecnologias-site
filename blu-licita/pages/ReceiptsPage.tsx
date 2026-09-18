@@ -3,12 +3,12 @@ import { Check, Download, Loader2, Plus, Printer, Trash2 } from "lucide-react";
 import { useBluAuth } from "../contexts/BluAuthContext";
 import { createCompanyDoc, listCompanyDocs } from "../services/firestoreCompany";
 import { serviceSchedulingService } from "../services/serviceSchedulingService";
+import { financialService } from "../../services/firebase";
 
 type ReceiptItem = { id: string; description: string; quantity: number; unitPriceCents: number; type: "product" | "service" };
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const money = (cents: number) => brl.format(Number(cents || 0) / 100);
 const label = (item: any) => item?.name || item?.description || item?.razaoSocial || item?.tradeName || "Item";
-const digits = (v: string) => String(v || "").replace(/\D/g, "");
 
 export const ReceiptsPage = () => {
   const { user } = useBluAuth();
@@ -63,10 +63,23 @@ export const ReceiptsPage = () => {
     if (!companyId) return;
     if (!client.name?.trim()) return setNotice("Selecione um cliente ou informe o nome do cliente avulso.");
     if (!items.length) return setNotice("Adicione pelo menos um produto ou serviço.");
+    const createFinancialEntry = window.confirm("Deseja gerar também uma entrada no financeiro para este recibo?\n\nOK: gerar entrada financeira\nCancelar: salvar somente o recibo");
     setSaving(true); setNotice("");
     try {
       const receipt = { code: `REC-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`, companyId, clientId: selectedClient?.id || "", client: { name: client.name.trim(), document: client.document || "", email: client.email || "" }, items, totalCents: total, status: "issued", createdAt: new Date().toISOString() };
       await createCompanyDoc("receipts", companyId, user?.id || "", receipt);
+      if (createFinancialEntry) {
+        const saved = await financialService.add({
+          description: `Recibo ${receipt.code} · ${receipt.client.name}`,
+          amount: receipt.totalCents / 100,
+          type: "income",
+          date: new Date().toISOString().slice(0, 10),
+          company: user?.companyName || companyId,
+          receiptId: receipt.code,
+          origin: "receipt",
+        } as any);
+        if (!saved) throw new Error("O recibo foi salvo, mas não foi possível gerar a entrada no financeiro.");
+      }
       setLastReceipt(receipt); setNotice("Recibo salvo com sucesso.");
     } catch (error: any) { setNotice(error?.message || "Não foi possível salvar o recibo."); } finally { setSaving(false); }
   };
