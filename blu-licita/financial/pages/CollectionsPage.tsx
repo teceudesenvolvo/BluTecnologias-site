@@ -98,6 +98,25 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+const generatedReportPdf = (html: string, company: Company | null | undefined, client?: ContactLead) => {
+  const plain = String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const lines = [
+    companyDisplayName(company),
+    `CNPJ: ${company?.document || company?.cnpj || "não informado"}`,
+    "RELATÓRIO DE MEDIÇÃO / COBRANÇA",
+    `Cliente: ${client?.razaoSocial || client?.name || "não informado"}`,
+    plain,
+  ];
+  const pdfText = (value: string) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").slice(0, 180);
+  const content = ["BT /F1 15 Tf 48 790 Td", `(${pdfText(lines[0])}) Tj`, "/F1 10 Tf"].concat(lines.slice(1).map((line) => `0 -28 Td (${pdfText(line)}) Tj`)).join("\n");
+  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", "<< /Length " + content.length + " >>\nstream\n" + content + "\nET\nendstream"];
+  let body = "%PDF-1.4\n"; const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(body.length); body += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = body.length; body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const binary = unescape(encodeURIComponent(body));
+  return `data:application/pdf;base64,${btoa(binary)}`;
+};
+
 const companyDisplayName = (company?: Company | null) => company?.razaoSocial || company?.nomeFantasia || company?.name || company?.displayName || "Blu Tecnologias";
 const companyFooter = (company?: Company | null) =>
   [company?.email, company?.telefoneCelular || company?.telefoneFixo, company?.address || company?.endereco].filter(Boolean).join(" · ");
@@ -423,6 +442,7 @@ const OfficialBillingForm = ({
   const [form, setForm] = React.useState<BillingForm>(emptyBilling);
   const [clientId, setClientId] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const reportEditorRef = React.useRef<HTMLDivElement | null>(null);
   const client = aux.clients.find((item: ContactLead) => item.id === clientId);
   const contracts = client?.contracts || [];
   const selectedCompany = companies.find((company) => company.id === form.senderCompanyId || company.razaoSocial === form.senderCompany || company.nomeFantasia === form.senderCompany);
@@ -435,6 +455,16 @@ const OfficialBillingForm = ({
       return [account.id || fullLabel, fullLabel] as [string, string];
     });
   const selectedCertificates = certificates.filter((certificate) => form.selectedCertificates.includes(certificate.id));
+  const certificateText = (certificate: Certificate) => `${certificate.name || ""} ${(certificate as any).type || ""}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const requiredCertificateLabels = ["Federal", "Municipal", "Estadual", "Trabalhista", "FGTS"];
+  const missingRequiredCertificates = requiredCertificateLabels.filter((label) => !selectedCertificates.some((certificate) => {
+    const text = certificateText(certificate);
+    return label === "Federal" ? /federal|receita federal|cnd federal/.test(text) : label === "Municipal" ? /municipal|prefeitura|iss/.test(text) : label === "Estadual" ? /estadual|estado|icms/.test(text) : label === "Trabalhista" ? /trabalhista|trabalho/.test(text) : /fgts|fundo de garantia/.test(text);
+  }));
+  const confirmCertificateWarning = () => {
+    if (!missingRequiredCertificates.length) return true;
+    return window.confirm(`Faltam estas CNDs: ${missingRequiredCertificates.join(", ")}.\n\nEssa validação é recomendada para contratos com órgãos públicos. Deseja enviar mesmo assim?`);
+  };
   const validCertificates = certificates.filter((certificate) => {
     if (!form.senderCompany || (certificate as any).company !== form.senderCompany) return false;
     if (!certificate.expiryDate) return false;
@@ -472,7 +502,7 @@ const OfficialBillingForm = ({
   };
 
   const exec = (command: string, value?: string) => {
-    const editor = document.getElementById("collection-report-editor") as HTMLElement | null;
+    const editor = reportEditorRef.current;
     editor?.focus();
     document.execCommand(command, false, value);
     const html = editor?.innerHTML || form.reportHtml;
@@ -480,10 +510,17 @@ const OfficialBillingForm = ({
   };
 
   const syncEditor = () => {
-    const editor = document.getElementById("collection-report-editor") as HTMLElement | null;
+    const editor = reportEditorRef.current;
     if (!editor) return;
     set("reportHtml", editor.innerHTML);
   };
+
+  // Não reatribui innerHTML a cada tecla: isso reposicionava o cursor e fazia o texto parecer invertido.
+  React.useEffect(() => {
+    const editor = reportEditorRef.current;
+    if (!editor || document.activeElement === editor) return;
+    if (editor.innerHTML !== form.reportHtml) editor.innerHTML = form.reportHtml;
+  }, [form.reportHtml]);
 
   const reportPreviewHtml = React.useMemo(() => buildBillingReportHtml({
     company: selectedCompany,
@@ -516,8 +553,10 @@ const OfficialBillingForm = ({
         expiryDate: certificate.expiryDate ? date(certificate.expiryDate) : "",
       }));
       const contract = contracts.find((item: any) => item.title === form.solutionSelect || item.id === form.solutionSelect);
+      const generatedReportFile = form.reportFile || generatedReportPdf(reportPreviewHtml, selectedCompany, client);
       const payload = {
         ...form,
+        reportFile: generatedReportFile,
         certificateFiles,
         selectedCertificatesDetails,
         clientEmail: client.email || client.financialContact || "",
@@ -558,6 +597,7 @@ const OfficialBillingForm = ({
                 attachmentUrls: uploadedAttachments,
                 reportHtml: form.reportHtml,
                 reportSubject: form.reportSubject,
+                reportFile: generatedReportFile,
                 status: "sent",
                 originType: "officialBilling",
                 originId: client.id,
@@ -644,7 +684,7 @@ const OfficialBillingForm = ({
           </label>
 
           <section className="sm:col-span-2">
-            <p className="text-sm font-bold text-slate-700">Certidões vigentes da empresa {selectedCompany?.razaoSocial || ""}</p>
+            <p className="text-sm font-bold text-slate-700">Certidões vigentes da empresa {selectedCompany?.razaoSocial || ""} <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{selectedCertificates.length} selecionada(s)</span></p>
             <div className="mt-3 flex flex-wrap gap-2">
               {!form.senderCompany ? (
                 <p className="text-sm italic text-slate-400">Selecione uma empresa para filtrar as certidões.</p>
@@ -681,11 +721,10 @@ const OfficialBillingForm = ({
               <div className="space-y-3">
                 <input value={form.reportSubject} onChange={(event) => set("reportSubject", event.target.value)} className="w-full rounded-xl border px-3 py-2.5 text-sm font-medium" placeholder="Título do relatório" />
                 <div
-                  id="collection-report-editor"
+                  ref={reportEditorRef}
                   contentEditable
                   suppressContentEditableWarning
                   onInput={syncEditor}
-                  dangerouslySetInnerHTML={{ __html: form.reportHtml }}
                   className="min-h-[220px] rounded-2xl border bg-white p-4 text-sm leading-7 text-slate-700 outline-none"
                 />
                 <label className="text-xs font-bold text-slate-600">Texto personalizado para o relatório
@@ -719,6 +758,7 @@ const OfficialBillingForm = ({
           <button type="button" onClick={close} className="rounded-xl border px-4 py-2">Cancelar</button>
           <button type="button" onClick={async () => {
             if (!client) return;
+            if (!confirmCertificateWarning()) return;
             setSending(true);
             try {
               const amount = Number(form.value || 0);
@@ -768,6 +808,7 @@ const OfficialBillingForm = ({
           </button>
           <button onClick={async () => {
             if (!client) return;
+            if (!confirmCertificateWarning()) return;
             setSending(true);
             try {
               const amount = Number(form.value || 0);
@@ -785,8 +826,10 @@ const OfficialBillingForm = ({
                 expiryDate: certificate.expiryDate ? date(certificate.expiryDate) : "",
               }));
               const contract = contracts.find((item: any) => String(item.id || item.title) === form.solutionSelect);
+              const generatedReportFile = form.reportFile || generatedReportPdf(reportPreviewHtml, selectedCompany, client);
               const payload = {
                 ...form,
+                reportFile: generatedReportFile,
                 attachmentUrls: uploadedAttachments,
                 certificateFiles,
                 selectedCertificatesDetails,
@@ -819,6 +862,9 @@ const OfficialBillingForm = ({
                 responsibleName: auth.currentUser?.displayName || "",
                 notes: form.emailText,
                 attachmentUrls: uploadedAttachments,
+                reportHtml: form.reportHtml,
+                reportSubject: form.reportSubject,
+                reportFile: generatedReportFile,
                 status: "sent",
                 originType: "officialBilling",
                 originId: client.id,
@@ -1189,6 +1235,13 @@ const ModalPreview = ({ html, close }: { html: string; close: () => void }) => (
           <h2 className="mt-1 text-lg font-bold">PDF timbrado da cobrança</h2>
         </div>
         <div className="flex gap-2">
+          <button type="button" onClick={() => {
+            const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+            if (!win) return;
+            win.document.open();
+            win.document.write(html.replace('</body>', '<script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250));<\\/script></body>'));
+            win.document.close();
+          }} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">Imprimir / salvar PDF</button>
           <button type="button" onClick={() => {
             const win = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
             if (!win) return;
