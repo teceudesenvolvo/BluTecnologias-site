@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, signInWithEmailAndPassword, onAuthStateChanged } from '../services/firebase';
+import { auth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence } from '../services/firebase';
 import { ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { ScrollReveal } from '../components/ScrollReveal';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
@@ -26,6 +26,7 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/admin');
     } catch (err) {

@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, signInWithEmailAndPassword, signOut } from '../../services/firebase';
+import { auth, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from '../../services/firebase';
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
 import { db, ensureNoDuplicateRecord } from '../../services/firebase';
 import type { BluUser } from '../types';
@@ -51,6 +51,7 @@ const toBluUser = async (user: User): Promise<BluUser> => {
 
 export class FirebaseAuthRepository implements AuthRepository {
   async signIn(email: string, password: string) {
+    await setPersistence(auth, browserLocalPersistence);
     const credential = await signInWithEmailAndPassword(auth, email, password);
     return await toBluUser(credential.user);
   }
