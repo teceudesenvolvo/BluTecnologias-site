@@ -69,6 +69,7 @@ import { AccountingWorkspacePage } from "../pages/AccountingWorkspacePage";
 import { AccountantCompanyProvider } from "../contexts/AccountantCompanyContext";
 import { EcommercePage } from "../pages/EcommercePage";
 import { ServicesPage } from "../pages/ServicesPage";
+import { ReceiptsPage } from "../pages/ReceiptsPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user } = useBluAuth();
@@ -301,6 +302,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="hq" element={<PlatformAdminOnly><BluHqPage /></PlatformAdminOnly>} />
         <Route path="migracao" element={<PlatformAdminOnly><MigrationPage /></PlatformAdminOnly>} />
         <Route path="orcamentos" element={<BudgetsPage />} />
+        <Route path="recibos" element={<ReceiptsPage />} />
         <Route path="financeiro" element={<UnifiedFinancialRoute />} />
         <Route path="financeiro/visao-geral" element={<FinancialExecutiveOverviewPage />} />
         <Route path="financeiro/configuracoes" element={<FinancialSettingsPage />} />
