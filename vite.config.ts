@@ -10,7 +10,22 @@ export default defineConfig({
         target: 'https://pncp.gov.br',
         changeOrigin: true,
         secure: true,
+        timeout: 15000,
+        proxyTimeout: 15000,
         configure: (proxy) => {
+          proxy.on('error', (error, _req, res) => {
+            // O PNCP pode ficar lento ou indisponível. Responda de forma
+            // determinística para que o frontend use suas modalidades de fallback.
+            if (!res.headersSent) {
+              res.writeHead(504, { 'Content-Type': 'application/json' });
+            }
+            if (!res.writableEnded) {
+              res.end(JSON.stringify({
+                message: 'O PNCP está temporariamente indisponível.',
+                code: error.code || 'UPSTREAM_TIMEOUT',
+              }));
+            }
+          })
           proxy.on('proxyRes', (proxyRes, req) => {
             if (!req.url?.startsWith('/pncp-api/')) return
             delete proxyRes.headers['x-frame-options']

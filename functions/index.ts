@@ -487,7 +487,7 @@ export const pncpProxy = functions.https.onRequest((req, res) => {
     });
 
     const upstreamUrl = `https://pncp.gov.br${upstreamPath}?${query.toString()}`;
-    https.get(upstreamUrl, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-PNCP-Connector/1.0' } }, (upstream) => {
+    const upstreamRequest = https.get(upstreamUrl, { headers: { Accept: 'application/json', 'User-Agent': 'Blu-PNCP-Connector/1.0' } }, (upstream) => {
       const chunks: Buffer[] = [];
       upstream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
       upstream.on('end', () => {
@@ -502,9 +502,13 @@ export const pncpProxy = functions.https.onRequest((req, res) => {
         res.set('Cache-Control', incomingPath.includes('modalidades') ? 'public, max-age=3600' : 'public, max-age=60');
         res.send(Buffer.concat(chunks));
       });
-    }).on('error', (error) => {
+    });
+    upstreamRequest.setTimeout(15000, () => {
+      upstreamRequest.destroy(new Error('PNCP upstream timeout'));
+    });
+    upstreamRequest.on('error', (error) => {
       console.error('pncpProxy:', error.message);
-      res.status(502).json({ message: 'O PNCP está temporariamente indisponível.' });
+      if (!res.headersSent) res.status(504).json({ message: 'O PNCP está temporariamente indisponível.' });
     });
   });
 });
