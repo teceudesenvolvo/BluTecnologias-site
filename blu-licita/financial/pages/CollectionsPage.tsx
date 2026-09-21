@@ -99,17 +99,38 @@ const escapeHtml = (value: unknown) =>
     .replace(/'/g, "&#39;");
 
 const generatedReportPdf = (html: string, company: Company | null | undefined, client?: ContactLead) => {
-  const plain = String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // O HTML completo contém CSS e regras @page dentro de <style>. Remover
+  // somente as tags deixava esse CSS como texto no PDF enviado.
+  const source = String(html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "");
+  const parsed = typeof DOMParser !== "undefined"
+    ? new DOMParser().parseFromString(source, "text/html")
+    : null;
+  const plain = String(parsed?.body?.textContent || source.replace(/<[^>]*>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim();
   const lines = [
     companyDisplayName(company),
     `CNPJ: ${company?.document || company?.cnpj || "não informado"}`,
     "RELATÓRIO DE MEDIÇÃO / COBRANÇA",
     `Cliente: ${client?.razaoSocial || client?.name || "não informado"}`,
-    plain,
+    ...plain.split(/\n+/),
   ];
-  const pdfText = (value: string) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").slice(0, 180);
-  const content = ["BT /F1 15 Tf 48 790 Td", `(${pdfText(lines[0])}) Tj`, "/F1 10 Tf"].concat(lines.slice(1).map((line) => `0 -28 Td (${pdfText(line)}) Tj`)).join("\n");
-  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", "<< /Length " + content.length + " >>\nstream\n" + content + "\nET\nendstream"];
+  const ascii = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "?");
+  const pdfText = (value: string) => ascii(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  const wrapped = lines.flatMap((line) => {
+    const value = ascii(line);
+    if (!value) return [""];
+    const chunks: string[] = [];
+    for (let index = 0; index < value.length; index += 88) chunks.push(value.slice(index, index + 88));
+    return chunks;
+  }).slice(0, 38);
+  const content = ["BT /F1 15 Tf 48 790 Td", `(${pdfText(wrapped[0] || "Relatorio")}) Tj`, "/F1 10 Tf"]
+    .concat(wrapped.slice(1).map((line) => `0 -20 Td (${pdfText(line)}) Tj`)).join("\n") + "\nET";
+  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", "<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream"];
   let body = "%PDF-1.4\n"; const offsets = [0];
   objects.forEach((object, index) => { offsets.push(body.length); body += `${index + 1} 0 obj\n${object}\nendobj\n`; });
   const xref = body.length; body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
