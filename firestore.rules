@@ -342,6 +342,13 @@ service cloud.firestore {
       allow update, delete: if sameCompany();
     }
 
+    // Políticas públicas dos aplicativos: leitura anônima para a página legal
+    // e gerenciamento restrito ao administrador da plataforma.
+    match /privacyPolicies/{policyId} {
+      allow read: if true;
+      allow create, update, delete: if isPlatformAdmin();
+    }
+
     // Catálogo global, sem segredos. Escritas somente por processo administrativo futuro.
     match /integrationProviders/{providerId} {
       allow read: if isSignedIn();

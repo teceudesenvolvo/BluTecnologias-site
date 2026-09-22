@@ -797,6 +797,18 @@ export const privacyPolicyService = {
     }
   },
 
+  // Catálogo legal da plataforma: políticas dos aplicativos são gerenciadas
+  // pelo BluHQ e não pertencem ao tenant da empresa atualmente selecionada.
+  async getAllGlobal(): Promise<PrivacyPolicy[]> {
+    try {
+      const snapshot = await getDocs(collection(db, 'privacyPolicies'));
+      return snapshot.docs.map(item => ({ id: item.id, ...item.data() } as PrivacyPolicy)).sort((a, b) => String(b.lastUpdated || '').localeCompare(String(a.lastUpdated || '')));
+    } catch (error) {
+      console.error('Erro ao buscar políticas globais:', error);
+      return [];
+    }
+  },
+
   async getById(id: string): Promise<PrivacyPolicy | null> {
     try {
       const snapshot = await getDoc(doc(db, 'privacyPolicies', id));

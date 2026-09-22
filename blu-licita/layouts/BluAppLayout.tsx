@@ -45,6 +45,7 @@ const nav = [
 const platformAdminNav = [
   { label: 'Novidades', to: '/admin/novidades', icon: Megaphone },
   { label: 'Blu HQ', to: '/admin/hq', icon: ShieldCheck },
+  { label: 'Políticas de privacidade', to: '/admin/privacidade', icon: FileText },
   { label: 'Migração', to: '/admin/migracao', icon: Database },
 ];
 

@@ -336,7 +336,7 @@ export const BluRoutes: React.FC = () => (
         <Route path="arps" element={<ARPs />} />
         <Route path="areas-interesse" element={<InterestAreas />} />
         <Route path="webmail" element={<Webmail />} />
-        <Route path="privacidade" element={<PrivacyPolicyGenerator />} />
+        <Route path="privacidade" element={<PlatformAdminOnly><PrivacyPolicyGenerator /></PlatformAdminOnly>} />
         <Route path="configuracoes" element={<SettingsPage />} />
         <Route path="configuracoes/integracoes" element={<PlatformAdminOnly><IntegrationsPage /></PlatformAdminOnly>} />
         <Route

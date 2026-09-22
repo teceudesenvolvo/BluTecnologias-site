@@ -8,6 +8,7 @@ import { defaultPublicPlans, loadAllPublicPlans, savePublicPlan, seedDefaultPubl
 import { billingProviderAdminService, type BillingProviderConfig } from '../services/billingProviderAdminService';
 import { bluHqUserAdminService } from '../services/bluHqUserAdminService';
 import { emailTemplateAdminService, type EmailTemplateDoc } from '../services/emailTemplateAdminService';
+import { PrivacyPolicyGenerator } from '../../pages/admin/PrivacyPolicyGenerator';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value / 100);
 
@@ -105,7 +106,7 @@ const emptyPlan = (): PublicPlanDoc => ({
 });
 
 export const BluHqPage: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState<'overview' | 'customers' | 'billing' | 'emails' | 'platform'>('overview');
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'customers' | 'billing' | 'emails' | 'platform' | 'privacy'>('overview');
   const [data, setData] = React.useState<HqOverview | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -533,6 +534,7 @@ export const BluHqPage: React.FC = () => {
             ['billing', 'Planos e gateway'],
             ['emails', 'E-mails'],
             ['platform', 'Plataforma Blu'],
+            ['privacy', 'Políticas de privacidade'],
           ].map(([key, label]) => {
             const active = activeTab === key;
             return (
@@ -1134,6 +1136,10 @@ export const BluHqPage: React.FC = () => {
                 </div>
               </section>
             </section>
+          )}
+
+          {activeTab === 'privacy' && (
+            <PrivacyPolicyGenerator />
           )}
         </>
       )}

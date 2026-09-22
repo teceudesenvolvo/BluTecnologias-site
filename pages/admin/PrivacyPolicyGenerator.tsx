@@ -36,7 +36,7 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
 
   const loadPolicies = async () => {
     setLoading(true);
-    const data = await privacyPolicyService.getAll();
+    const data = await privacyPolicyService.getAllGlobal();
     setPolicies(data);
     setLoading(false);
   };
@@ -186,7 +186,7 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
                   <td className="p-4 text-slate-500 text-sm">{new Date(p.lastUpdated).toLocaleDateString()}</td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <a href={`#/privacy/${p.id}`} target="_blank" rel="noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver Página Pública">
+                      <a href={`/privacy/${encodeURIComponent(p.id)}`} target="_blank" rel="noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver Página Pública">
                         <ExternalLink size={18} />
                       </a>
                       <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
