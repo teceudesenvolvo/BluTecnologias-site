@@ -141,6 +141,19 @@ export const PrivacyPolicyGenerator: React.FC<{ setActiveTab?: (tab: string) => 
     setSaving(false);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Excluir esta política de privacidade? Esta ação não pode ser desfeita.')) return;
+    setLoading(true);
+    try {
+      const success = await privacyPolicyService.delete(id);
+      if (!success) throw new Error('Não foi possível excluir a política.');
+      await loadPolicies();
+    } catch (error: any) {
+      window.alert(error?.message || 'Não foi possível excluir a política.');
+      setLoading(false);
+    }
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(policy);
     setCopied(true);

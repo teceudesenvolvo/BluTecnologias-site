@@ -8,12 +8,18 @@ export const PrivacyPolicyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [policy, setPolicy] = useState<PrivacyPolicy | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadPolicy = async () => {
       if (id) {
-        const data = await privacyPolicyService.getById(id);
-        setPolicy(data);
+        try {
+          const data = await privacyPolicyService.getById(decodeURIComponent(id));
+          setPolicy(data);
+          if (!data) setError('O documento não foi encontrado ou ainda não foi publicado.');
+        } catch (reason: any) {
+          setError(reason?.message || 'Não foi possível carregar esta política.');
+        }
       }
       setLoading(false);
     };
@@ -33,7 +39,7 @@ export const PrivacyPolicyPage: React.FC = () => {
       <div className="min-h-screen flex flex-col justify-center items-center bg-slate-50 text-slate-500">
         <ShieldAlert size={48} className="mb-4 text-slate-300" />
         <h2 className="text-xl font-bold mb-2">Política não encontrada</h2>
-        <p>Verifique o link e tente novamente.</p>
+        <p>{error || 'Verifique o link e tente novamente.'}</p>
       </div>
     );
   }

@@ -811,11 +811,14 @@ export const privacyPolicyService = {
 
   async getById(id: string): Promise<PrivacyPolicy | null> {
     try {
-      const snapshot = await getDoc(doc(db, 'privacyPolicies', id));
+      const snapshot = await getDoc(doc(db, 'privacyPolicies', decodeURIComponent(id)));
       return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as PrivacyPolicy) : null;
     } catch (error) {
       console.error('Erro ao buscar política:', error);
-      return null;
+      // Compatibilidade com documentos legados e ambientes que não permitem
+      // leitura direta do documento por ID, mas permitem a listagem pública.
+      const policies = await this.getAllGlobal();
+      return policies.find((item) => item.id === decodeURIComponent(id)) || null;
     }
   },
 
