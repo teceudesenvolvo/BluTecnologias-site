@@ -199,7 +199,7 @@ export const CidadesAI: React.FC = () => {
           <h2 className="mx-auto mt-4 max-w-4xl text-4xl font-black tracking-[-.05em] sm:text-6xl">Vamos conversar sobre as prioridades do seu município?</h2>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-blue-100">Apresente seu cenário. Nossa equipe ajuda a avaliar um caminho de implantação adequado ao órgão.</p>
           <Link to="/contact" className="mt-8 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-white px-7 font-black text-blue-800 transition hover:bg-cyan-50">Solicitar uma apresentação <ArrowRight size={18} /></Link>
-          <div className="mt-10 flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-semibold text-blue-100"><span>Portal de Serviços</span><span>Portal do Legislativo</span><span>App da Câmara</span><span>Blu Escolar</span><Link to="/products" className="inline-flex items-center gap-1 text-white underline underline-offset-4">Ver todas as soluções <ChevronRight size={15} /></Link></div>
+          <div className="mt-10 flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-semibold text-blue-100"><span>Portal de Serviços</span><span>Portal do Legislativo</span><span>App da Câmara</span><span>Portal Escolar</span><Link to="/products" className="inline-flex items-center gap-1 text-white underline underline-offset-4">Ver todas as soluções <ChevronRight size={15} /></Link></div>
         </div>
       </section>
     </main>

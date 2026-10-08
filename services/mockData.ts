@@ -27,11 +27,11 @@ export const initialSoftwares: Software[] = [
   },
   {
     id: '4',
-    nome_produto: 'Blu Escolar',
-    descricao_venda: 'Modernize a gestão educacional do seu município. Matrículas 100% online, diário de classe digital e controle de frequência em tempo real.',
+    nome_produto: 'Portal Escolar',
+    descricao_venda: 'Centralize matrículas, diário de classe e frequência, com reconhecimento facial e integração a catracas compatíveis, para acompanhar a educação municipal em um só lugar.',
     icone_3d: 'GraduationCap',
     link_demo: '#',
-    features: ['Matrícula Online', 'Diário Digital', 'Gestão de Transportes']
+    features: ['Matrícula Online', 'Diário de Classe Digital', 'Frequência Facial e Catracas']
   },
   {
     id: '5',
