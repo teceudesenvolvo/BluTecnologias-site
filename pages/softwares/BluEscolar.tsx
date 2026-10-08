@@ -109,9 +109,9 @@ export const BluEscolar: React.FC = () => {
                 <p className="text-xl md:text-2xl text-indigo-700/80 max-w-3xl mx-auto mb-12 font-medium">
                   O novo portal personalizado para a prefeitura elimina a fricção. O que antes levava horas em filas, agora acontece em segundos, no conforto do seu sofá.
                 </p>
-                <button className="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 hover:-translate-y-1">
-                  Ver Demonstração
-                </button>
+                <Link to="/contact" className="inline-flex bg-indigo-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 hover:-translate-y-1">
+                  Solicitar demonstração
+                </Link>
              </div>
            </ScrollReveal>
         </div>
@@ -245,9 +245,9 @@ export const BluEscolar: React.FC = () => {
             <Link to="/contact" className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl hover:-translate-y-1 flex items-center gap-2">
               Agendar Demonstração <ArrowRight size={20} />
             </Link>
-            <button className="px-10 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow-md">
-              Baixar Whitepaper
-            </button>
+            <a href="#specs" className="px-10 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm hover:shadow-md">
+              Conhecer os recursos
+            </a>
           </div>
         </div>
       </section>

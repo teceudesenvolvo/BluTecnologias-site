@@ -11,7 +11,7 @@ import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
 
 // Produtos
-import { BluGov } from './pages/softwares/BluGov';
+import { CidadesAI } from './pages/softwares/CidadesAI';
 import { PortalServicos } from './pages/softwares/PortalServicos';
 import { PortalLegislativo } from './pages/softwares/PortalLegislativo';
 import { AppCamara } from './pages/softwares/AppCamara';
@@ -67,7 +67,8 @@ const AppContent: React.FC = () => {
             <Route path="/products/2" element={<PortalLegislativo />} />
             <Route path="/products/3" element={<AppCamara />} />
             <Route path="/products/4" element={<BluEscolar />} />
-            <Route path="/products/5" element={<BluGov />} />
+            <Route path="/products/5" element={<CidadesAI />} />
+            <Route path="/products/cidades-ai" element={<CidadesAI />} />
             <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/privacy/:id" element={<PrivacyPolicyPage />} />
             <Route path="/:storeSlug/produto/:productSlug" element={<PublicStorePage product />} />

@@ -4,10 +4,10 @@ export const initialSoftwares: Software[] = [
   {
     id: '1',
     nome_produto: 'Portal de Serviços',
-    descricao_venda: 'Otimize a prestação de serviços e reduza custos. Uma plataforma única para centralizar o atendimento ao cidadão e digitalizar processos.',
+    descricao_venda: 'Para prefeituras e câmaras municipais: centralize o atendimento ao cidadão, publique orientações e digitalize solicitações em um portal acessível.',
     icone_3d: 'LayoutDashboard',
     link_demo: '#',
-    features: ['Emissão de Guias', 'Protocolo Digital', 'Consulta de Processos']
+    features: ['Carta de Serviços', 'Protocolo Digital', 'Consulta de Processos']
   },
   {
     id: '2',
@@ -35,11 +35,11 @@ export const initialSoftwares: Software[] = [
   },
   {
     id: '5',
-    nome_produto: 'Governança 360°',
-    descricao_venda: 'Uma solução completa de ERP e Fintech para órgãos públicos que buscam eficiência máxima e risco zero.',
+    nome_produto: 'Cidades AI',
+    descricao_venda: 'Inteligência artificial aplicada à gestão pública para aproximar cidadãos, equipes e informações municipais com responsabilidade e transparência.',
     icone_3d: 'Sparkles',
     link_demo: '#',
-    features: ['Análise de Editais com IA', 'Gestão de Contratos', 'Automação de Pagamentos']
+    features: ['Atendimento digital assistido', 'Busca em informações oficiais', 'Apoio às equipes municipais']
   }
 ];
 

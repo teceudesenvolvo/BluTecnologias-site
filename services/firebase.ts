@@ -4,9 +4,10 @@ import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'fire
 import { getFunctions } from 'firebase/functions';
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { BlogPost } from '../types';
+import { firebaseConfig, firebaseFunctionsRegion } from './firebaseConfig';
 
-// Configuração do Firebase - Substitua pelos dados do seu projeto no Console do Firebase
-const firebaseConfig = {
+// A configuração é mantida exclusivamente em ./firebaseConfig.ts.
+/*
   apiKey: "AIzaSyBwyV2KFRfT_Hsh10A8sXoJusuLIAUQ35Y",
   authDomain: "blutecnologias-site.firebaseapp.com",
   projectId: "blutecnologias-site",
@@ -15,12 +16,13 @@ const firebaseConfig = {
   appId: "1:22963166270:web:0f3848fc534cc4f20cc56f",
   measurementId: "G-8Q9H1KYGG0"
 };
+*/
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence };
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, firebaseFunctionsRegion);
 export const db = getFirestore(app);
 
 const currentOwner = () => {

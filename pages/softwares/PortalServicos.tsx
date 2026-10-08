@@ -61,14 +61,14 @@ export const PortalServicos: React.FC = () => {
       <section id="overview" className="pt-32 pb-20 px-6 text-center bg-slate-50">
         <ScrollReveal>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
-            A Câmara a um clique de distância.
+            Os serviços públicos a um clique de distância.
           </h1>
           <p className="text-2xl md:text-4xl font-medium text-slate-500 mb-10 max-w-4xl mx-auto tracking-tight">
-            Nosso compromisso é modernizar processos e usar a tecnologia como ponte para a transparência e eficiência pública.
+            Uma experiência digital para prefeituras e câmaras municipais aproximarem o cidadão dos serviços, orientações e solicitações do seu órgão.
           </p>
           <div className="flex justify-center gap-4">
             <a href="#servicos" className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg">
-              Conhecer Serviços
+              Ver recursos do portal
             </a>
           </div>
         </ScrollReveal>
@@ -83,8 +83,9 @@ export const PortalServicos: React.FC = () => {
               <div className="w-3 h-3 rounded-full bg-yellow-400" />
               <div className="w-3 h-3 rounded-full bg-green-400" />
             </div>
-            <img src={PortalServicosImg} alt="Dashboard do Portal de Serviços" className="w-full h-full object-cover object-top" />
+            <img src={PortalServicosImg} alt="Exemplo de implantação do Portal de Serviços em uma instituição pública" className="w-full h-full object-cover object-top" />
           </div>
+          <p className="mt-3 text-center text-sm text-slate-500">Exemplo de implantação em uma Câmara Municipal. A solução também atende prefeituras e é configurada para a realidade de cada órgão.</p>
         </ScrollReveal>
       </section>
 
@@ -92,66 +93,52 @@ export const PortalServicos: React.FC = () => {
       <section id="servicos" className="py-32 px-6 bg-white">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Cidadania Digital e Segura</h2>
-            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Serviços essenciais para o cidadão, disponíveis de forma online, rápida e com total proteção de dados.</p>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Atendimento municipal em um só lugar</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Organize serviços, canais de atendimento e solicitações para que a população encontre o caminho certo sem depender de filas ou informações dispersas.</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Atendimento Jurídico */}
-            <ScrollReveal className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-              <Scale className="w-12 h-12 text-blue-600 mb-6" />
-              <h3 className="text-2xl font-bold mb-3">Atendimento Jurídico</h3>
-              <p className="text-slate-600 mb-4">Orientação gratuita para cidadãos que não podem contratar um advogado. Solicite online com RG, CPF e comprovante de residência.</p>
-              <a href="#" className="font-semibold text-blue-600 hover:underline">Saiba como solicitar &rarr;</a>
-            </ScrollReveal>
-
-            {/* Procuradoria da Mulher */}
-            <ScrollReveal delay={100} className="bg-pink-50 border border-pink-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300 lg:col-span-2">
-              <HeartHandshake className="w-12 h-12 text-pink-600 mb-6" />
-              <h3 className="text-2xl font-bold mb-3">Procuradoria da Mulher</h3>
-              <p className="text-slate-600 mb-4">Órgão dedicado à defesa dos direitos das mulheres. Realize denúncias de forma sigilosa e segura, com acolhimento por equipe especializada.</p>
-              <div className="flex flex-wrap gap-4">
-                <a href="#" className="font-semibold text-pink-600 hover:underline">Fazer denúncia &rarr;</a>
-                <span className="font-semibold text-red-600 flex items-center gap-2"><Siren size={18}/> Botão do Pânico (Exclusivo no App)</span>
-              </div>
-            </ScrollReveal>
-
-            {/* PROCON */}
-            <ScrollReveal delay={200} className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300 lg:col-span-2">
-              <ShieldQuestion className="w-12 h-12 text-green-600 mb-6" />
-              <h3 className="text-2xl font-bold mb-3">PROCON Municipal Digital</h3>
-              <p className="text-slate-600 mb-4">Defenda seus direitos de consumidor. Registre reclamações contra empresas e prestadores de serviço diretamente pelo portal.</p>
-              <a href="#" className="font-semibold text-green-600 hover:underline">Registrar reclamação &rarr;</a>
-            </ScrollReveal>
-
-            {/* Ouvidoria */}
-            <ScrollReveal delay={300} className="bg-slate-50 border border-slate-100 p-10 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-              <MessageSquare className="w-12 h-12 text-purple-600 mb-6" />
-              <h3 className="text-2xl font-bold mb-3">Ouvidoria: Sua Voz</h3>
-              <p className="text-slate-600 mb-4">O canal oficial para enviar sugestões, elogios, críticas ou reclamações sobre qualquer serviço municipal.</p>
-              <a href="#" className="font-semibold text-purple-600 hover:underline">Fale com a Ouvidoria &rarr;</a>
-            </ScrollReveal>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { icon: Scale, title: 'Atendimento Jurídico', desc: 'Receba solicitações de assistência jurídica, orientações e documentos em um fluxo digital.' },
+              { icon: HeartHandshake, title: 'Procuradoria da Mulher', desc: 'Disponibilize um canal reservado para acolhimento e encaminhamento conforme os protocolos do órgão.' },
+              { icon: Siren, title: 'Botão do Pânico no aplicativo', desc: 'Recurso de segurança para acionar o canal de apoio da Procuradoria da Mulher pelo app institucional.' },
+              { icon: ShieldQuestion, title: 'PROCON Municipal', desc: 'Organize o recebimento e o acompanhamento de reclamações de consumo.' },
+              { icon: MessageSquare, title: 'Ouvidoria', desc: 'Reúna manifestações, sugestões, elogios, críticas e reclamações para acompanhamento.' },
+              { icon: Users, title: 'Balcão do Cidadão', desc: 'Ofereça um ponto digital para orientar a população e encaminhar demandas.' },
+              { icon: FileText, title: 'Protocolo Digital', desc: 'Receba solicitações e documentos sem depender exclusivamente do atendimento presencial.' },
+              { icon: FileSearch, title: 'Consulta de Processos', desc: 'Permita que o cidadão consulte o andamento de protocolos e solicitações.' },
+              { icon: Banknote, title: 'Emissão de Guias', desc: 'Disponibilize a emissão de guias e orientações de pagamento pelos canais digitais.' },
+              { icon: Phone, title: 'Solicitações aos Vereadores', desc: 'Organize pedidos enviados à Câmara e encaminhe-os para acompanhamento.' },
+              { icon: Calendar, title: 'Agendamento de Gabinetes', desc: 'Facilite a solicitação de horários de atendimento com os gabinetes.' },
+            ].map((item, i) => (
+              <ScrollReveal key={item.title} delay={i * 40} className="rounded-3xl border border-slate-100 bg-slate-50 p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <item.icon className="mb-5 h-10 w-10 text-blue-600" />
+                <h3 className="mb-3 text-xl font-bold">{item.title}</h3>
+                <p className="leading-7 text-slate-600">{item.desc}</p>
+              </ScrollReveal>
+            ))}
           </div>
+          <p className="mt-8 text-center text-sm text-slate-500">A disponibilidade de cada módulo depende da configuração e do escopo contratado pelo órgão.</p>
         </div>
       </section>
 
-      {/* 11-22. Transparência e Atividade Legislativa */}
+      {/* Transparência e informação municipal */}
       <section id="transparencia" className="py-32 px-6 bg-gradient-to-b from-blue-50 to-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Legislativo Aberto e Transparente</h2>
-            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Acompanhe de perto o trabalho dos vereadores e as decisões que moldam o futuro da nossa cidade.</p>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Informação pública clara e acessível</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Publique orientações e facilite o acesso da população aos canais, serviços e informações do município.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Banknote, title: "Portal da Transparência", desc: "Consulte gastos, licitações e contratos." },
-              { icon: Library, title: "Leis Municipais", desc: "Acesse a biblioteca digital de leis e decretos." },
-              { icon: FileSearch, title: "Acompanhe seu Processo", desc: "Verifique o andamento de suas solicitações." },
-              { icon: Calendar, title: "Agenda de Sessões", desc: "Fique por dentro do calendário de votações." },
-              { icon: Video, title: "Sessões Ao Vivo", desc: "Assista às sessões em tempo real pela internet." },
-              { icon: Users, title: "Perfil dos Vereadores", desc: "Conheça a biografia e projetos de cada parlamentar." },
-              { icon: Newspaper, title: "Notícias e Comunicados", desc: "Feed de atualizações e eventos da Câmara." },
-              { icon: BookMarked, title: "Diário Oficial", desc: "Acesso às publicações e atos administrativos." },
+              { icon: Banknote, title: "Portal da Transparência", desc: "Facilite o acesso da população a despesas, contratos e informações públicas." },
+              { icon: Library, title: "Carta de Serviços", desc: "Explique como acessar cada serviço, seus requisitos e documentos necessários." },
+              { icon: FileSearch, title: "Acompanhamento de Processos", desc: "Permita consultar o andamento de protocolos e solicitações." },
+              { icon: Calendar, title: "Agenda Municipal", desc: "Divulgue eventos, atendimentos e atividades públicas do município." },
+              { icon: Video, title: "Audiências Públicas", desc: "Compartilhe informações e conteúdos de participação social." },
+              { icon: Users, title: "Secretarias e Órgãos", desc: "Ajude o cidadão a localizar áreas e canais de atendimento." },
+              { icon: Newspaper, title: "Notícias e Comunicados", desc: "Publique atualizações e avisos da administração municipal ou da Câmara." },
+              { icon: BookMarked, title: "Diário Oficial", desc: "Organize o acesso a publicações e atos administrativos." },
             ].map((item, i) => (
               <ScrollReveal key={i} delay={i * 100} className="bg-white p-8 rounded-2xl shadow-md hover:shadow-lg transition-shadow">
                 <item.icon className="w-10 h-10 text-blue-600 mb-5" />
@@ -163,46 +150,53 @@ export const PortalServicos: React.FC = () => {
         </div>
       </section>
       
-      {/* 14 & 15. App e Segurança */}
+      {/* Acesso mobile e segurança */}
       <section className="py-32 px-6 bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <ScrollReveal>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider mb-6">
               Mobilidade e Segurança
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">O poder na palma da sua mão.</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">A prefeitura na palma da sua mão.</h2>
             <p className="text-xl text-gray-400 leading-relaxed mb-6">
-              Com o aplicativo da Câmara, você recebe notificações em tempo real e acessa ferramentas exclusivas.
+              Em uma experiência adaptada ao celular, a população encontra serviços, avisos e canais digitais da prefeitura com mais facilidade.
             </p>
             <p className="text-xl text-gray-400 leading-relaxed">
-              Todos os seus dados são protegidos com criptografia de ponta a ponta, em total conformidade com a LGPD.
+              A implantação considera os perfis de acesso e os cuidados necessários para tratar dados pessoais conforme as diretrizes do órgão.
             </p>
           </ScrollReveal>
           <ScrollReveal delay={200} className="relative mx-auto max-w-[300px]">
             <div className="relative aspect-[9/19] bg-zinc-800 rounded-[3rem] border-[8px] border-zinc-900 shadow-2xl overflow-hidden ring-1 ring-white/10">
-              <img src={AppCamaraImg} alt="App da Câmara" className="w-full h-full object-cover" />
+              <img src={AppCamaraImg} alt="Exemplo de aplicativo institucional municipal" className="w-full h-full object-cover" />
             </div>
+            <p className="mt-3 text-center text-sm text-slate-300">Exemplo de aplicativo de uma Câmara Municipal. A identidade e os serviços podem ser configurados para prefeituras.</p>
           </ScrollReveal>
         </div>
       </section>
 
-      {/* 19-30. Outras Seções */}
+      {/* Recursos para a gestão municipal */}
       <section className="py-32 px-6 bg-slate-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Mais para Você</h2>
-            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Informação, participação e o futuro da gestão pública digital.</p>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight">Mais módulos para cada realidade pública</h2>
+            <p className="text-xl text-slate-500 mt-4 max-w-3xl mx-auto">Recursos para gestão do portal, comunicação com cidadãos e transparência legislativa, conforme o perfil do órgão.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
-              { icon: Info, title: "Como Funciona a Câmara?", desc: "Entenda o papel do Poder Legislativo e a importância do seu vereador." },
-              { icon: Mic, title: "Tribuna Livre", desc: "Saiba como usar a palavra durante as sessões para levar as demandas da sua comunidade." },
-              { icon: Accessibility, title: "Acessibilidade Digital", desc: "Nosso compromisso em tornar o portal acessível para pessoas com deficiência." },
-              { icon: ListChecks, title: "Guia de Serviços Online", desc: "Um índice completo de todos os serviços que podem ser resolvidos de forma 100% digital." },
-              { icon: UserCog, title: "Portal do Servidor", desc: "Área restrita para funcionários da Câmara acessarem seus documentos e avisos." },
-              { icon: Sparkles, title: "O Futuro é Digital", desc: "Conheça nosso plano de expansão com novos serviços e funcionalidades para os próximos meses." },
+              { icon: Info, title: "Guia de Serviços Online", desc: "Reúna orientações para a população acessar serviços municipais e legislativos." },
+              { icon: Mic, title: "Participação Cidadã", desc: "Divulgue consultas, audiências e formas de contribuir com a gestão." },
+              { icon: Accessibility, title: "Acessibilidade Digital", desc: "Facilite o acesso ao portal para pessoas com diferentes necessidades." },
+              { icon: UserCog, title: "Gestão de Usuários", desc: "Administre os usuários internos que operam os módulos do portal." },
+              { icon: Lock, title: "Perfil e Permissões", desc: "Organize o acesso às áreas administrativas conforme o perfil de cada usuário." },
+              { icon: Smartphone, title: "Aplicativo Institucional", desc: "Leve notícias, serviços e canais de atendimento do órgão para o celular." },
+              { icon: Users, title: "Portal do Servidor", desc: "Disponibilize informações e avisos institucionais para as equipes do órgão." },
+              { icon: Bell, title: "Notificações no Aplicativo", desc: "Envie avisos e atualizações aos cidadãos pelo app institucional." },
+              { icon: Library, title: "Leis Municipais", desc: "Disponibilize leis e decretos municipais para consulta pública." },
+              { icon: Calendar, title: "Agenda de Sessões", desc: "Divulgue pautas e datas das sessões da Câmara Municipal." },
+              { icon: Video, title: "Sessões ao Vivo", desc: "Compartilhe a transmissão das sessões legislativas com a população." },
+              { icon: Users, title: "Perfil dos Vereadores", desc: "Apresente informações públicas sobre os parlamentares e seus mandatos." },
             ].map((item, i) => (
-              <ScrollReveal key={i} delay={i * 100} className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+              <ScrollReveal key={item.title} delay={i * 40} className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                 <item.icon className="w-8 h-8 text-slate-500 mb-4" />
                 <h3 className="font-bold text-lg mb-2">{item.title}</h3>
                 <p className="text-sm text-slate-500">{item.desc}</p>
@@ -216,11 +210,11 @@ export const PortalServicos: React.FC = () => {
       <section className="py-32 px-6 bg-white border-t border-slate-100">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-5xl md:text-6xl font-bold text-slate-900 mb-8 tracking-tight">
-            Modernize sua gestão.
+            Modernize o atendimento da sua prefeitura.
           </h2>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <Link to="/contact" className="px-10 py-4 bg-blue-600 text-white rounded-full font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-600/30">
-              Solicitar Orçamento
+              Solicitar demonstração
             </Link>
             <Link to="/products" className="px-10 py-4 text-slate-600 font-bold text-lg hover:bg-slate-50 rounded-full transition-all flex items-center">
               Ver todos os produtos <ChevronRight className="w-5 h-5 ml-1" />

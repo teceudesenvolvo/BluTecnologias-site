@@ -81,9 +81,9 @@ export const PortalLegislativo: React.FC = () => {
             A ponte entre o gabinete e a rua. Conectamos o Web e o Mobile em um ecossistema único.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <button className="px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2">
-              <Download size={20} /> Baixar o App
-            </button>
+            <a href="#mobile" className="px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2">
+              <Download size={20} /> Conhecer o aplicativo
+            </a>
             <Link to="/contact" className="px-8 py-4 bg-white text-slate-900 border border-slate-200 rounded-full font-bold text-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
               <Play size={20} /> Demo Parlamentar
             </Link>
