@@ -190,7 +190,7 @@ export const BluEscolar: React.FC = () => {
           <h2 className="mx-auto mt-4 max-w-4xl text-4xl font-black tracking-[-.05em] sm:text-6xl">Sua rede municipal pronta para uma gestão mais conectada?</h2>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-indigo-100">Converse com a Blu sobre os desafios da Secretaria de Educação e conheça uma proposta adequada à realidade do seu município.</p>
           <Link to="/contact" className="mt-8 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-white px-7 font-black text-indigo-900 transition hover:bg-indigo-50">Agendar apresentação <ArrowRight size={18} /></Link>
-          <div className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm font-semibold text-indigo-100"><Link to="/products/1" className="hover:text-white">Portal de Serviços</Link><Link to="/products/2" className="hover:text-white">Portal do Legislativo</Link><Link to="/products/3" className="hover:text-white">App da Câmara</Link><Link to="/products/cidades-ai" className="hover:text-white">Cidades AI</Link><Link to="/products" className="inline-flex items-center gap-1 text-white underline underline-offset-4">Todas as soluções <ArrowRight size={14} /></Link></div>
+          <div className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm font-semibold text-indigo-100"><Link to="/products/3" className="hover:text-white">App da Câmara</Link><Link to="/products/cidades-ai" className="hover:text-white">Cidades AI</Link><Link to="/products" className="inline-flex items-center gap-1 text-white underline underline-offset-4">Todas as soluções <ArrowRight size={14} /></Link></div>
         </div>
       </section>
     </main>

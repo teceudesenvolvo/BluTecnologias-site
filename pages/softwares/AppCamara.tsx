@@ -4,21 +4,13 @@ import { initialSoftwares } from '../../services/mockData';
 import AppCamaraImg from '../../assets/HomeAppCamara.png';
 import MulherAppCamaraImg from '../../assets/MulherAppCamara.png';
 import { 
-  ArrowLeft, 
   CheckCircle2, 
-  LayoutDashboard, 
   Landmark, 
-  Smartphone, 
   ChevronRight, 
-  Star,
   Zap,
   Shield,
-  Wifi,
-  FileText,
   MessageSquare,
   Users,
-  Download,
-  Info,
   AlertTriangle,
   ShoppingBag,
   HeartHandshake,
@@ -26,7 +18,6 @@ import {
   Tv,
   UserCheck,
   MousePointerClick,
-  Bell,
   Eye,
   TrendingUp,
   Quote,
@@ -34,6 +25,13 @@ import {
   HelpCircle,
   BarChart3
 } from 'lucide-react';
+
+const appModules = [
+  { group: 'Atendimento ao cidadão', items: ['Portal e Carta de Serviços', 'Balcão do Cidadão', 'Protocolo e Processos', 'Ouvidoria', 'e-SIC', 'Recepção e agendamentos', 'Mensagens e avaliações'] },
+  { group: 'Serviços especializados', items: ['PROCON', 'Procuradoria da Mulher e canal de acolhimento', 'Atendimento Jurídico', 'Apoio ao Microempreendedor'] },
+  { group: 'Legislativo e gabinetes', items: ['Gestão legislativa: matérias, tramitação, pautas, sessões e comissões', 'Vereadores e perfis parlamentares', 'Agenda, demandas e tarefas dos gabinetes', 'TV Câmara e transmissões', 'Notícias', 'Escola do Parlamento', 'PIEL — integração legislativa'] },
+  { group: 'Gestão e operação', items: ['Gestão de usuários e permissões', 'Notificações', 'Gestão Eletrônica de Documentos (GED)', 'Fiscalização de contratos e medições', 'Portal de empresas contratadas', 'Almoxarifado', 'Patrimônio e inventário', 'Manutenção preventiva e corretiva', 'Gestão de frotas', 'Controle interno e compliance', 'E-mail institucional e chatbot WhatsApp'] },
+];
 
 export const AppCamara: React.FC = () => {
   // ID fixo para o App da Câmara
@@ -58,12 +56,12 @@ export const AppCamara: React.FC = () => {
           
           <h1 className="text-6xl md:text-8xl font-bold tracking-tight mb-6">
             <span className="block text-slate-900 leading-tight">
-              Aproxime sua gestão <br/> dos cidadãos.
+              Câmara e cidadão conectados em uma única plataforma.
             </span>
           </h1>
           
           <p className="text-xl md:text-2xl text-slate-500 max-w-3xl mx-auto leading-relaxed mt-8 font-medium">
-            Ofereça aos seus cidadãos uma ferramenta poderosa para participação e acesso a serviços, enquanto sua gestão ganha dados estratégicos e otimiza o atendimento.
+            App da Câmara reúne Portal de Serviços e Portal do Legislativo em uma única solução: canais digitais para o cidadão, transparência legislativa e ferramentas de gestão configuráveis para Câmaras Municipais.
           </p>
 
           <div className="mt-12 flex justify-center gap-4">
@@ -146,7 +144,7 @@ export const AppCamara: React.FC = () => {
       <section id="features" className="bg-slate-900 py-32 text-white">
         <div className="max-w-7xl mx-auto px-6">
           <h2 className="text-4xl md:text-6xl font-bold mb-20 text-center">
-            Tudo o que você precisa.
+            Um ecossistema completo, organizado por módulos.
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -205,6 +203,23 @@ export const AppCamara: React.FC = () => {
                </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-[#f5f8fc] px-6 py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-sm font-black uppercase tracking-[.2em] text-blue-600">Uma solução integrada</p>
+            <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Serviços, Legislativo e operação no mesmo ambiente.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">Os módulos são administrados por equipes e permissões próprias. A Câmara configura os recursos que fazem parte da sua implantação, mantendo os canais públicos e a gestão conectados.</p>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-2">
+            {appModules.map(({ group, items }) => <article key={group} className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+              <h3 className="text-xl font-black text-slate-900">{group}</h3>
+              <ul className="mt-5 grid gap-3 sm:grid-cols-2">{items.map(item => <li key={item} className="flex gap-2 text-sm leading-6 text-slate-600"><CheckCircle2 size={17} className="mt-1 shrink-0 text-blue-600" />{item}</li>)}</ul>
+            </article>)}
+          </div>
+          <p className="mt-6 text-sm leading-6 text-slate-500">A disponibilidade de cada módulo pode variar conforme a contratação, habilitação e configuração do ambiente institucional.</p>
         </div>
       </section>
 
@@ -301,23 +316,23 @@ export const AppCamara: React.FC = () => {
       {/* 11. Depoimentos (Prova Social) */}
       <section className="py-32 px-6 bg-white">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">O que dizem os gestores</h2>
+          <h2 className="text-4xl font-bold text-center mb-16 text-slate-900">Exemplos de uso na rotina pública</h2>
           <div className="grid gap-8 md:grid-cols-2">
             <div className="bg-slate-50 p-8 rounded-3xl relative">
               <Quote className="absolute top-6 left-6 text-blue-200 w-10 h-10" />
               <p className="text-slate-700 italic mb-6 relative z-10 pt-6">
-                "Com o App, centralizamos a ouvidoria e reduzimos o tempo de resposta em 60%. Os relatórios nos dão uma visão clara dos principais problemas da cidade."
+                "A Câmara pode centralizar manifestações e acompanhar prazos e temas recorrentes em relatórios de gestão."
               </p>
-              <div className="font-bold text-slate-900">– Prefeito de Cidade Exemplo</div>
-              <div className="text-sm text-slate-500">Cliente Blu</div>
+              <div className="font-bold text-slate-900">Ouvidoria e acompanhamento</div>
+              <div className="text-sm text-slate-500">Exemplo de aplicação dos módulos</div>
             </div>
             <div className="bg-slate-50 p-8 rounded-3xl relative">
               <Quote className="absolute top-6 left-6 text-blue-200 w-10 h-10" />
               <p className="text-slate-700 italic mb-6 relative z-10 pt-6">
-                "A funcionalidade da Procuradoria da Mulher foi um marco. Conseguimos oferecer um canal seguro e eficiente, que era uma demanda antiga da nossa comunidade."
+                "Um canal reservado pode ajudar a organizar acolhimento e encaminhamentos da Procuradoria da Mulher."
               </p>
-              <div className="font-bold text-slate-900">– Vereadora de Vila Nova</div>
-              <div className="text-sm text-slate-500">Cliente Blu</div>
+              <div className="font-bold text-slate-900">Procuradoria da Mulher</div>
+              <div className="text-sm text-slate-500">Exemplo de aplicação dos módulos</div>
             </div>
           </div>
         </div>
@@ -363,19 +378,19 @@ export const AppCamara: React.FC = () => {
       {/* 14. Números de Impacto */}
       <section className="py-24 px-6 bg-blue-600 text-white">
         <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-12">Resultados que sua gestão pode alcançar</h2>
+          <h2 className="text-3xl font-bold mb-12">Acompanhe a evolução do atendimento público</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6">
-              <div className="text-5xl font-bold mb-2">+500</div>
-              <div className="text-blue-100 font-medium">Demandas atendidas este mês</div>
+              <div className="text-2xl font-bold mb-2">Demandas organizadas</div>
+              <div className="text-blue-100 font-medium">Solicitações reunidas em fluxos acompanháveis</div>
             </div>
             <div className="p-6 border-y md:border-y-0 md:border-x border-blue-500">
-              <div className="text-5xl font-bold mb-2">60%</div>
-              <div className="text-blue-100 font-medium">Redução no tempo de resposta</div>
+              <div className="text-2xl font-bold mb-2">Prazos acompanhados</div>
+              <div className="text-blue-100 font-medium">Visibilidade do andamento e das responsabilidades</div>
             </div>
             <div className="p-6">
-              <div className="text-5xl font-bold mb-2">100%</div>
-              <div className="text-blue-100 font-medium">Das sessões transmitidas em HD</div>
+              <div className="text-2xl font-bold mb-2">Canais integrados</div>
+              <div className="text-blue-100 font-medium">Serviços, Legislativo e comunicação em um só ecossistema</div>
             </div>
           </div>
         </div>

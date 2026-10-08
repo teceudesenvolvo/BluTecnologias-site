@@ -2,28 +2,12 @@ import { BlogPost, Software } from '../types';
 
 export const initialSoftwares: Software[] = [
   {
-    id: '1',
-    nome_produto: 'Portal de Serviços',
-    descricao_venda: 'Para prefeituras e câmaras municipais: centralize o atendimento ao cidadão, publique orientações e digitalize solicitações em um portal acessível.',
-    icone_3d: 'LayoutDashboard',
-    link_demo: '#',
-    features: ['Carta de Serviços', 'Protocolo Digital', 'Consulta de Processos']
-  },
-  {
-    id: '2',
-    nome_produto: 'Portal do Legislativo',
-    descricao_venda: 'Modernize a gestão legislativa e cumpra as leis de transparência com facilidade. Ofereça sessões ao vivo, pautas digitais e votação eletrônica segura.',
-    icone_3d: 'Landmark',
-    link_demo: '#',
-    features: ['Transmissão Ao Vivo', 'Gestão de Pautas', 'Portal da Transparência']
-  },
-  {
     id: '3',
     nome_produto: 'App da Câmara',
-    descricao_venda: 'Engaje o cidadão e fortaleça o mandato. Um canal direto de comunicação que oferece dados valiosos para a tomada de decisão e inclui módulos de serviços essenciais.',
+    descricao_venda: 'Um ecossistema digital integrado para Câmaras Municipais: aplicativo do cidadão, serviços públicos, transparência, gestão legislativa e rotinas administrativas em módulos configuráveis.',
     icone_3d: 'Smartphone',
     link_demo: '#',
-    features: ['Denúncias PROCON', 'Apoio à Mulher', 'Notificações Push']
+    features: ['Atendimento ao cidadão', 'Legislativo e transparência', 'Serviços e módulos administrativos']
   },
   {
     id: '4',
@@ -36,10 +20,10 @@ export const initialSoftwares: Software[] = [
   {
     id: '5',
     nome_produto: 'Cidades AI',
-    descricao_venda: 'Inteligência artificial aplicada à gestão pública para aproximar cidadãos, equipes e informações municipais com responsabilidade e transparência.',
+    descricao_venda: 'ERP municipal para integrar prefeitura e secretarias. Contrate por módulos, organize rotinas administrativas e amplie a plataforma conforme as prioridades do município.',
     icone_3d: 'Sparkles',
     link_demo: '#',
-    features: ['Atendimento digital assistido', 'Busca em informações oficiais', 'Apoio às equipes municipais']
+    features: ['ERP para prefeitura e secretarias', 'Módulos contratados por área', 'Gestão integrada e expansível']
   }
 ];
 

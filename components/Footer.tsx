@@ -19,9 +19,8 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-bold text-slate-800 mb-4">Produtos</h4>
             <ul className="space-y-2 text-sm text-slate-500">
-              <li><Link to="/products" className="hover:text-blue-600">Portal de Serviços</Link></li>
-              <li><Link to="/products" className="hover:text-blue-600">Portal do Legislativo</Link></li>
-              <li><Link to="/products" className="hover:text-blue-600">App da Câmara</Link></li>
+              <li><Link to="/products/3" className="hover:text-blue-600">App da Câmara</Link></li>
+              <li><Link to="/products/cidades-ai" className="hover:text-blue-600">Cidades AI</Link></li>
             </ul>
           </div>
 
