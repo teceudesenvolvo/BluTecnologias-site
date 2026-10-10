@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
-  FileCheck2,
   FileText,
   Boxes,
   Instagram,
@@ -120,6 +119,7 @@ export const Home: React.FC = () => {
               Agendar demonstração
             </Link>
           </div>
+          <Hero3DScene />
           <SalesOutcomePanel />
         </section>
 
@@ -316,6 +316,35 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
       </div>
     )}
   </header>
+);
+
+const Hero3DScene = () => (
+  <div aria-hidden="true" className="blu-3d-scene relative mt-12 h-[250px] w-full max-w-4xl sm:mt-16 sm:h-[320px]">
+    <div className="absolute left-1/2 top-1/2 h-52 w-[min(80vw,620px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-blue-500/20 via-cyan-300/25 to-indigo-400/20 blur-3xl" />
+    <div className="blu-3d-core absolute left-1/2 top-1/2 w-[min(76vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-white/80 bg-white/70 p-3 shadow-[0_36px_100px_rgba(15,60,140,.22)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-5 dark:border-white/15 dark:bg-slate-900/55">
+      <div className="rounded-[1.1rem] border border-slate-200/80 bg-white/80 p-4 shadow-inner sm:rounded-[1.5rem] sm:p-6 dark:border-white/10 dark:bg-slate-950/65">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><Boxes size={18}/></span><div className="text-left"><p className="text-xs font-black text-slate-900 dark:text-white sm:text-sm">Blu · Gestão conectada</p><p className="mt-0.5 text-[10px] font-semibold text-slate-400 sm:text-xs">Vendas, operação e financeiro</p></div></div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700 sm:px-3 sm:text-[10px] dark:bg-emerald-400/10 dark:text-emerald-300">Tudo integrado</span>
+        </div>
+        <div className="mt-4 grid grid-cols-[1.1fr_.9fr] gap-3 sm:mt-6 sm:gap-4">
+          <div className="rounded-xl border border-slate-100 bg-white/80 p-3 sm:rounded-2xl sm:p-4 dark:border-white/8 dark:bg-white/5">
+            <div className="flex items-center justify-between"><span className="text-[9px] font-bold text-slate-500 sm:text-xs">Visão da operação</span><TrendingUp size={14} className="text-blue-600"/></div>
+            <div className="mt-3 flex h-16 items-end gap-1.5 sm:h-24 sm:gap-2">{[34, 55, 44, 70, 54, 82, 64, 93, 73, 100, 79, 91].map((height,index)=><span key={index} className="blu-3d-chart-bar flex-1 rounded-t-sm bg-gradient-to-t from-blue-600 to-cyan-400" style={{height:`${height}%`, animationDelay:`${index*70}ms`}}/>)}</div>
+          </div>
+          <div className="grid gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 p-2.5 text-left sm:rounded-2xl sm:p-3 dark:border-white/8 dark:bg-white/5"><span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-200"><ShoppingCart size={14}/></span><div><p className="text-[9px] font-black text-slate-800 dark:text-white sm:text-[10px]">Venda</p><p className="text-[8px] text-slate-400 sm:text-[9px]">Pedido conectado</p></div></div>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 p-2.5 text-left sm:rounded-2xl sm:p-3 dark:border-white/8 dark:bg-white/5"><span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-400/10 dark:text-violet-200"><CalendarDays size={14}/></span><div><p className="text-[9px] font-black text-slate-800 dark:text-white sm:text-[10px]">Serviço</p><p className="text-[8px] text-slate-400 sm:text-[9px]">Agenda sincronizada</p></div></div>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 p-2.5 text-left sm:rounded-2xl sm:p-3 dark:border-white/8 dark:bg-white/5"><span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-200"><WalletCards size={14}/></span><div><p className="text-[9px] font-black text-slate-800 dark:text-white sm:text-[10px]">Financeiro</p><p className="text-[8px] text-slate-400 sm:text-[9px]">Atualizado na origem</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div className="blu-3d-float blu-3d-float-a absolute left-[2%] top-[22%] hidden items-center gap-2 rounded-2xl border border-white/80 bg-white/75 px-4 py-3 text-xs font-black text-slate-700 shadow-xl backdrop-blur-xl sm:flex dark:border-white/15 dark:bg-slate-900/75 dark:text-white"><Package size={16} className="text-blue-600"/>Estoque sincronizado</div>
+    <div className="blu-3d-float blu-3d-float-b absolute bottom-[14%] right-[1%] hidden items-center gap-2 rounded-2xl border border-white/80 bg-white/75 px-4 py-3 text-xs font-black text-slate-700 shadow-xl backdrop-blur-xl sm:flex dark:border-white/15 dark:bg-slate-900/75 dark:text-white"><ReceiptText size={16} className="text-cyan-600"/>Cobrança registrada</div>
+    <span className="blu-3d-orbit absolute left-[15%] top-[12%] h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_24px_rgba(34,211,238,.8)]" />
+    <span className="blu-3d-orbit blu-3d-orbit-delayed absolute bottom-[15%] left-[22%] h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,.8)]" />
+  </div>
 );
 
 const SalesOutcomePanel = () => {
