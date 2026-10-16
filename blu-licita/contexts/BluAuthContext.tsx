@@ -35,10 +35,16 @@ export const BluAuthProvider: React.FC<React.PropsWithChildren> = ({ children })
 
   const refreshMemberships = async () => {
     if (!user?.id) { setMemberships([]); return; }
-    const [linked, managed] = await Promise.all([
-      companyAccessService.listMyMemberships(user.id).catch(() => []),
-      companyAccessService.listManagedCompanies().catch(() => []),
-    ]);
+    let linked: CompanyMembership[] = [];
+    let managed: Awaited<ReturnType<typeof companyAccessService.listManagedCompanies>> = [];
+    // O usuário Blu é reidratado do localStorage antes do Firebase terminar de
+    // restaurar auth.currentUser. Não dispare Firestore/Callable sem sessão.
+    if (await companyAccessService.hasAuthenticatedSession(user.id)) {
+      [linked, managed] = await Promise.all([
+        companyAccessService.listMyMemberships(user.id).catch(() => []),
+        companyAccessService.listManagedCompanies().catch(() => []),
+      ]);
+    }
     const byCompany = new Map(linked.map((item) => [item.companyId, item]));
     managed.forEach((item) => {
       if (byCompany.has(item.id)) return;

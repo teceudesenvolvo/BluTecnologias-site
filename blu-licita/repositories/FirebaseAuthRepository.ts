@@ -13,7 +13,10 @@ const toBluUser = async (user: User): Promise<BluUser> => {
   let rememberedCompanyId = '';
   try { rememberedCompanyId = JSON.parse(localStorage.getItem('blu-licita:user') || 'null')?.companyId || ''; } catch {}
   const contextual = activeContextual.find((item: any) => item.companyId === rememberedCompanyId) || activeContextual[0];
-  const memberships = await getDocs(query(collection(db, 'companyUsers'), where('userId', '==', user.uid), limit(20)));
+  // A falha ao ler vínculos não deve invalidar uma autenticação já aceita pelo
+  // Firebase. O acesso aos módulos continua protegido pelas regras/autorização.
+  const memberships = await getDocs(query(collection(db, 'companyUsers'), where('userId', '==', user.uid), limit(20)))
+    .catch(() => ({ docs: [] as any[] }));
   const membershipDoc = memberships.docs.find((item) => item.data().companyId === rememberedCompanyId) || memberships.docs[0];
   const membership = contextual || membershipDoc?.data();
   const partners = await getDocs(query(collection(db, 'partnerUsers'), where('userId', '==', user.uid), limit(1))).catch(() => ({ docs: [] as any[] }));
@@ -33,7 +36,7 @@ const toBluUser = async (user: User): Promise<BluUser> => {
       billingCompanyId: String(userProfileData?.billingCompanyId || userProfileData?.primaryBillingCompanyId || partnerMembership.partnerId || partnerMembership.companyId || `partner-${user.uid}`),
     };
   }
-  const companyId = membership?.companyId || `company-${user.uid}`;
+  const companyId = membership?.companyId || userProfileData?.companyId || `company-${user.uid}`;
   const company = await getDoc(doc(db, 'companies', companyId)).catch(() => null);
   return {
     id: user.uid,
@@ -52,7 +55,7 @@ const toBluUser = async (user: User): Promise<BluUser> => {
 export class FirebaseAuthRepository implements AuthRepository {
   async signIn(email: string, password: string) {
     await setPersistence(auth, browserLocalPersistence);
-    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
     return await toBluUser(credential.user);
   }
 

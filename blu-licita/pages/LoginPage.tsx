@@ -4,6 +4,23 @@ import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 import { useBluAuth } from '../contexts/BluAuthContext';
 
+const loginErrorMessage = (error: unknown) => {
+  const code = (error as { code?: string } | null)?.code || '';
+  if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(code)) {
+    return 'E-mail ou senha incorretos. Confira os dados e tente novamente.';
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Não foi possível conectar ao serviço de login. Verifique sua internet e tente novamente.';
+  }
+  if (code === 'auth/user-disabled') {
+    return 'Esta conta está desativada. Entre em contato com o suporte.';
+  }
+  return 'Não foi possível concluir o login. Tente novamente ou contate o suporte.';
+};
+
 export const BluLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,8 +37,8 @@ export const BluLoginPage: React.FC = () => {
     try {
       await signIn(email, password);
       navigate('/admin/dashboard');
-    } catch {
-      setError('Falha no login. Verifique suas credenciais.');
+    } catch (reason) {
+      setError(loginErrorMessage(reason));
     } finally {
       setLoading(false);
     }

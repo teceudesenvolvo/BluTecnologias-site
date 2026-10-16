@@ -1,11 +1,51 @@
 import { httpsCallable } from 'firebase/functions';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { db, functions } from '../../services/firebase';
+import { auth, db, functions } from '../../services/firebase';
 import type { AccountantIdentity, CompanyMembership, CompanyPermissionMap, MembershipStatus } from '../domain/companyAccess';
 
-const call = <T, R>(name: string, payload: T) => httpsCallable<T, R>(functions, name)(payload).then((result) => result.data);
+const waitForAuthUser = (timeoutMs = 8000): Promise<User | null> => new Promise((resolve) => {
+  if (auth.currentUser) {
+    resolve(auth.currentUser);
+    return;
+  }
+
+  let unsubscribe: (() => void) | undefined;
+  const finish = (user: User | null) => {
+    clearTimeout(timer);
+    unsubscribe?.();
+    resolve(user);
+  };
+  const timer = window.setTimeout(() => finish(auth.currentUser), timeoutMs);
+  unsubscribe = onAuthStateChanged(auth, finish);
+});
+
+const authenticatedUser = async (expectedUid?: string) => {
+  const user = await waitForAuthUser();
+  if (!user) throw new Error('Sua sessão expirou. Entre novamente para continuar.');
+  if (expectedUid && user.uid !== expectedUid) {
+    throw new Error('A sessão autenticada não corresponde ao usuário atual. Entre novamente.');
+  }
+  // Garante que uma sessão persistida ainda consiga obter um token antes do
+  // SDK Callable enviar a requisição para a Cloud Function.
+  await user.getIdToken();
+  return user;
+};
+
+const call = async <T, R>(name: string, payload: T) => {
+  await authenticatedUser();
+  return httpsCallable<T, R>(functions, name)(payload).then((result) => result.data);
+};
 
 export const companyAccessService = {
+  async hasAuthenticatedSession(expectedUid: string): Promise<boolean> {
+    try {
+      await authenticatedUser(expectedUid);
+      return true;
+    } catch {
+      return false;
+    }
+  },
   async listMyMemberships(userId: string): Promise<CompanyMembership[]> {
     if (!userId) return [];
     const [snapshot, legacy] = await Promise.all([
