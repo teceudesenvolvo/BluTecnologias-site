@@ -72,8 +72,11 @@ import { ServicesPage } from "../pages/ServicesPage";
 import { ReceiptsPage } from "../pages/ReceiptsPage";
 
 const ProtectedLayout: React.FC = () => {
-  const { user } = useBluAuth();
+  const { user, authReady } = useBluAuth();
   const location = useLocation();
+  if (!authReady) {
+    return <div className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">Verificando sua sessão…</div>;
+  }
   return user ? (
     <AccountantCompanyProvider><BluAppLayout /></AccountantCompanyProvider>
   ) : (

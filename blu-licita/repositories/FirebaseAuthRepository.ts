@@ -3,6 +3,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from '../../services/firebase';
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
 import { db, ensureNoDuplicateRecord } from '../../services/firebase';
+import { firebaseClientConfigError } from '../../services/firebaseConfig';
 import type { BluUser } from '../types';
 import type { AuthRepository, PartnerSignupInput, TrialSignupInput } from './AuthRepository';
 import { defaultPublicPlans } from '../services/publicPlanCatalog';
@@ -54,6 +55,9 @@ const toBluUser = async (user: User): Promise<BluUser> => {
 
 export class FirebaseAuthRepository implements AuthRepository {
   async signIn(email: string, password: string) {
+    if (firebaseClientConfigError) {
+      throw Object.assign(new Error(firebaseClientConfigError), { code: 'auth/api-key-not-valid' });
+    }
     await setPersistence(auth, browserLocalPersistence);
     const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
     return await toBluUser(credential.user);

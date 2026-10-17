@@ -18,6 +18,16 @@ const loginErrorMessage = (error: unknown) => {
   if (code === 'auth/user-disabled') {
     return 'Esta conta está desativada. Entre em contato com o suporte.';
   }
+  if (code.startsWith('auth/api-key-not-valid') || code === 'auth/invalid-api-key') {
+    return 'A configuração Firebase deste ambiente está inválida. Configure a chave Web em VITE_FIREBASE_API_KEY.';
+  }
+  if (code === 'auth/invalid-email') return 'Confira o formato do e-mail informado.';
+  if (code === 'auth/operation-not-allowed' || code === 'auth/api-key-not-valid') {
+    return 'O serviço de autenticação está mal configurado. Avise o suporte da Blu.';
+  }
+  if (code.startsWith('auth/')) {
+    return `Falha no serviço de autenticação (${code.slice(5)}). Tente novamente ou contate o suporte.`;
+  }
   return 'Não foi possível concluir o login. Tente novamente ou contate o suporte.';
 };
 

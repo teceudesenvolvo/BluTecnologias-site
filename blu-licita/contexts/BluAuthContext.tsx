@@ -4,9 +4,11 @@ import { authService } from '../services/authService';
 import type { PartnerSignupInput, TrialSignupInput } from '../repositories/AuthRepository';
 import type { CompanyMembership } from '../domain/companyAccess';
 import { companyAccessService } from '../services/companyAccessService';
+import { auth, onAuthStateChanged } from '../../services/firebase';
 
 interface AuthContextValue {
   user: BluUser | null;
+  authReady: boolean;
   memberships: CompanyMembership[];
   switchCompany(companyId: string): Promise<void>;
   refreshMemberships(): Promise<void>;
@@ -26,12 +28,26 @@ export const BluAuthProvider: React.FC<React.PropsWithChildren> = ({ children })
     catch { return null; }
   });
   const [memberships, setMemberships] = useState<CompanyMembership[]>([]);
+  const [authReady, setAuthReady] = useState(() => user?.id === 'demo-user');
 
   const persist = (nextUser: BluUser | null) => {
     setUser(nextUser);
     if (nextUser) localStorage.setItem(storageKey, JSON.stringify(nextUser));
     else localStorage.removeItem(storageKey);
   };
+
+  React.useEffect(() => onAuthStateChanged(auth, (firebaseUser) => {
+    if (firebaseUser) {
+      if (user && user.id !== 'demo-user' && user.id !== firebaseUser.uid) persist(null);
+      setAuthReady(true);
+      return;
+    }
+
+    // A UI cache não é uma sessão. Sem usuário autenticado no Firebase, limpa
+    // o cache antigo para que telas protegidas não disparem chamadas anônimas.
+    if (user && user.id !== 'demo-user') persist(null);
+    setAuthReady(true);
+  }), [user?.id]);
 
   const refreshMemberships = async () => {
     if (!user?.id) { setMemberships([]); return; }
@@ -78,6 +94,7 @@ export const BluAuthProvider: React.FC<React.PropsWithChildren> = ({ children })
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
+    authReady,
     memberships,
     refreshMemberships,
     switchCompany: async (companyId) => {
@@ -91,7 +108,7 @@ export const BluAuthProvider: React.FC<React.PropsWithChildren> = ({ children })
     createTrialAccount: async (input) => persist(await authService.createTrialAccount(input)),
     createPartnerAccount: async (input) => persist(await authService.createPartnerAccount(input)),
     signOut: async () => { await authService.signOut(); persist(null); },
-  }), [user, memberships]);
+  }), [user, memberships, authReady]);
 
   return <BluAuthContext.Provider value={value}>{children}</BluAuthContext.Provider>;
 };
