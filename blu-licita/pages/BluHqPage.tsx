@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, Building2, CheckCircle2, CreditCard, DollarSign, Edit3, Headphones, Loader2, Megaphone, Plus, RefreshCw, Save, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowUpRight, Building2, CheckCircle2, CreditCard, DollarSign, Edit3, Eye, Headphones, Loader2, Megaphone, Plus, RefreshCw, Save, Search, Trash2, Users, X } from 'lucide-react';
 import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { hqService, type HqCustomerRow, type HqOverview } from '../services/hqService';
@@ -571,6 +571,7 @@ export const BluHqPage: React.FC = () => {
             <Metric icon={<Users />} label="Cadastros incompletos" value={String(data?.metrics.incompleteCustomers || 0)} detail="Empresas ou vínculos que ainda pedem revisão" tone="amber" />
             <Metric icon={<Users />} label="Parceiros" value={String(data?.metrics.partners || 0)} detail="Revendedores e parceiros cadastrados" />
             <Metric icon={<ArrowUpRight />} label="Movimentos de plano" value={`${String(data?.metrics.upgrades || 0)} / ${String(data?.metrics.downgrades || 0)}`} detail="Upgrades / downgrades registrados" />
+            <Metric icon={<Eye />} label="Acessos à apuração" value={String(data?.electionPageViews.total || 0)} detail={`${data?.electionPageViews.today || 0} hoje · ${data?.electionPageViews.last30Days || 0} nos últimos 30 dias`} />
           </section>}
 
           {activeTab === 'billing' && <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">

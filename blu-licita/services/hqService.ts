@@ -178,6 +178,7 @@ export type HqIncompleteCustomer = {
 };
 
 export type HqOverview = {
+  electionPageViews: { total: number; today: number; last30Days: number };
   tenants: HqCustomerRow[];
   incompleteCustomers: HqIncompleteCustomer[];
   partners: HqPartner[];
@@ -242,7 +243,7 @@ export const hqService = {
     if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
-    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners] = await Promise.all([
+    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners, electionViews] = await Promise.all([
       asList<HqCompany>('companies'),
       asList<HqSubscription>('subscriptions'),
       asList<HqPlan>('plans'),
@@ -254,7 +255,21 @@ export const hqService = {
       asList<any>('companyUsers').catch(() => []),
       asList<HqPlatformCustomer>('platformCustomers').catch(() => []),
       asList<HqPartner>('partners').catch(() => []),
+      asList<{ id: string; date?: string; count?: number }>('electionPageViews').catch(() => []),
     ]);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - 29);
+    const startDate = start.toISOString().slice(0, 10);
+    const electionPageViews = electionViews.reduce((totals, item) => {
+      const count = Math.max(0, Number(item.count || 0));
+      const date = item.date || item.id;
+      totals.total += count;
+      if (date === today) totals.today += count;
+      if (date >= startDate && date <= today) totals.last30Days += count;
+      return totals;
+    }, { total: 0, today: 0, last30Days: 0 });
 
     const activeMemberships = memberships.filter((membership) => !isDeletedRecord(membership) && String(membership.status || '').toLowerCase() !== 'inactive');
     const activePlatformCustomers = platformCustomers.filter((customer) => !isDeletedRecord(customer as any));
@@ -431,6 +446,7 @@ export const hqService = {
     const criticalCharges = orders.filter((order) => ['FAILED', 'EXPIRED', 'PENDING'].includes(String(order.status || '').toUpperCase())).length;
 
     return {
+      electionPageViews,
       tenants,
       members,
       prospects: realProspects,

@@ -10,6 +10,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'admin@blutecnologias.com.br';
     }
 
+    match /electionPageViews/{viewDate} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     function companyUser(companyId) {
       return isSignedIn() && (
         companyId == request.auth.uid ||

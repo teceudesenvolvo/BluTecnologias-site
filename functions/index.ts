@@ -4,6 +4,27 @@ import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer';
 import * as cors from 'cors';
 import * as https from 'https';
+
+export const recordElectionPageView = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ error: 'method-not-allowed' }); return; }
+  try {
+    const date = new Date().toISOString().slice(0, 10);
+    await admin.firestore().collection('electionPageViews').doc(date).set({
+      date,
+      count: admin.firestore.FieldValue.increment(1),
+      lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    res.status(204).send('');
+  } catch (error) {
+    console.error('Failed to record election page view', error);
+    res.status(500).json({ error: 'record-failed' });
+  }
+});
+
 export { mutateTaxRecord, commandTaxRecord } from './taxManagement';
 export { importBankStatement, commandReconciliation } from './reconciliation';
 export { commandBudget } from './budgets';
