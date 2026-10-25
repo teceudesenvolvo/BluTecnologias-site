@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, Building2, Landmark, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Building2, Landmark, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '../assets/LOGO BLU SISTEMAS_Prancheta 1 cópia.png';
 
@@ -28,7 +28,22 @@ const audienceCards = [
   },
 ] as const;
 
-export const AudienceGateway: React.FC = () => (
+export const AudienceGateway: React.FC = () => {
+  const [showWelcome, setShowWelcome] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      const hasSeenWelcome = window.localStorage.getItem('blu-welcome-seen');
+      if (!hasSeenWelcome) {
+        setShowWelcome(true);
+        window.localStorage.setItem('blu-welcome-seen', 'true');
+      }
+    } catch {
+      // Keep the gateway usable when browser storage is unavailable.
+    }
+  }, []);
+
+  return (
   <main className="relative min-h-screen overflow-hidden bg-[#030712] px-4 py-5 text-white sm:px-6">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(14,165,233,.22),transparent_38%)]" />
     <header className="relative z-10 mx-auto flex max-w-[1500px] items-center justify-between py-3">
@@ -59,5 +74,22 @@ export const AudienceGateway: React.FC = () => (
         </Link>
       ))}
     </section>
+
+    {showWelcome && <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/75 p-4 backdrop-blur-md" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowWelcome(false); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="welcome-title" className="relative my-auto w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/15 bg-gradient-to-br from-[#102844] via-[#0b1b30] to-[#07111f] p-7 text-white shadow-2xl shadow-black/50 sm:p-10">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl" />
+        <button type="button" onClick={() => setShowWelcome(false)} aria-label="Fechar apresentação" className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={18}/></button>
+        <div className="relative">
+          <span className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs font-black uppercase tracking-[.14em] text-sky-200"><Sparkles size={14}/>Bem-vindo à Blu</span>
+          <h2 id="welcome-title" className="mt-6 text-3xl font-black tracking-tight sm:text-4xl">Conheça a Blu Tecnologias</h2>
+          <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">Tecnologia para conectar operações, simplificar a gestão e aproximar pessoas. Escolha sua jornada para conhecer nossas soluções empresariais e públicas.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link to="/empresas" onClick={() => setShowWelcome(false)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-sky-400 px-5 py-3 text-sm font-black text-[#061321] transition hover:bg-sky-300">Conheça a Blu <ArrowRight size={16}/></Link>
+            <button type="button" onClick={() => setShowWelcome(false)} className="min-h-12 rounded-xl border border-white/15 px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/5">Continuar explorando</button>
+          </div>
+        </div>
+      </section>
+    </div>}
   </main>
-);
+  );
+};
