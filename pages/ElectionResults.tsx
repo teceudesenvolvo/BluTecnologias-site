@@ -1,5 +1,6 @@
 import React from "react";
-import { Activity, ExternalLink, RefreshCw } from "lucide-react";
+import { Activity, ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const TSE_RESULT_URL = "https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json";
 const TSE_HOME_URL = "https://resultados.tse.jus.br/oficial/app/index.html#/eleicao/6258/uf/br/cargo/1/vis/nominal/resultados";
@@ -32,10 +33,16 @@ export const ElectionResultsPage: React.FC = () => {
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [updatedAt, setUpdatedAt] = React.useState<Date | null>(null);
+  const [checkedAt, setCheckedAt] = React.useState<Date | null>(null);
+  const requestInFlight = React.useRef(false);
 
   const refresh = React.useCallback(async (signal?: AbortSignal) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     try {
-      const response = await fetch(TSE_RESULT_URL, { signal, cache: "no-cache" });
+      const url = new URL(TSE_RESULT_URL);
+      url.searchParams.set("_", String(Date.now()));
+      const response = await fetch(url, { signal, cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 404 ? "O TSE ainda não publicou o próximo boletim desta eleição." : `O TSE respondeu com status ${response.status}.`);
       const result = await response.json() as TseData;
       setData(result);
@@ -45,7 +52,9 @@ export const ElectionResultsPage: React.FC = () => {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       setError(cause instanceof Error ? cause.message : "Não foi possível consultar os dados do TSE.");
     } finally {
+      setCheckedAt(new Date());
       setLoading(false);
+      requestInFlight.current = false;
     }
   }, []);
 
@@ -68,9 +77,13 @@ export const ElectionResultsPage: React.FC = () => {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <a href="/" className="text-sm font-black tracking-[.12em] text-sky-300">BLU · ELEIÇÕES 2026</a>
-          <a href={TSE_HOME_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm font-bold text-white/85 transition hover:bg-white/10">
-            Resultado oficial do TSE <ExternalLink size={15}/>
-          </a>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <Link to="/empresas" className="hidden text-right sm:block"><span className="block text-xs font-black text-white">Blu Tecnologias</span><span className="text-[10px] text-slate-400">Soluções digitais para empresas e órgãos públicos</span></Link>
+            <Link to="/empresas" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-400 px-3 py-2.5 text-xs font-black text-[#061321] transition hover:bg-sky-300 sm:px-4 sm:text-sm">Conheça a Blu <ArrowRight size={14}/></Link>
+            <a href={TSE_HOME_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-white/85 transition hover:bg-white/10 sm:gap-2 sm:px-4 sm:text-sm">
+              Resultado oficial do TSE <ExternalLink size={14}/>
+            </a>
+          </div>
         </header>
 
         <section className="mt-10 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#102844] via-[#10213a] to-[#10192b] p-6 shadow-2xl sm:p-10">
@@ -112,7 +125,7 @@ export const ElectionResultsPage: React.FC = () => {
 
           <aside className="space-y-4">
             <div className="rounded-[1.5rem] border border-white/10 bg-[#0d1b2b] p-5"><h2 className="font-black">Resumo dos votos</h2><Stat label="Votos válidos" value={data?.v?.vv}/><Stat label="Brancos" value={data?.v?.vb}/><Stat label="Nulos" value={data?.v?.vn}/><Stat label="Total computado" value={data?.v?.tv}/></div>
-            <div className="rounded-[1.5rem] border border-sky-300/15 bg-sky-400/5 p-5"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.14em] text-sky-300"><RefreshCw size={14}/> Atualização automática</div><p className="mt-3 text-sm leading-6 text-slate-300">Consultamos a fonte oficial a cada minuto.</p><p className="mt-3 text-xs text-slate-400">Última consulta: {updatedAt ? updatedAt.toLocaleTimeString("pt-BR") : "—"}</p><p className="mt-1 text-xs text-slate-400">Boletim TSE: {resultDate}</p>{error && <p className="mt-3 rounded-lg bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">{error} <button onClick={() => { setLoading(true); void refresh(); }} className="ml-1 underline">Tentar novamente</button></p>}</div>
+            <div className="rounded-[1.5rem] border border-sky-300/15 bg-sky-400/5 p-5"><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.14em] text-sky-300"><RefreshCw size={14}/> Atualização automática</div><p className="mt-3 text-sm leading-6 text-slate-300">Consultamos os dados oficiais do TSE a cada minuto, sem reutilizar o cache do navegador.</p><p className="mt-3 text-xs text-slate-400">Última consulta: {checkedAt ? checkedAt.toLocaleTimeString("pt-BR") : "—"}</p><p className="mt-1 text-xs text-slate-400">Dados atualizados: {updatedAt ? updatedAt.toLocaleTimeString("pt-BR") : "aguardando primeiro boletim"}</p><p className="mt-1 text-xs text-slate-400">Boletim TSE: {resultDate}</p>{error && <p className="mt-3 rounded-lg bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">{error} <button onClick={() => { setLoading(true); void refresh(); }} className="ml-1 underline">Tentar novamente</button></p>}</div>
             <p className="px-1 text-xs leading-5 text-slate-500">Dados oficiais do TSE. A Blu apenas apresenta as informações publicadas pelo tribunal. Em caso de divergência, prevalece o portal oficial.</p>
           </aside>
         </section>
