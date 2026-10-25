@@ -1,11 +1,18 @@
 import React from "react";
 import { SecondRoundPartial } from "./SecondRoundPartial";
-import { Activity, ArrowRight, ExternalLink, RefreshCw, Search, X } from "lucide-react";
+import { Activity, ArrowRight, ExternalLink, RefreshCw, Search, Scale, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { trackPageView } from "../services/analytics";
 
 const TSE_CONFIG_URL = "https://resultados.tse.jus.br/oficial/comum/config/ele-c.json";
 const REFRESH_INTERVAL = 60_000;
+const APURACAO_HISTORY_KEY = "blu-election-apuracao-history-v1";
+const readApuracaoHistory = (): ApuracaoSnapshot[] => {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(APURACAO_HISTORY_KEY) || "[]");
+    return Array.isArray(stored) ? stored.filter((item) => item && (item.turn === 1 || item.turn === 2) && Number.isFinite(item.timestamp) && Array.isArray(item.candidates)) : [];
+  } catch { return []; }
+};
 const IBGE_STATE_CODES: Record<string, string> = { ac: "12", al: "27", ap: "16", am: "13", ba: "29", ce: "23", df: "53", es: "32", go: "52", ma: "21", mt: "51", ms: "50", mg: "31", pa: "15", pb: "25", pr: "41", pe: "26", pi: "22", rj: "33", rn: "24", rs: "43", ro: "11", rr: "14", sc: "42", sp: "35", se: "28", to: "17" };
 const STATE_CODES = [
   ["ac", "Acre"], ["al", "Alagoas"], ["ap", "Amapá"], ["am", "Amazonas"], ["ba", "Bahia"], ["ce", "Ceará"],
@@ -24,6 +31,7 @@ type TseData = {
   carg?: Array<{ cd?: string | number; agr?: Array<{ par?: Array<{ sg?: string; cand?: TseCandidate[] }> }> }>;
 };
 type StateResult = { uf: string; name: string; data: TseData; candidates: TseCandidate[] };
+type ApuracaoSnapshot = { timestamp: number; turn: 1 | 2; sections: number; candidates: Array<{ key: string; name: string; percent: number; votes: number }> };
 type Municipality = { code: string; name: string };
 type GeoFeature = { type: string; id?: string | number; properties?: Record<string, string | number>; geometry?: { type: string; coordinates: unknown } };
 type GeoCollection = { type: string; features: GeoFeature[] };
@@ -102,7 +110,11 @@ export const ElectionResultsPage: React.FC = () => {
   }, []);
   const dismissBluIntro = () => { setShowBluIntro(false); try { sessionStorage.setItem("blu-election-intro-dismissed", "1"); } catch { /* storage disabled */ } };
   const [showPartial, setShowPartial] = React.useState(false);
+  const [showComparison, setShowComparison] = React.useState(false);
   const [data, setData] = React.useState<TseData | null>(null);
+  const [comparisonData, setComparisonData] = React.useState<TseData | null>(null);
+  const [comparisonLoading, setComparisonLoading] = React.useState(false);
+  const [apuracaoHistory, setApuracaoHistory] = React.useState<ApuracaoSnapshot[]>(readApuracaoHistory);
   const [stateResults, setStateResults] = React.useState<StateResult[]>([]);
   const [selectedUf, setSelectedUf] = React.useState("ac");
   const [stateMap, setStateMap] = React.useState<GeoCollection | null>(null);
@@ -124,6 +136,18 @@ export const ElectionResultsPage: React.FC = () => {
   const electionId = electionCode(selectedTurn);
 
   React.useEffect(() => {
+    if (!showComparison) return;
+    const controller = new AbortController();
+    setComparisonLoading(true);
+    setComparisonData(null);
+    fetchResult(resultUrl("br", electionCode(selectedTurn === 1 ? 2 : 1)), controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setComparisonData(result); })
+      .catch(() => { if (!controller.signal.aborted) setComparisonData(null); })
+      .finally(() => { if (!controller.signal.aborted) setComparisonLoading(false); });
+    return () => controller.abort();
+  }, [showComparison, selectedTurn]);
+
+  React.useEffect(() => {
     if (pageViewTracked.current) return;
     pageViewTracked.current = true;
     void trackPageView("/eleicoes/apuracao", "Apuração presidencial · Blu Tecnologias");
@@ -136,6 +160,24 @@ export const ElectionResultsPage: React.FC = () => {
       const result = await fetchResult(resultUrl("br", electionId), signal);
       if (signal?.aborted) return;
       setData(result);
+      const snapshotCandidates = extractCandidates(result).map((candidate) => ({
+        key: String(candidate.n || candidate.nm || ""), name: candidate.nmu || candidate.nm || "Candidatura",
+        percent: number(candidate.pvap), votes: number(candidate.vap),
+      }));
+      const total = number(result.s?.ts);
+      const sections = number(result.s?.pst) || (total ? number(result.s?.st) / total * 100 : 0);
+      const snapshot: ApuracaoSnapshot = { timestamp: Date.now(), turn: selectedTurn, sections, candidates: snapshotCandidates };
+      setApuracaoHistory((previous) => {
+        const last = [...previous].reverse().find((item) => item.turn === selectedTurn);
+        const changed = !last || last.sections !== snapshot.sections || last.candidates.length !== snapshot.candidates.length || snapshot.candidates.some((candidate) => {
+          const old = last.candidates.find((item) => item.key === candidate.key);
+          return !old || old.percent !== candidate.percent || old.votes !== candidate.votes;
+        });
+        if (!changed) return previous;
+        const next = [...previous, snapshot].slice(-1000);
+        try { window.localStorage.setItem(APURACAO_HISTORY_KEY, JSON.stringify(next)); } catch { /* O histórico da sessão continua disponível em memória. */ }
+        return next;
+      });
       setError("");
       setUpdatedAt(new Date());
       const stateFiles = await Promise.all(STATE_CODES.map(async ([uf, name]) => {
@@ -156,7 +198,7 @@ export const ElectionResultsPage: React.FC = () => {
       setLoading(false);
       requestInFlight.current = false;
     }
-  }, [electionId]);
+  }, [electionId, selectedTurn]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -280,6 +322,15 @@ export const ElectionResultsPage: React.FC = () => {
     ? candidates.find((candidate) => Boolean(candidate.st && /^eleito(?:\b| por)/i.test(candidate.st)))
     : undefined;
   const selectedState = stateResults.find((state) => state.uf === selectedUf);
+  const stateVoteRanking = [...stateResults]
+    .map((state) => {
+      const totalSections = number(state.data.s?.ts);
+      const countedSections = number(state.data.s?.st);
+      const progress = number(state.data.s?.pst) || (totalSections ? countedSections / totalSections * 100 : 0);
+      return { ...state, totalVotes: number(state.data.v?.tv), progress };
+    })
+    .filter((state) => state.totalVotes > 0)
+    .sort((a, b) => b.progress - a.progress || a.name.localeCompare(b.name, "pt-BR"));
   const selectedStateName = STATE_CODES.find(([uf]) => uf === selectedUf)?.[1] || selectedUf.toUpperCase();
   const stateCandidatesAlphabetical = selectedState?.candidates.slice().sort((a, b) => (a.nmu || a.nm || "").localeCompare(b.nmu || b.nm || "", "pt-BR")) || [];
   const visibleMunicipalities = municipalities.filter((municipality) => municipality.name.toLocaleLowerCase("pt-BR").includes(municipalityQuery.toLocaleLowerCase("pt-BR")));
@@ -288,6 +339,13 @@ export const ElectionResultsPage: React.FC = () => {
   const sectionPercent = number(data?.s?.pst) || (totalSections ? countedSections / totalSections * 100 : 0);
   const isFinal = data?.and === "f" || data?.tf === "s";
   const resultDate = data?.dg && data?.hg ? `${data.dg} às ${data.hg}` : "aguardando primeiro boletim";
+  const turnHistory = apuracaoHistory.filter((snapshot) => snapshot.turn === selectedTurn);
+  const latestSnapshot = turnHistory[turnHistory.length - 1];
+  const trackedCandidates = candidates.length
+    ? candidates.slice(0, selectedTurn === 2 ? 2 : 5).map((candidate) => ({ key: String(candidate.n || candidate.nm || ""), name: candidate.nmu || candidate.nm || "Candidatura" }))
+    : (latestSnapshot?.candidates.slice().sort((a, b) => b.votes - a.votes).slice(0, selectedTurn === 2 ? 2 : 5).map(({ key, name }) => ({ key, name })) || []);
+  const historyMax = Math.max(100, ...turnHistory.flatMap((snapshot) => snapshot.candidates.map((candidate) => candidate.percent)));
+  const historyColors = ["#38bdf8", "#c4b5fd", "#34d399", "#fbbf24", "#fb7185"];
 
   return (
     <main className="min-h-screen bg-[#07111f] px-4 py-8 text-white sm:px-6 lg:py-12">
@@ -320,13 +378,38 @@ export const ElectionResultsPage: React.FC = () => {
 
         <nav aria-label="Turno da eleição" className="mt-7 inline-flex flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-[#0d1b2b] p-1.5">
           {([1, 2] as const).map((turn) => {
-            const active = !showPartial && selectedTurn === turn;
-            return <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); }} aria-pressed={active} className={`rounded-xl px-5 py-3 text-sm font-black transition ${active ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${active ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>;
+            const active = !showPartial && !showComparison && selectedTurn === turn;
+            return <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); setShowComparison(false); }} aria-pressed={active} className={`rounded-xl px-5 py-3 text-sm font-black transition ${active ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${active ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>;
           })}
-          <button type="button" onClick={() => { setSelectedTurn(2); setShowPartial(true); }} aria-pressed={showPartial} className={`ml-1 rounded-xl border px-5 py-3 text-sm font-black transition ${showPartial ? "border-amber-300/40 bg-amber-300 text-[#221600] shadow-lg" : "border-amber-300/20 text-amber-200 hover:bg-amber-300/10"}`}>Parcial 2º turno · exterior</button>
+          <button type="button" onClick={() => { setShowComparison(true); setShowPartial(false); }} aria-pressed={showComparison} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${showComparison ? "border-violet-300/40 bg-violet-300 text-[#160b2b] shadow-lg" : "border-violet-300/20 text-violet-200 hover:bg-violet-300/10"}`}><Scale size={15}/>Comparativo</button>
+          <button type="button" onClick={() => { setSelectedTurn(2); setShowComparison(false); setShowPartial(true); }} aria-pressed={showPartial} className={`ml-1 rounded-xl border px-5 py-3 text-sm font-black transition ${showPartial ? "border-amber-300/40 bg-amber-300 text-[#221600] shadow-lg" : "border-amber-300/20 text-amber-200 hover:bg-amber-300/10"}`}>Parcial 2º turno · exterior</button>
         </nav>
 
-        {showPartial ? <SecondRoundPartial /> : <>
+        {showPartial ? <SecondRoundPartial /> : showComparison ? <>
+          <section className="mt-10 rounded-[2rem] border border-violet-300/20 bg-gradient-to-br from-[#21183a] via-[#151d35] to-[#10192b] p-6 shadow-2xl sm:p-9">
+            <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-violet-200"><Scale size={15}/>Comparação de resultados oficiais</p>
+            <h1 className="mt-3 text-3xl font-black sm:text-4xl">Comparativo entre os turnos</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Valores publicados pelo TSE para cada turno. A variação em votos é calculada como 2º turno menos 1º turno; percentuais usam os votos válidos de cada turno.</p>
+          </section>
+          {(() => {
+            const firstTurn = selectedTurn === 1 ? data : comparisonData;
+            const secondTurn = selectedTurn === 2 ? data : comparisonData;
+            const firstCandidates = firstTurn ? extractCandidates(firstTurn) : [];
+            const secondCandidates = secondTurn ? extractCandidates(secondTurn) : [];
+            const byNumber = new Map<string, { first?: TseCandidate; second?: TseCandidate }>();
+            firstCandidates.forEach((candidate) => { const key = String(candidate.n || candidate.nm || ""); byNumber.set(key, { ...byNumber.get(key), first: candidate }); });
+            secondCandidates.forEach((candidate) => { const key = String(candidate.n || candidate.nm || ""); byNumber.set(key, { ...byNumber.get(key), second: candidate }); });
+            const secondTurnCandidates = secondCandidates.length ? secondCandidates : firstCandidates;
+            const rows = secondTurnCandidates.slice(0, 2).map((candidate) => byNumber.get(String(candidate.n || candidate.nm || "")) || { second: candidate });
+            const delta = (second: string | number | undefined, first: string | number | undefined) => number(second) - number(first);
+            const formatDelta = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${integer(Math.abs(value))}`;
+            return <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Presidência · Brasil</p><h2 className="mt-1 text-xl font-black">Votos por candidatura</h2></div><span className="text-xs text-slate-400">1º turno × 2º turno</span></div>
+              {comparisonLoading && !comparisonData ? <p className="py-12 text-center text-sm text-slate-400">Consultando dados do outro turno no TSE…</p> : rows.length ? <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-400"><th className="px-3 py-3 font-semibold">Candidatura</th><th className="px-3 py-3 text-right font-semibold">1º turno · votos</th><th className="px-3 py-3 text-right font-semibold">1º turno · %</th><th className="px-3 py-3 text-right font-semibold">2º turno · votos</th><th className="px-3 py-3 text-right font-semibold">2º turno · %</th><th className="px-3 py-3 text-right font-semibold">Variação em votos</th></tr></thead><tbody>{rows.map(({ first, second }) => { const candidate = second || first!; const change = delta(second?.vap, first?.vap); return <tr key={candidate.n || candidate.nm} className="border-b border-white/5 last:border-0"><th scope="row" className="px-3 py-4 font-semibold">{candidate.nmu || candidate.nm || "Candidatura"}<span className="ml-2 text-xs text-slate-500">{candidate.sg || (candidate.n ? `nº ${candidate.n}` : "")}</span></th><td className="px-3 py-4 text-right tabular-nums">{first ? integer(first.vap) : "—"}</td><td className="px-3 py-4 text-right tabular-nums text-slate-300">{first ? percent(first.pvap) : "—"}</td><td className="px-3 py-4 text-right tabular-nums">{second ? integer(second.vap) : "—"}</td><td className="px-3 py-4 text-right tabular-nums text-slate-300">{second ? percent(second.pvap) : "—"}</td><td className={`px-3 py-4 text-right font-bold tabular-nums ${change > 0 ? "text-sky-300" : change < 0 ? "text-amber-200" : "text-slate-300"}`}>{first && second ? formatDelta(change) : "—"}</td></tr>; })}</tbody><tfoot><tr className="border-t border-white/10 font-bold"><th className="px-3 py-4">Votos válidos</th><td className="px-3 py-4 text-right tabular-nums">{firstTurn?.v?.vv ? integer(firstTurn.v.vv) : "—"}</td><td></td><td className="px-3 py-4 text-right tabular-nums">{secondTurn?.v?.vv ? integer(secondTurn.v.vv) : "—"}</td><td></td><td className="px-3 py-4 text-right tabular-nums">{firstTurn?.v?.vv && secondTurn?.v?.vv ? formatDelta(delta(secondTurn.v.vv, firstTurn.v.vv)) : "—"}</td></tr></tfoot></table></div> : <p className="py-12 text-center text-sm text-slate-400">Os resultados de um ou dos dois turnos ainda não estão disponíveis no TSE.</p>}
+              <p className="mt-5 border-t border-white/8 pt-4 text-xs leading-5 text-slate-500">Fonte: arquivos oficiais de resultados do TSE. Diferenças entre turnos refletem totais de votações distintas e não indicam transferência individual de votos.</p>
+            </section>;
+          })()}
+        </> : <>
         <section className="mt-10 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#102844] via-[#10213a] to-[#10192b] p-6 shadow-2xl sm:p-10">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
@@ -376,6 +459,54 @@ export const ElectionResultsPage: React.FC = () => {
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Gráfico nacional</p><h2 className="mt-1 text-xl font-black">Votos por candidatura</h2></div><span className="text-xs text-slate-400">Percentual dos votos computados</span></div>
           {candidates.length ? <div className="mt-5 space-y-5">{candidates.map((candidate, index) => <div key={`chart-${candidate.n}-${candidate.nm}`} className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)_130px] sm:items-center"><div className="min-w-0"><span className="block truncate text-sm font-bold">{candidate.nmu || candidate.nm}</span><span className="text-xs text-slate-400">{candidate.sg || `Número ${candidate.n || "—"}`}</span></div><div className="h-4 overflow-hidden rounded-full bg-white/8"><div className={`h-full rounded-full transition-all ${index === 0 ? "bg-sky-400" : "bg-violet-400"}`} style={{ width: `${Math.max(number(candidate.pvap) ? Math.min(number(candidate.pvap), 100) : 0, 0)}%` }}/></div><div className="flex justify-between gap-2 text-sm tabular-nums sm:block sm:text-right"><strong>{percent(candidate.pvap)}</strong><span className="ml-2 text-slate-400">{integer(candidate.vap)} votos</span></div></div>)}</div>
             : <p className="py-8 text-center text-sm text-slate-400">O gráfico será preenchido quando o TSE publicar a votação.</p>}
+        </section>
+
+        <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7" aria-labelledby="apuracao-history-title">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5">
+            <div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Evolução da apuração</p><h2 id="apuracao-history-title" className="mt-1 text-xl font-black">Percentual de votos ao longo do tempo</h2></div>
+            <span className="text-xs text-slate-400">{turnHistory.length} capturas salvas · {selectedTurn}º turno</span>
+          </div>
+          {turnHistory.length > 1 && trackedCandidates.length ? <>
+            <div className="mt-5 overflow-x-auto">
+              <svg viewBox="0 0 900 300" className="h-64 min-w-[680px] w-full" role="img" aria-label={`Evolução dos percentuais de votação nas últimas ${turnHistory.length} capturas do ${selectedTurn}º turno`}>
+                {[0, 25, 50, 75, 100].map((tick) => { const y = 270 - tick / historyMax * 240; return <g key={tick}><line x1="58" x2="885" y1={y} y2={y} stroke="rgba(255,255,255,.08)"/><text x="48" y={y + 4} textAnchor="end" fill="#94a3b8" fontSize="11">{tick}%</text></g>; })}
+                {trackedCandidates.map((candidate, candidateIndex) => {
+                  const points = turnHistory.map((snapshot, index) => {
+                    const value = snapshot.candidates.find((item) => item.key === candidate.key)?.percent;
+                    const x = 58 + index / (turnHistory.length - 1) * 827;
+                    return { x, y: 270 - (value ?? 0) / historyMax * 240, value, snapshot };
+                  }).filter((point) => point.value !== undefined);
+                  if (!points.length) return null;
+                  const path = points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+                  return <g key={candidate.key}><path d={path} fill="none" stroke={historyColors[candidateIndex]} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>{points.map((point) => <circle key={`${point.snapshot.timestamp}-${candidate.key}`} cx={point.x} cy={point.y} r="4" fill={historyColors[candidateIndex]}><title>{`${candidate.name}: ${percent(point.value)} · ${new Date(point.snapshot.timestamp).toLocaleString("pt-BR")}`}</title></circle>)}</g>;
+                })}
+                <text x="58" y="294" fill="#94a3b8" fontSize="11">{new Date(turnHistory[0].timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</text>
+                <text x="885" y="294" textAnchor="end" fill="#94a3b8" fontSize="11">{new Date(turnHistory[turnHistory.length - 1].timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</text>
+              </svg>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">{trackedCandidates.map((candidate, index) => <span key={candidate.key} className="inline-flex items-center gap-2 text-xs text-slate-300"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: historyColors[index] }}/>{candidate.name}</span>)}</div>
+            <p className="mt-4 text-xs leading-5 text-slate-500">Capturas dos arquivos oficiais do TSE salvas neste navegador quando os resultados mudam. A consulta ocorre a cada minuto e o histórico permanece disponível neste dispositivo.</p>
+          </> : <div className="py-10 text-center"><p className="text-sm font-semibold text-slate-300">{turnHistory.length ? "Aguardando mudanças nos resultados para desenhar a evolução." : "O gráfico será criado após a primeira captura dos dados do TSE."}</p><p className="mt-2 text-xs text-slate-500">As capturas são salvas neste navegador quando os resultados mudam.</p></div>}
+        </section>
+
+        <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7" aria-labelledby="state-votes-title">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5">
+            <div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Apuração por UF</p><h2 id="state-votes-title" className="mt-1 text-xl font-black">Percentual apurado por estado</h2></div>
+            <span className="text-xs text-slate-400">Ordenado por seções totalizadas · {stateVoteRanking.length} UFs</span>
+          </div>
+          {stateVoteRanking.length ? <div className="mt-6 space-y-3" role="list" aria-label="Estados ordenados por votos apurados">
+            {stateVoteRanking.map((state) => {
+              const progress = state.progress;
+              return <div key={state.uf} role="listitem" className="grid grid-cols-[minmax(74px,110px)_minmax(0,1fr)_auto] items-center gap-3 sm:gap-5">
+                <div className="min-w-0"><span className="block truncate text-sm font-bold">{state.name}</span><span className="text-[10px] font-black uppercase text-slate-500">{state.uf}</span></div>
+                <div className="h-5 overflow-hidden rounded-md bg-white/8" role="progressbar" aria-label={`${state.name}: ${percent(progress)} das seções totalizadas`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(progress, 100)}>
+                  <div className="h-full min-w-1 rounded-md bg-gradient-to-r from-sky-600 to-sky-300 transition-all" style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }} />
+                </div>
+                <div className="w-24 text-right sm:w-36"><strong className="block text-sm tabular-nums sm:text-base">{percent(progress)}</strong><span className="text-[10px] text-slate-500 sm:text-xs">{integer(state.data.s?.st)} / {integer(state.data.s?.ts)} seções</span></div>
+              </div>;
+            })}
+          </div> : <p className="py-8 text-center text-sm text-slate-400">Os dados estaduais serão exibidos assim que o TSE publicar os arquivos de apuração.</p>}
+          <p className="mt-5 border-t border-white/8 pt-4 text-xs text-slate-500">Barras proporcionais ao percentual de seções totalizadas em cada estado. Dados oficiais do TSE, atualizados junto com a apuração.</p>
         </section>
 
         <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7">
