@@ -94,7 +94,12 @@ function extractCandidates(data: TseData): TseCandidate[] {
 
 export const ElectionResultsPage: React.FC = () => {
   const [selectedTurn, setSelectedTurn] = React.useState<1 | 2>(2);
-  const [showBluIntro, setShowBluIntro] = React.useState(() => { try { return sessionStorage.getItem("blu-election-intro-dismissed") !== "1"; } catch { return true; } });
+  const [showBluIntro, setShowBluIntro] = React.useState(false);
+  React.useEffect(() => {
+    try { if (sessionStorage.getItem("blu-election-intro-dismissed") === "1") return; } catch { /* storage disabled */ }
+    const timer = window.setTimeout(() => setShowBluIntro(true), 60_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const dismissBluIntro = () => { setShowBluIntro(false); try { sessionStorage.setItem("blu-election-intro-dismissed", "1"); } catch { /* storage disabled */ } };
   const [showPartial, setShowPartial] = React.useState(false);
   const [data, setData] = React.useState<TseData | null>(null);
