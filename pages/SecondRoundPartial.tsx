@@ -40,6 +40,32 @@ export const SecondRoundPartial: React.FC = () => (
           </div>
         ))}
       </div>
+      <div className="mt-7 rounded-2xl border border-white/10 bg-black/15 p-5 sm:p-6">
+        <h2 className="text-lg font-black">Comparativo de votos por candidato</h2>
+        <p className="mt-1 text-xs text-slate-400">Distribuição dos votos válidos da parcial do exterior — não é uma previsão nacional</p>
+        <div className="mt-6 space-y-6">
+          {preliminary.votes.map((candidate, index) => {
+            const share = total > 0 ? candidate.votes / total * 100 : 0;
+            return (
+              <div key={candidate.name}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-bold">{candidate.name}</span>
+                  <span className="tabular-nums text-slate-200">{format(candidate.votes)} votos · {share.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
+                </div>
+                <div className="h-5 overflow-hidden rounded-lg bg-white/10" role="progressbar" aria-label={`Participação de ${candidate.name} na parcial do exterior`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}>
+                  <div className={`h-full rounded-lg ${index === 0 ? "bg-sky-400" : "bg-amber-400"}`} style={{ width: `${share}%` }}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-5 rounded-2xl border border-white/10 bg-[#0d1b2b] p-5 sm:p-6">
+        <h2 className="text-lg font-black">Projeção de resultado nacional</h2>
+        <p className="mt-2 text-xl font-black text-amber-200">Indisponível com os dados atuais</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">A votação antecipada do exterior não constitui uma amostra representativa do eleitorado nacional. Uma extrapolação simples poderia produzir um vencedor fictício. O gráfico acima mostra somente a distribuição observada nos boletins incluídos nesta parcial.</p>
+        <p className="mt-2 text-xs text-slate-400">Consulte a aba “2º turno” para acompanhar os resultados nacionais publicados pelo TSE.</p>
+      </div>
       <div className="mt-6 space-y-2 text-sm text-slate-300">
         <p><strong className="text-white">Abrangência:</strong> {preliminary.coverage}.</p>
         <p><strong className="text-white">Horário do levantamento:</strong> {preliminary.capturedAt}.</p>
