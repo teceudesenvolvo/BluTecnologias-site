@@ -1,4 +1,5 @@
 import React from "react";
+import { SecondRoundPartial } from "./SecondRoundPartial";
 import { Activity, ArrowRight, ExternalLink, RefreshCw, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { trackPageView } from "../services/analytics";
@@ -93,6 +94,7 @@ function extractCandidates(data: TseData): TseCandidate[] {
 
 export const ElectionResultsPage: React.FC = () => {
   const [selectedTurn, setSelectedTurn] = React.useState<1 | 2>(2);
+  const [showPartial, setShowPartial] = React.useState(false);
   const [data, setData] = React.useState<TseData | null>(null);
   const [stateResults, setStateResults] = React.useState<StateResult[]>([]);
   const [selectedUf, setSelectedUf] = React.useState("ac");
@@ -308,9 +310,11 @@ export const ElectionResultsPage: React.FC = () => {
         </header>
 
         <nav aria-label="Turno da eleição" className="mt-7 inline-flex rounded-2xl border border-white/10 bg-[#0d1b2b] p-1.5">
-          {([1, 2] as const).map((turn) => <button key={turn} type="button" onClick={() => setSelectedTurn(turn)} aria-pressed={selectedTurn === turn} className={`rounded-xl px-5 py-3 text-sm font-black transition ${selectedTurn === turn ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${selectedTurn === turn ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>)}
+          {([1, 2] as const).map((turn) => <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); }} aria-pressed={!showPartial && selectedTurn === turn} className={`rounded-xl px-5 py-3 text-sm font-black transition ${selectedTurn === turn ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${selectedTurn === turn ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>)}
+          <button type="button" onClick={() => { setSelectedTurn(2); setShowPartial(true); }} aria-pressed={showPartial} className={`rounded-xl px-5 py-3 text-sm font-black transition ${showPartial ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>Parcial 2º turno</button>
         </nav>
 
+        {showPartial ? <SecondRoundPartial /> : <>
         <section className="mt-10 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#102844] via-[#10213a] to-[#10192b] p-6 shadow-2xl sm:p-10">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
@@ -409,6 +413,7 @@ export const ElectionResultsPage: React.FC = () => {
             </div>
           </div>
         </section>
+        </>}
         <footer className="mt-8 text-center text-xs text-slate-500">Fontes: <a className="underline hover:text-slate-300" href={TSE_CONFIG_URL} target="_blank" rel="noreferrer">arquivos oficiais de resultados do TSE</a> · <a className="underline hover:text-slate-300" href="https://servicodados.ibge.gov.br/api/docs/malhas?versao=3" target="_blank" rel="noreferrer">malha geográfica do IBGE</a> · Eleição {electionId} · Cargo 1</footer>
       </div>
     </main>
