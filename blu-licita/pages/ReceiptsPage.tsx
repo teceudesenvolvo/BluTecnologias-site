@@ -9,6 +9,31 @@ import { companySettingsService } from "../../services/firestoreSettingsService"
 type ReceiptItem = { id: string; description: string; quantity: number; unitPriceCents: number; type: "product" | "service" };
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const money = (cents: number) => brl.format(Number(cents || 0) / 100);
+const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character]!));
+const companyLogoUrl = (company: any) => company?.logoUrl || company?.logo || company?.brandLogoUrl || company?.imageUrl || "";
+const companyAddress = (company: any) => [
+  [company?.logradouro, company?.numero].filter(Boolean).join(", "),
+  company?.complemento,
+  company?.bairro,
+  [company?.cep, [company?.municipio || company?.city, company?.uf || company?.state].filter(Boolean).join("/")].filter(Boolean).join(" · "),
+  company?.address,
+].filter(Boolean).join(" · ");
+const imageToDataUrl = async (url: string) => {
+  if (!url || url.startsWith("data:")) return url;
+  try {
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return url;
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+};
 const label = (item: any) => {
   // Para pessoas jurídicas, o recibo deve identificar a empresa pela Razão Social.
   if (item?.cnpj || item?.documentType === "cnpj" || item?.type === "company") {
@@ -68,13 +93,28 @@ export const ReceiptsPage = () => {
     setItems((current) => [...current, { id: crypto.randomUUID(), description: manualItem.description.trim(), quantity: Math.max(1, Number(manualItem.quantity || 1)), unitPriceCents: Math.round(Number(String(manualItem.unitPrice).replace(",", ".") || 0) * 100), type: "product" }]);
     setManualItem({ description: "", quantity: 1, unitPrice: "" });
   };
-  const openDocument = (receipt: any) => {
-    const popup = window.open("", "_blank", "noopener,noreferrer");
+  const openDocument = async (receipt: any) => {
+    // Keep a handle to the popup so the document can be written after opening.
+    // noopener may make window.open return null in modern browsers, even when
+    // the new tab was opened successfully.
+    const popup = window.open("", "_blank");
     if (!popup) return setNotice("Permita pop-ups para imprimir o recibo.");
-    const rows = receipt.items.map((item: ReceiptItem) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${money(item.unitPriceCents)}</td><td>${money(item.quantity * item.unitPriceCents)}</td></tr>`).join("");
+    const items: ReceiptItem[] = Array.isArray(receipt.items) ? receipt.items : [];
+    const client = receipt.client || {};
+    const rows = items.map((item) => `<tr><td>${escapeHtml(item.description)}</td><td>${Number(item.quantity) || 0}</td><td>${money(item.unitPriceCents)}</td><td>${money((Number(item.quantity) || 0) * (Number(item.unitPriceCents) || 0))}</td></tr>`).join("");
     const company = receipt.company || {};
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${receipt.code}</title><style>body{font:14px Arial;max-width:760px;margin:40px auto;color:#172033}header{border-bottom:3px solid #0ea5e9;padding-bottom:16px;margin-bottom:24px}h1{font-size:24px}table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}.total{font-size:20px;font-weight:bold;text-align:right;margin-top:24px}.muted{color:#64748b}</style></head><body><header><h2>${company.razaoSocial || company.nomeFantasia || "Empresa emissora"}</h2><p class="muted">CNPJ: ${company.cnpj || company.document || "não informado"} · ${company.email || ""}</p></header><h1>RECIBO</h1><p><b>${receipt.code}</b><br>${new Date(receipt.createdAt).toLocaleDateString("pt-BR")}</p><p>Recebemos de <b>${receipt.client.name || "Cliente avulso"}</b>${receipt.client.document ? ` — ${receipt.client.document}` : ""}${receipt.client.email ? ` — ${receipt.client.email}` : ""}.</p><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><p class="total">Total recebido: ${money(receipt.totalCents)}</p><p>Documento emitido pelo Sistema de Gestão Blu Tecnologias.</p><script>setTimeout(()=>window.print(),200)<\\/script></body></html>`);
+    const logo = await imageToDataUrl(companyLogoUrl(company));
+    const address = companyAddress(company);
+    const phone = company.telefoneCelular || company.telefoneFixo || company.phone || "";
+    const companyName = company.razaoSocial || company.nomeFantasia || company.name || "Empresa emissora";
+    const companyDocument = company.cnpj || company.document || "";
+    const contactLine = [company.email, phone].filter(Boolean).map(escapeHtml).join(" · ");
+    popup.document.open();
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(receipt.code || "Recibo")}</title><style>
+      @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:14px Arial,sans-serif;max-width:760px;margin:0 auto;color:#172033}.page{min-height:260mm;display:flex;flex-direction:column}.letterhead{display:flex;align-items:center;gap:20px;border-bottom:3px solid #0ea5e9;padding:0 0 18px;margin-bottom:28px}.logo{width:100px;height:76px;object-fit:contain}.brand{min-width:0}.brand h2{font-size:20px;margin:0 0 8px}.brand p{margin:4px 0;line-height:1.4}.muted{color:#64748b;font-size:12px}.document{flex:1}h1{font-size:25px;margin:0 0 18px}.meta{margin:0 0 20px;line-height:1.5}table{width:100%;border-collapse:collapse;margin-top:28px}td,th{padding:10px 8px;border-bottom:1px solid #dbe1e8;text-align:left;vertical-align:top}th{font-size:12px}td:nth-child(n+2),th:nth-child(n+2){white-space:nowrap}.total{font-size:20px;font-weight:bold;text-align:right;margin-top:24px}.footer{border-top:1px solid #dbe1e8;margin-top:35px;padding-top:12px;color:#64748b;font-size:11px;line-height:1.5}.footer p{margin:3px 0}@media print{body{max-width:none}.page{min-height:260mm}}
+      </style></head><body><main class="page"><header class="letterhead">${logo ? `<img class="logo" src="${escapeHtml(logo)}" alt="Logomarca ${escapeHtml(companyName)}">` : ""}<div class="brand"><h2>${escapeHtml(companyName)}</h2>${companyDocument ? `<p class="muted">CNPJ: ${escapeHtml(companyDocument)}</p>` : ""}${address ? `<p class="muted">${escapeHtml(address)}</p>` : ""}${contactLine ? `<p class="muted">${contactLine}</p>` : ""}</div></header><section class="document"><h1>RECIBO</h1><p class="meta"><b>${escapeHtml(receipt.code || "")}</b><br>${new Date(receipt.createdAt || Date.now()).toLocaleDateString("pt-BR")}</p><p>Recebemos de <b>${escapeHtml(client.name || "Cliente avulso")}</b>${client.document ? ` — ${escapeHtml(client.document)}` : ""}${client.email ? ` — ${escapeHtml(client.email)}` : ""}.</p><table><thead><tr><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><p class="total">Total recebido: ${money(receipt.totalCents)}</p></section><footer class="footer"><p>${escapeHtml(companyName)}${companyDocument ? ` · CNPJ ${escapeHtml(companyDocument)}` : ""}</p>${address ? `<p>${escapeHtml(address)}</p>` : ""}${contactLine ? `<p>${contactLine}</p>` : ""}</footer></main><script>window.onload=()=>setTimeout(()=>window.print(),200)<\\/script></body></html>`);
     popup.document.close();
+    popup.opener = null;
   };
   const save = async () => {
     if (!companyId) return;

@@ -9,6 +9,7 @@ import { BusinessLanding } from './pages/BusinessLanding';
 import { AudienceGateway } from './pages/AudienceGateway';
 import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
+import { ElectionResultsPage } from './pages/ElectionResults';
 
 // Produtos
 import { CidadesAI } from './pages/softwares/CidadesAI';
@@ -32,14 +33,15 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
   const isLanding = location.pathname === '/' || location.pathname === '/empresas' || location.pathname.startsWith('/empresas/');
+  const isElectionResults = location.pathname === '/eleicoes/apuracao';
   const firstSegment = location.pathname.split('/').filter(Boolean)[0] || '';
   const institutionalRoots = new Set([
     'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products', 'empresas',
-    'privacy', 'admin', 'blu',
+    'privacy', 'admin', 'blu', 'eleicoes',
   ]);
   const isStorefront = Boolean(firstSegment) && !institutionalRoots.has(firstSegment);
-  const hideFooter = location.pathname === '/login' || isSystem || isLanding || isStorefront;
-  const hideNavbar = location.pathname === '/login' || location.pathname === '/products' || isSystem || isLanding || isStorefront;
+  const hideFooter = location.pathname === '/login' || isSystem || isLanding || isStorefront || isElectionResults;
+  const hideNavbar = location.pathname === '/login' || location.pathname === '/products' || isSystem || isLanding || isStorefront || isElectionResults;
 
   return (
       <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>
@@ -54,6 +56,7 @@ const AppContent: React.FC = () => {
             <Route path="/empresas/servicos" element={<BusinessLanding type="servicos" />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogPost />} />
+            <Route path="/eleicoes/apuracao" element={<ElectionResultsPage />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />
             <Route path="/planos" element={<PlansPage />} />
             <Route path="/parceria" element={<PartnerProgramPage />} />

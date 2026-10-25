@@ -290,6 +290,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
         <button onClick={() => scrollToSection('plataforma')} className="hover:text-blue-600">Funcionalidades</button>
         <button onClick={() => scrollToSection('problema')} className="hover:text-blue-600">Produto</button>
         <button onClick={() => scrollToSection('ia')} className="hover:text-blue-600">IA</button>
+        <Link to="/eleicoes/apuracao" className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-2 text-rose-700 transition hover:bg-rose-100 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/20"><span className="h-2 w-2 animate-pulse rounded-full bg-rose-500"/>Apuração ao vivo</Link>
         <Link to="/parceria" className="hover:text-blue-600">Parceria</Link>
         <Link to="/blog" className="hover:text-blue-600">Conteúdos</Link>
       </div>
@@ -309,6 +310,7 @@ const Header = ({ dark, setDark, menuOpen, setMenuOpen }: { dark: boolean; setDa
         <div className="grid gap-2 text-sm font-bold">
           <Link to="/planos" className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-white">Escolher jornada e plano</Link>
           <Link to="/admin/login" className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-blue-700 dark:border-blue-300/20 dark:bg-blue-500/10 dark:text-blue-200">Entrar no sistema</Link>
+          <Link to="/eleicoes/apuracao" onClick={() => setMenuOpen(false)} className="flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-rose-700 dark:border-rose-300/20 dark:bg-rose-500/10 dark:text-rose-200"><span className="h-2 w-2 animate-pulse rounded-full bg-rose-500"/>Acompanhar apuração presidencial</Link>
           <Link to="/products" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Soluções para órgãos públicos</Link>
           <Link to="/parceria" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Programa de parceria</Link>
           <Link to="/contact" className="rounded-2xl border border-white/70 bg-white/58 px-4 py-3 text-center shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10">Agendar demonstração</Link>
