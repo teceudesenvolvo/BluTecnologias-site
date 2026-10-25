@@ -280,19 +280,6 @@ export const ElectionResultsPage: React.FC = () => {
   const countedSections = number(data?.s?.st);
   const sectionPercent = number(data?.s?.pst) || (totalSections ? countedSections / totalSections * 100 : 0);
   const isFinal = data?.and === "f" || data?.tf === "s";
-  const projectionStates = stateResults.filter((state) => number(state.data.s?.st) > 0 && number(state.data.s?.ts) > 0);
-  const projectionCoverageSections = projectionStates.reduce((sum, state) => sum + number(state.data.s?.st), 0);
-  const projectionCoveragePercent = totalSections ? Math.min(projectionCoverageSections / totalSections * 100, 100) : 0;
-  const projectedCandidates = candidates.map((candidate) => {
-    const projectedVotes = projectionStates.reduce((sum, state) => {
-      const stateCandidate = state.candidates.find((item) => String(item.n) === String(candidate.n));
-      const stateCounted = number(state.data.s?.st);
-      return sum + (stateCandidate && stateCounted ? number(stateCandidate.vap) / stateCounted * number(state.data.s?.ts) : 0);
-    }, 0);
-    return { ...candidate, projectedVotes };
-  }).sort((a, b) => b.projectedVotes - a.projectedVotes);
-  const projectionReady = !isFinal && projectionCoveragePercent >= 20 && projectionStates.length >= 10 && projectedCandidates.length >= 2;
-  const projectedLeader = projectionReady ? projectedCandidates[0] : undefined;
   const resultDate = data?.dg && data?.hg ? `${data.dg} às ${data.hg}` : "aguardando primeiro boletim";
 
   return (
@@ -309,9 +296,12 @@ export const ElectionResultsPage: React.FC = () => {
           </div>
         </header>
 
-        <nav aria-label="Turno da eleição" className="mt-7 inline-flex rounded-2xl border border-white/10 bg-[#0d1b2b] p-1.5">
-          {([1, 2] as const).map((turn) => <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); }} aria-pressed={!showPartial && selectedTurn === turn} className={`rounded-xl px-5 py-3 text-sm font-black transition ${selectedTurn === turn ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${selectedTurn === turn ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>)}
-          <button type="button" onClick={() => { setSelectedTurn(2); setShowPartial(true); }} aria-pressed={showPartial} className={`rounded-xl px-5 py-3 text-sm font-black transition ${showPartial ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>Parcial 2º turno</button>
+        <nav aria-label="Turno da eleição" className="mt-7 inline-flex flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-[#0d1b2b] p-1.5">
+          {([1, 2] as const).map((turn) => {
+            const active = !showPartial && selectedTurn === turn;
+            return <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); }} aria-pressed={active} className={`rounded-xl px-5 py-3 text-sm font-black transition ${active ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${active ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>;
+          })}
+          <button type="button" onClick={() => { setSelectedTurn(2); setShowPartial(true); }} aria-pressed={showPartial} className={`ml-1 rounded-xl border px-5 py-3 text-sm font-black transition ${showPartial ? "border-amber-300/40 bg-amber-300 text-[#221600] shadow-lg" : "border-amber-300/20 text-amber-200 hover:bg-amber-300/10"}`}>Parcial 2º turno · exterior</button>
         </nav>
 
         {showPartial ? <SecondRoundPartial /> : <>
@@ -342,12 +332,12 @@ export const ElectionResultsPage: React.FC = () => {
           <div className="rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7">
             <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5">
               <div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Votação nominal</p><h2 className="mt-1 text-xl font-black">Candidaturas à Presidência</h2></div>
-              <span className="text-xs text-slate-400">Votos · percentual</span>
+              <span className="text-xs text-slate-400">{selectedTurn === 2 ? "Ranking parcial por votos válidos · dados do TSE" : "Votos · percentual"}</span>
             </div>
             {loading && !data ? <div className="py-16 text-center text-sm text-slate-400">Conectando aos dados oficiais do TSE…</div>
               : candidates.length ? <div className="divide-y divide-white/10">{candidates.map((candidate, index) => <article key={`${candidate.n}-${candidate.nm}`} className="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 py-5 sm:grid-cols-[52px_minmax(0,1fr)_140px]">
-                <div className={`grid h-10 w-10 place-items-center rounded-xl text-sm font-black ${index === 0 ? "bg-sky-400 text-[#061321]" : "bg-white/8 text-white"}`}>{candidate.n || "—"}</div>
-                <div className="min-w-0"><h3 className="truncate font-black">{candidate.nmu || candidate.nm || "Candidatura"}</h3><p className="mt-1 text-xs text-slate-400">{candidate.sg || ""}{candidate.st ? ` · ${candidate.st}` : ""}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10 sm:hidden"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(number(candidate.pvap), 100)}%` }}/></div></div>
+                <div className={`grid h-10 w-10 place-items-center rounded-xl text-sm font-black ${index === 0 ? "bg-sky-400 text-[#061321]" : "bg-white/8 text-white"}`}>{index + 1}º</div>
+                <div className="min-w-0"><h3 className="truncate font-black">{candidate.nmu || candidate.nm || "Candidatura"}</h3><p className="mt-1 text-xs text-slate-400">{candidate.n ? `Número ${candidate.n}` : ""}{candidate.sg ? ` · ${candidate.sg}` : ""}{candidate.st ? ` · ${candidate.st}` : ""}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10 sm:hidden"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(number(candidate.pvap), 100)}%` }}/></div></div>
                 <div className="text-right"><strong className="block text-lg font-black tabular-nums">{integer(candidate.vap)}</strong><span className="text-sm text-sky-300">{percent(candidate.pvap)}</span><div className="mt-2 hidden h-1.5 overflow-hidden rounded-full bg-white/10 sm:block"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(number(candidate.pvap), 100)}%` }}/></div></div>
               </article>)}</div>
               : <div className="py-12 text-center"><p className="font-bold">{error ? "Os resultados ainda não estão disponíveis." : "Aguardando divulgação oficial."}</p><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">O TSE publicará os primeiros dados após o encerramento da votação e o início da totalização. Esta página exibirá os números assim que o arquivo oficial for disponibilizado.</p></div>}
@@ -364,24 +354,6 @@ export const ElectionResultsPage: React.FC = () => {
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Gráfico nacional</p><h2 className="mt-1 text-xl font-black">Votos por candidatura</h2></div><span className="text-xs text-slate-400">Percentual dos votos computados</span></div>
           {candidates.length ? <div className="mt-5 space-y-5">{candidates.map((candidate, index) => <div key={`chart-${candidate.n}-${candidate.nm}`} className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)_130px] sm:items-center"><div className="min-w-0"><span className="block truncate text-sm font-bold">{candidate.nmu || candidate.nm}</span><span className="text-xs text-slate-400">{candidate.sg || `Número ${candidate.n || "—"}`}</span></div><div className="h-4 overflow-hidden rounded-full bg-white/8"><div className={`h-full rounded-full transition-all ${index === 0 ? "bg-sky-400" : "bg-violet-400"}`} style={{ width: `${Math.max(number(candidate.pvap) ? Math.min(number(candidate.pvap), 100) : 0, 0)}%` }}/></div><div className="flex justify-between gap-2 text-sm tabular-nums sm:block sm:text-right"><strong>{percent(candidate.pvap)}</strong><span className="ml-2 text-slate-400">{integer(candidate.vap)} votos</span></div></div>)}</div>
             : <p className="py-8 text-center text-sm text-slate-400">O gráfico será preenchido quando o TSE publicar a votação.</p>}
-        </section>
-
-        <section className="mt-7 rounded-[1.75rem] border border-amber-200/15 bg-gradient-to-br from-[#172235] to-[#111b2b] p-5 sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
-            <div><p className="text-xs font-black uppercase tracking-[.16em] text-amber-300">Simulação estatística · não oficial</p><h2 className="mt-1 text-xl font-black sm:text-2xl">Estimativa de vencedor</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Extrapolamos os votos por candidatura em cada UF com totalização iniciada, considerando o total de seções daquele estado.</p></div>
-            {projectedLeader && <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3"><p className="text-xs font-bold text-amber-200">À frente no cenário projetado</p><p className="mt-1 font-black">{projectedLeader.nmu || projectedLeader.nm}</p><p className="mt-1 text-xs text-amber-100/75">{integer(projectedLeader.projectedVotes)} votos estimados</p></div>}
-          </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <Metric label="Seções consideradas nas UFs" value={`${integer(projectionCoverageSections)} / ${integer(totalSections)}`}/>
-            <Metric label="Cobertura da apuração" value={percent(projectionCoveragePercent)}/>
-            <Metric label="Estados incluídos" value={`${projectionStates.length} / 27`}/>
-          </div>
-          {isFinal ? <p className="mt-5 rounded-xl border border-emerald-300/15 bg-emerald-300/5 p-4 text-sm leading-6 text-emerald-100">A totalização foi finalizada pelo TSE. A projeção foi encerrada; consulte o resultado oficial acima.</p>
-            : projectionReady ? <div className="mt-6 space-y-5">{projectedCandidates.map((candidate, index) => {
-              const maxProjection = Math.max(...projectedCandidates.map((item) => item.projectedVotes), 1);
-              return <div key={`projection-${candidate.n}-${candidate.nm}`} className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)_150px] sm:items-center"><div className="min-w-0"><span className="block truncate text-sm font-bold">{candidate.nmu || candidate.nm}</span><span className="text-xs text-slate-400">{candidate.sg || `Número ${candidate.n || "—"}`}</span></div><div className="h-4 overflow-hidden rounded-full bg-white/8"><div className={`h-full rounded-full transition-all ${index === 0 ? "bg-amber-300" : "bg-slate-400"}`} style={{ width: `${Math.min(candidate.projectedVotes / maxProjection * 100, 100)}%` }}/></div><div className="text-sm text-slate-300 tabular-nums sm:text-right"><strong>{integer(candidate.projectedVotes)}</strong><span className="ml-1 text-xs text-slate-400">estimados</span></div></div>;
-            })}</div> : <div className="mt-5 rounded-xl border border-white/8 bg-black/10 p-4 text-sm leading-6 text-slate-300">A projeção só será exibida após pelo menos 20% das seções nacionais e dados de 10 estados. Essa cobertura mínima reduz oscilações muito grandes no início da apuração.</div>}
-          <p className="mt-5 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">A estimativa assume que as seções ainda não totalizadas terão votação semelhante à média observada em cada estado incluído. Não é pesquisa eleitoral nem previsão oficial; os votos pendentes podem alterar o cenário. O resultado oficial é definido exclusivamente pelo TSE.</p>
         </section>
 
         <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7">
