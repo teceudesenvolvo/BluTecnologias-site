@@ -1,6 +1,6 @@
 import React from "react";
 import { SecondRoundPartial } from "./SecondRoundPartial";
-import { Activity, ArrowRight, ExternalLink, RefreshCw, Search } from "lucide-react";
+import { Activity, ArrowRight, ExternalLink, RefreshCw, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { trackPageView } from "../services/analytics";
 
@@ -94,6 +94,8 @@ function extractCandidates(data: TseData): TseCandidate[] {
 
 export const ElectionResultsPage: React.FC = () => {
   const [selectedTurn, setSelectedTurn] = React.useState<1 | 2>(2);
+  const [showBluIntro, setShowBluIntro] = React.useState(() => { try { return sessionStorage.getItem("blu-election-intro-dismissed") !== "1"; } catch { return true; } });
+  const dismissBluIntro = () => { setShowBluIntro(false); try { sessionStorage.setItem("blu-election-intro-dismissed", "1"); } catch { /* storage disabled */ } };
   const [showPartial, setShowPartial] = React.useState(false);
   const [data, setData] = React.useState<TseData | null>(null);
   const [stateResults, setStateResults] = React.useState<StateResult[]>([]);
@@ -285,6 +287,21 @@ export const ElectionResultsPage: React.FC = () => {
   return (
     <main className="min-h-screen bg-[#07111f] px-4 py-8 text-white sm:px-6 lg:py-12">
       <div className="mx-auto max-w-6xl">
+        {showBluIntro && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020916]/80 p-4 backdrop-blur-md" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismissBluIntro(); }}>
+            <div role="dialog" aria-modal="true" aria-labelledby="blu-intro-title" aria-describedby="blu-intro-description" className="relative w-full max-w-lg rounded-[2rem] border border-sky-300/20 bg-[#0d1b2b] p-7 shadow-2xl sm:p-9">
+              <button type="button" onClick={dismissBluIntro} aria-label="Fechar apresentação da Blu" className="absolute right-5 top-5 rounded-xl border border-white/15 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X size={19}/></button>
+              <p className="text-xs font-black uppercase tracking-[.18em] text-sky-300">Tecnologia que aproxima</p>
+              <h2 id="blu-intro-title" className="mt-3 pr-10 text-3xl font-black tracking-tight">Conheça a Blu Tecnologias</h2>
+              <p id="blu-intro-description" className="mt-4 text-sm leading-7 text-slate-300">Somos uma empresa de tecnologia que desenvolve soluções digitais para empresas e órgãos públicos. Criamos plataformas, aplicativos e ferramentas inteligentes para simplificar processos, melhorar o atendimento e conectar pessoas aos serviços de que precisam.</p>
+              <p className="mt-3 text-xs leading-5 text-slate-400">Este painel eleitoral é uma iniciativa da Blu para facilitar o acompanhamento de informações públicas. Os resultados oficiais são fornecidos pelo TSE.</p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link to="/empresas" className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-400 px-5 py-3 text-sm font-black text-[#061321] hover:bg-sky-300">Conhecer a Blu <ArrowRight size={16}/></Link>
+                <button type="button" onClick={dismissBluIntro} className="rounded-xl border border-white/15 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">Fechar</button>
+              </div>
+            </div>
+          </div>
+        )}
         <header className="flex flex-wrap items-center justify-between gap-4">
           <a href="/" className="text-sm font-black tracking-[.12em] text-sky-300">BLU · ELEIÇÕES 2026</a>
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
