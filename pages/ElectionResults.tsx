@@ -47,7 +47,7 @@ const resultUrl = (uf: string, electionId: number) => `https://resultados.tse.ju
 const officialResultsUrl = (electionId: number) => `https://resultados.tse.jus.br/oficial/app/index.html#/eleicao/${electionId}/uf/br/cargo/1/vis/nominal/resultados`;
 const municipalityConfigUrl = (electionId: number) => `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/config/mun-e${String(electionId).padStart(6, "0")}-cm.json`;
 const municipalityResultUrl = (uf: string, code: string, electionId: number) => `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/dados/${uf}/${uf}${code.padStart(5, "0")}-c0001-e${String(electionId).padStart(6, "0")}-u.json`;
-const stateMapUrl = "https://servicodados.ibge.gov.br/api/v3/malhas/estados?formato=application/vnd.geo+json&qualidade=minima";
+const stateMapUrl = (uf: string) => `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${uf.toUpperCase()}?formato=application/vnd.geo+json&qualidade=minima`;
 const municipalityListUrl = (uf: string) => `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`;
 let anyMapLoadPromise: Promise<AnyMapApi> | undefined;
 
@@ -118,6 +118,8 @@ export const ElectionResultsPage: React.FC = () => {
   const [stateResults, setStateResults] = React.useState<StateResult[]>([]);
   const [selectedUf, setSelectedUf] = React.useState("ac");
   const [stateMap, setStateMap] = React.useState<GeoCollection | null>(null);
+  const [stateMapLoading, setStateMapLoading] = React.useState(true);
+  const [mapRetry, setMapRetry] = React.useState(0);
   const [mapError, setMapError] = React.useState("");
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const [municipalities, setMunicipalities] = React.useState<Municipality[]>([]);
@@ -212,11 +214,41 @@ export const ElectionResultsPage: React.FC = () => {
 
   React.useEffect(() => {
     const controller = new AbortController();
-    fetch(stateMapUrl, { signal: controller.signal, cache: "force-cache" })
-      .then((response) => { if (!response.ok) throw new Error("IBGE indisponível"); return response.json() as Promise<GeoCollection>; })
-      .then(setStateMap).catch(() => undefined);
+    setStateMapLoading(true);
+    setMapError("");
+    const loadMapData = async () => {
+      try {
+        const stateShapes = await Promise.allSettled(STATE_CODES.map(async ([uf]) => {
+          const response = await fetch(stateMapUrl(uf), { signal: controller.signal, cache: "force-cache" });
+          if (!response.ok) throw new Error(`${uf.toUpperCase()}: HTTP ${response.status}`);
+          const shape = await response.json() as GeoCollection | GeoFeature;
+          const features = shape.type === "FeatureCollection" ? (shape as GeoCollection).features : shape.type === "Feature" ? [shape as GeoFeature] : [];
+          return { uf, features: features.map((feature) => ({
+              ...feature,
+              id: uf,
+              properties: { ...(feature.properties || {}), codarea: IBGE_STATE_CODES[uf], id: uf, uf },
+            })) };
+        }));
+        const availableShapes = stateShapes.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+        const features = availableShapes.flatMap((shape) => shape.features);
+        if (!features.length) throw new Error("O IBGE não retornou geometrias estaduais reconhecidas.");
+        if (!controller.signal.aborted) {
+          setStateMap({ type: "FeatureCollection", features });
+          const unavailableCount = STATE_CODES.length - availableShapes.filter((shapes) => shapes.features.length > 0).length;
+          if (unavailableCount) setMapError(`A malha de ${unavailableCount} UF(s) não foi carregada; exibindo as demais.`);
+        }
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setStateMap(null);
+          setMapError(cause instanceof Error ? cause.message : "Não foi possível consultar o IBGE.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setStateMapLoading(false);
+      }
+    };
+    void loadMapData();
     return () => controller.abort();
-  }, []);
+  }, [mapRetry]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -514,8 +546,8 @@ export const ElectionResultsPage: React.FC = () => {
           <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
             <div className="rounded-2xl border border-white/8 bg-black/10 p-3 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-sky-300">Mapa AnyMap · Brasil</p><p className="mt-1 text-lg font-black">{selectedStateName} <span className="text-slate-400">· {selectedUf.toUpperCase()}</span></p></div>{selectedState && <p className="text-right text-xs text-slate-400">Seções: {integer(selectedState.data.s?.st)} / {integer(selectedState.data.s?.ts)}<span className="block text-sky-300">{percent(selectedState.data.s?.pst)}</span></p>}</div>
-              {mapFeatures.length ? <div ref={mapContainerRef} role="group" aria-label="Mapa interativo AnyMap das unidades federativas do Brasil" className="mt-3 w-full" style={{ height: 360 }} /> : <div className="grid h-72 place-items-center text-sm text-slate-400">Carregando a malha geográfica do IBGE…</div>}
-              {mapError && <p className="mt-2 text-center text-xs text-amber-200">{mapError}</p>}
+              {mapFeatures.length ? <div ref={mapContainerRef} role="group" aria-label="Mapa interativo AnyMap das unidades federativas do Brasil" className="mt-3 w-full" style={{ height: 360 }} /> : <div className="grid h-72 place-items-center text-center text-sm text-slate-400">{stateMapLoading ? "Carregando a malha geográfica do IBGE…" : <div><p className="text-amber-200">Não foi possível carregar o mapa dos estados.</p><p className="mt-2 text-xs text-slate-500">{mapError || "A malha do IBGE não retornou unidades federativas reconhecidas."}</p><button type="button" onClick={() => setMapRetry((attempt) => attempt + 1)} className="mt-4 rounded-lg border border-white/15 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10">Tentar novamente</button></div>}</div>}
+              {mapFeatures.length > 0 && mapError && <p className="mt-2 text-center text-xs text-amber-200">{mapError} <button type="button" onClick={() => setMapRetry((attempt) => attempt + 1)} className="ml-1 underline">Tentar novamente</button></p>}
               <div className="mt-2 flex flex-wrap justify-center gap-1.5">{STATE_CODES.map(([uf]) => <button key={uf} type="button" onClick={() => setSelectedUf(uf)} aria-pressed={selectedUf === uf} className={`rounded-md px-2 py-1 text-[10px] font-black transition ${selectedUf === uf ? "bg-sky-300 text-[#061321]" : "bg-white/8 text-slate-300 hover:bg-white/15"}`}>{uf.toUpperCase()}</button>)}</div>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-white/8 pt-3 text-[10px] text-slate-400"><span className="font-semibold uppercase tracking-wide">Progresso das seções</span><span>menor</span><i className="h-2.5 w-24 rounded-sm bg-gradient-to-r from-sky-950 to-sky-300"/><span>maior</span></div>
               <p className="mt-3 text-center text-[11px] text-slate-500">Malha geográfica: IBGE · Dados de apuração: TSE</p>
