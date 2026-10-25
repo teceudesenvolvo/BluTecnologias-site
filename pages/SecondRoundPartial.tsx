@@ -4,15 +4,42 @@ import { ExternalLink, Info, RefreshCw } from "lucide-react";
 const preliminary = {
   capturedAt: "25/10/2026, 12h07 (horário de Brasília)",
   source: "Congresso em Foco — levantamento preliminar de boletins no exterior",
-  sourceUrl: "https://congressoemfoco.uol.com.br/",
+  sourceUrl: "https://www.congressoemfoco.com.br/amp/noticia/123603/primeiras-urnas-sao-apuradas-no-exterior-acompanhe-os-resultados",
   coverage: "22 países e territórios informados no levantamento",
   votes: [
     { name: "Luiz Inácio Lula da Silva", votes: 16585 },
     { name: "Flávio Bolsonaro", votes: 34056 },
   ],
+  countries: [
+    { name: "Arábia Saudita", lula: 49, flavio: 31 },
+    { name: "Austrália", lula: 6017, flavio: 3465 },
+    { name: "Catar", lula: 159, flavio: 195 },
+    { name: "China continental", lula: 375, flavio: 134 },
+    { name: "Coreia do Sul", lula: 148, flavio: 82 },
+    { name: "Emirados Árabes Unidos", lula: 643, flavio: 772 },
+    { name: "Egito", lula: 60, flavio: 16 },
+    { name: "Filipinas", lula: 27, flavio: 39 },
+    { name: "Hong Kong", lula: 127, flavio: 133 },
+    { name: "Índia", lula: 25, flavio: 23, note: "1 de 2 urnas" },
+    { name: "Indonésia", lula: 15, flavio: 23 },
+    { name: "Japão", lula: 7098, flavio: 28538 },
+    { name: "Jordânia", lula: 725, flavio: 76 },
+    { name: "Quênia", lula: 29, flavio: 16 },
+    { name: "Kuwait", lula: 62, flavio: 17 },
+    { name: "Malásia", lula: 41, flavio: 44 },
+    { name: "Nova Zelândia", lula: 418, flavio: 101 },
+    { name: "Singapura", lula: 213, flavio: 121 },
+    { name: "Síria", lula: 106, flavio: 11 },
+    { name: "Tailândia", lula: 56, flavio: 60 },
+    { name: "Taiwan", lula: 94, flavio: 130 },
+    { name: "Turquia", lula: 98, flavio: 29, note: "1 de 2 urnas" },
+  ],
 };
 const format = (value: number) => value.toLocaleString("pt-BR");
 const total = preliminary.votes.reduce((sum, item) => sum + item.votes, 0);
+const countryRanking = preliminary.countries
+  .map((country) => ({ ...country, total: country.lula + country.flavio }))
+  .sort((a, b) => b.total - a.total);
 
 export const SecondRoundPartial: React.FC = () => (
   <section className="mt-10 space-y-6" aria-label="Parcial do segundo turno no exterior">
@@ -59,6 +86,30 @@ export const SecondRoundPartial: React.FC = () => (
             );
           })}
         </div>
+      </div>
+      <div className="mt-7 rounded-2xl border border-white/10 bg-black/15 p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">Ranking por país ou território</h2>
+            <p className="mt-1 text-xs text-slate-400">Ordenado pelo total de votos divulgados nesta parcial · 22 localidades</p>
+          </div>
+          <span className="text-xs text-slate-400">Votos por candidatura</span>
+        </div>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[560px] border-collapse text-left text-sm">
+            <thead><tr className="border-b border-white/10 text-xs text-slate-400"><th className="px-3 py-3 font-semibold">#</th><th className="px-3 py-3 font-semibold">País / território</th><th className="px-3 py-3 text-right font-semibold">Total</th><th className="px-3 py-3 text-right font-semibold">Lula</th><th className="px-3 py-3 text-right font-semibold">Flávio</th></tr></thead>
+            <tbody>{countryRanking.map((country, index) => (
+              <tr key={country.name} className="border-b border-white/5 last:border-0">
+                <td className="px-3 py-3 font-bold tabular-nums text-slate-400">{index + 1}</td>
+                <th scope="row" className="px-3 py-3 text-left font-semibold">{country.name}{country.note && <span className="ml-2 rounded-md bg-amber-300/10 px-1.5 py-1 text-[10px] font-bold text-amber-200">{country.note}</span>}</th>
+                <td className="px-3 py-3 text-right font-black tabular-nums">{format(country.total)}</td>
+                <td className="px-3 py-3 text-right tabular-nums text-sky-200">{format(country.lula)}</td>
+                <td className="px-3 py-3 text-right tabular-nums text-amber-200">{format(country.flavio)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-400">Índia e Turquia: números parciais, com 1 de 2 urnas contabilizadas em cada localidade. Os demais valores refletem os boletins reunidos pela fonte no horário indicado.</p>
       </div>
       <div className="mt-5 rounded-2xl border border-white/10 bg-[#0d1b2b] p-5 sm:p-6">
         <h2 className="text-lg font-black">Projeção de resultado nacional</h2>
