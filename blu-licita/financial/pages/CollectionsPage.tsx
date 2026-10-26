@@ -8,10 +8,12 @@ import {
   Kanban,
   LayoutList,
   Loader2,
+  Minus,
   Mail,
   Eye,
   Plus,
   Receipt,
+  Save,
   Search,
   Send,
   Italic,
@@ -89,6 +91,53 @@ const emptyBilling = (): BillingForm => ({
   dueDate: today(),
   attachmentUrls: [],
 });
+
+type PersistedBillingDraft = { form: BillingForm; clientId: string; updatedAt: number };
+const BILLING_DRAFT_DB = "blu-financial-drafts";
+const BILLING_DRAFT_STORE = "official-billing";
+let billingDraftDb: Promise<IDBDatabase> | undefined;
+
+const openBillingDraftDb = () => {
+  if (!billingDraftDb) billingDraftDb = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(BILLING_DRAFT_DB, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(BILLING_DRAFT_STORE)) request.result.createObjectStore(BILLING_DRAFT_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Não foi possível abrir o armazenamento de rascunhos."));
+  }).catch((error) => { billingDraftDb = undefined; throw error; });
+  return billingDraftDb;
+};
+
+const readBillingDraft = async (key: string): Promise<PersistedBillingDraft | null> => {
+  const db = await openBillingDraftDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(BILLING_DRAFT_STORE, "readonly").objectStore(BILLING_DRAFT_STORE).get(key);
+    request.onsuccess = () => resolve((request.result as PersistedBillingDraft | undefined) || null);
+    request.onerror = () => reject(request.error || new Error("Não foi possível recuperar o rascunho."));
+  });
+};
+
+const writeBillingDraft = async (key: string, draft: PersistedBillingDraft) => {
+  const db = await openBillingDraftDb();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(BILLING_DRAFT_STORE, "readwrite");
+    transaction.objectStore(BILLING_DRAFT_STORE).put(draft, key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error("Não foi possível salvar o rascunho."));
+    transaction.onabort = () => reject(transaction.error || new Error("O salvamento do rascunho foi interrompido."));
+  });
+};
+
+const deleteBillingDraft = async (key: string) => {
+  const db = await openBillingDraftDb();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(BILLING_DRAFT_STORE, "readwrite");
+    transaction.objectStore(BILLING_DRAFT_STORE).delete(key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error("Não foi possível remover o rascunho."));
+  });
+};
 
 const escapeHtml = (value: unknown) =>
   String(value ?? "")
@@ -277,6 +326,7 @@ export const CollectionsPage = () => {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState("all");
   const [billingOpen, setBillingOpen] = React.useState(false);
+  const [billingMinimized, setBillingMinimized] = React.useState(false);
   const [previewHtml, setPreviewHtml] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<FinancialCollection | null>(null);
   const [detail, setDetail] = React.useState<FinancialCollection | null>(null);
@@ -354,7 +404,7 @@ export const CollectionsPage = () => {
           <h1 className="mt-2 text-3xl font-bold">Cobranças</h1>
           <p className="text-sm text-slate-500">Envie a cobrança oficial ao órgão com contrato, nota fiscal, relatório e certidões vigentes.</p>
         </div>
-        <button type="button" onClick={() => setBillingOpen(true)} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">
+        <button type="button" onClick={() => { setBillingMinimized(false); setBillingOpen(true); }} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">
           <Plus size={17} /> Nova cobrança
         </button>
       </header>
@@ -405,7 +455,10 @@ export const CollectionsPage = () => {
           financialSettings={financialSettings}
           previewHtml={previewHtml}
           saving={data.saving}
-          close={() => setBillingOpen(false)}
+          minimized={billingMinimized}
+          minimize={() => setBillingMinimized(true)}
+          restore={() => setBillingMinimized(false)}
+          close={() => { setBillingOpen(false); setBillingMinimized(false); }}
           saveCollection={data.save}
           reload={data.reload}
           setPreviewHtml={setPreviewHtml}
@@ -443,6 +496,9 @@ const OfficialBillingForm = ({
   financialSettings,
   previewHtml,
   saving,
+  minimized,
+  minimize,
+  restore,
   close,
   saveCollection,
   reload,
@@ -455,6 +511,9 @@ const OfficialBillingForm = ({
   financialSettings: FinancialSettings | null;
   previewHtml: string | null;
   saving: boolean;
+  minimized: boolean;
+  minimize: () => void;
+  restore: () => void;
   close: () => void;
   saveCollection: (value: CollectionInput) => Promise<void>;
   reload: () => Promise<void>;
@@ -463,6 +522,14 @@ const OfficialBillingForm = ({
   const [form, setForm] = React.useState<BillingForm>(emptyBilling);
   const [clientId, setClientId] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [draftLoaded, setDraftLoaded] = React.useState(false);
+  const [draftRestored, setDraftRestored] = React.useState(false);
+  const [draftStatus, setDraftStatus] = React.useState<"saved" | "saving" | "error" | "idle">("idle");
+  const draftKey = `official-billing:${auth.currentUser?.uid || "anonymous"}`;
+  const draftSnapshotRef = React.useRef<PersistedBillingDraft>({ form: emptyBilling(), clientId: "", updatedAt: Date.now() });
+  const draftReadyRef = React.useRef(false);
+  const draftDirtyRef = React.useRef(false);
+  const draftClearedRef = React.useRef(false);
   const reportEditorRef = React.useRef<HTMLDivElement | null>(null);
   const client = aux.clients.find((item: ContactLead) => item.id === clientId);
   const contracts = client?.contracts || [];
@@ -493,7 +560,71 @@ const OfficialBillingForm = ({
   });
   const selectedContract = contracts.find((item: any) => String(item.id || item.title) === form.solutionSelect);
 
-  const set = (key: keyof BillingForm, value: any) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof BillingForm, value: any) => {
+    draftDirtyRef.current = true;
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  React.useEffect(() => {
+    let active = true;
+    void readBillingDraft(draftKey).then((draft) => {
+      if (!active) return;
+      if (draft?.form) {
+        draftDirtyRef.current = true;
+        setForm({ ...emptyBilling(), ...draft.form });
+        setClientId(draft.clientId || "");
+        setDraftRestored(true);
+      }
+    }).catch((error) => {
+      console.error("Não foi possível recuperar o rascunho da cobrança.", error);
+      if (active) setDraftStatus("error");
+    }).finally(() => {
+      if (active) {
+        draftReadyRef.current = true;
+        setDraftLoaded(true);
+      }
+    });
+    return () => { active = false; };
+  }, [draftKey]);
+
+  draftSnapshotRef.current = { form, clientId, updatedAt: Date.now() };
+  React.useEffect(() => {
+    if (!draftLoaded || !draftDirtyRef.current || draftClearedRef.current) return;
+    const snapshot = { form, clientId, updatedAt: Date.now() };
+    const timer = window.setTimeout(() => {
+      if (draftClearedRef.current) return;
+      setDraftStatus("saving");
+      void writeBillingDraft(draftKey, snapshot).then(() => setDraftStatus("saved")).catch((error) => {
+        console.error("Não foi possível salvar o rascunho da cobrança.", error);
+        setDraftStatus("error");
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [form, clientId, draftKey, draftLoaded]);
+
+  React.useEffect(() => () => {
+    if (draftReadyRef.current && draftDirtyRef.current && !draftClearedRef.current) {
+      void writeBillingDraft(draftKey, draftSnapshotRef.current).catch((error) => console.error("Não foi possível preservar o rascunho da cobrança.", error));
+    }
+  }, [draftKey]);
+
+  const saveDraft = async () => {
+    draftDirtyRef.current = true;
+    draftSnapshotRef.current = { form, clientId, updatedAt: Date.now() };
+    setDraftStatus("saving");
+    try {
+      await writeBillingDraft(draftKey, draftSnapshotRef.current);
+      setDraftStatus("saved");
+    } catch (error) {
+      console.error("Não foi possível salvar o rascunho da cobrança.", error);
+      setDraftStatus("error");
+    }
+  };
+
+  const clearDraft = async () => {
+    draftClearedRef.current = true;
+    try { await deleteBillingDraft(draftKey); } catch (error) { console.error("Não foi possível remover o rascunho enviado.", error); }
+  };
 
   React.useEffect(() => {
     if (!preferredCompany) return;
@@ -505,7 +636,7 @@ const OfficialBillingForm = ({
   }, [preferredCompany?.id]);
 
   React.useEffect(() => {
-    if (!selectedContract) return;
+    if (!selectedContract || draftRestored) return;
     const contractValue = Number(selectedContract.value || selectedContract.amount || selectedContract.total || 0);
     setForm((current) => ({
       ...current,
@@ -514,7 +645,7 @@ const OfficialBillingForm = ({
       dueDate: current.dueDate || selectedContract.endDate || current.dueDate,
       reportSubject: `Medição referente ao ${selectedContract.title || selectedContract.number || "contrato"}`,
     }));
-  }, [selectedContract?.id]);
+  }, [selectedContract?.id, draftRestored]);
 
   const handleFile = async (file: File | undefined, key: "invoiceFile" | "reportFile") => {
     if (!file) return;
@@ -590,6 +721,7 @@ const OfficialBillingForm = ({
 
       const sent = await clientService.sendBilling(client.id, payload);
       if (!sent) throw new Error("Falha ao enviar o e-mail de cobrança.");
+      await clearDraft();
 
       const billingId = String(Date.now());
       await saveCollection({
@@ -639,10 +771,20 @@ const OfficialBillingForm = ({
 
   return (
     <>
-    <Drawer title="Nova cobrança oficial" close={close}>
+    {!draftLoaded ? <Drawer title="Nova cobrança oficial" close={close}><div className="grid flex-1 place-items-center text-sm text-slate-500"><span className="flex items-center gap-2"><Loader2 className="animate-spin" size={18}/> Recuperando rascunho salvo…</span></div></Drawer> : minimized ? <div className="fixed bottom-5 right-5 z-[230] flex items-center gap-2 rounded-2xl border border-blue-200 bg-white p-3 shadow-2xl">
+      <button type="button" onClick={restore} className="flex items-center gap-2 text-left text-sm font-bold text-slate-800"><Mail size={17} className="text-blue-600"/><span>Rascunho de cobrança<br/><small className="font-normal text-slate-500">Toque para continuar</small></span></button>
+      <button type="button" onClick={close} aria-label="Fechar e manter o rascunho" title="Fechar e manter o rascunho" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={17}/></button>
+    </div> : <Drawer title="Nova cobrança oficial" close={close} minimize={() => { void saveDraft().then(minimize); }}>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-6 py-2.5 text-xs">
+          <span className={draftStatus === "error" ? "text-rose-600" : "text-slate-500"}>{!draftLoaded ? "Carregando rascunho…" : draftRestored ? "Rascunho recuperado neste dispositivo" : "Rascunho salvo automaticamente neste dispositivo"}</span>
+          {draftStatus === "saving" && <span className="text-blue-600">Salvando…</span>}
+          {draftStatus === "saved" && <span className="text-emerald-600">Salvo</span>}
+          {draftStatus === "error" && <span className="text-rose-600">Não foi possível salvar o rascunho</span>}
+        </div>
         <div className="grid flex-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2">
           <Select label="Órgão / cliente" value={clientId} set={(value) => {
+            draftDirtyRef.current = true;
             setClientId(value);
             const selected = aux.clients.find((item: ContactLead) => item.id === value);
             setForm((current) => ({
@@ -654,6 +796,7 @@ const OfficialBillingForm = ({
             }));
           }} options={[["", "Selecione"], ...aux.clients.map((item: ContactLead) => [item.id, item.razaoSocial || item.name])]} />
           <Select label="Empresa emitente" value={form.senderCompanyId || form.senderCompany} set={(value) => {
+            draftDirtyRef.current = true;
             const company = companies.find((item) => item.id === value || item.razaoSocial === value || item.nomeFantasia === value);
             setForm((current) => ({
               ...current,
@@ -666,6 +809,8 @@ const OfficialBillingForm = ({
             label="Contrato salvo do cliente"
             value={form.solutionSelect}
             set={(value) => {
+              draftDirtyRef.current = true;
+              setDraftRestored(false);
               const contract = contracts.find((item: any) => String(item.id || item.title) === value);
               const rawValue = contract?.valueCents ?? contract?.value ?? contract?.amount ?? contract?.valor ?? "";
               const normalizedValue = typeof rawValue === "number" ? String((rawValue > 100000 ? rawValue / 100 : rawValue).toFixed?.(2) ?? rawValue) : String(rawValue || "");
@@ -775,7 +920,8 @@ const OfficialBillingForm = ({
             Fluxo oficial: a cobrança será enviada para <b>{client?.email || client?.financialContact || "o e-mail cadastrado do órgão"}</b> com nota fiscal, relatório/medição e certidões selecionadas.
           </p>
         </div>
-        <footer className="flex justify-end gap-2 border-t p-5">
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t p-5">
+          <button type="button" onClick={() => void saveDraft()} className="mr-auto flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-700"><Save size={16}/> Salvar rascunho</button>
           <button type="button" onClick={close} className="rounded-xl border px-4 py-2">Cancelar</button>
           <button type="button" onClick={async () => {
             if (!client) return;
@@ -858,6 +1004,7 @@ const OfficialBillingForm = ({
               };
               const sent = await clientService.sendBilling(client.id, payload);
               if (!sent) throw new Error("Falha ao enviar o e-mail de cobrança.");
+              await clearDraft();
               const billingId = String(Date.now());
               await saveCollection({
                 issuerCompanyId: form.senderCompanyId,
@@ -906,7 +1053,7 @@ const OfficialBillingForm = ({
           </button>
         </footer>
       </form>
-    </Drawer>
+    </Drawer>}
     {previewHtml && <ModalPreview html={previewHtml} close={() => setPreviewHtml(null)} />}
     </>
   );
@@ -1234,12 +1381,15 @@ const Receive = ({ item, accounts, saving, close, save }: { item: FinancialColle
   );
 };
 
-const Drawer = ({ title, close, children }: { title: string; close: () => void; children: React.ReactNode }) => (
+const Drawer = ({ title, close, minimize, children }: { title: string; close: () => void; minimize?: () => void; children: React.ReactNode }) => (
   <div className="fixed inset-0 z-[220] flex justify-end bg-slate-950/60 backdrop-blur-md">
     <section className="relative z-[221] flex h-full w-full max-w-4xl flex-col bg-white shadow-2xl">
       <header className="flex items-center justify-between border-b p-5">
         <h2 className="text-lg font-bold">{title}</h2>
-        <button onClick={close} className="rounded-lg p-2 hover:bg-slate-100"><X size={20} /></button>
+        <div className="flex items-center gap-1">
+          {minimize && <button type="button" onClick={minimize} aria-label="Minimizar cobrança" title="Minimizar cobrança" className="rounded-lg p-2 hover:bg-slate-100"><Minus size={20}/></button>}
+          <button type="button" onClick={close} aria-label="Fechar cobrança e manter rascunho" title="Fechar e manter rascunho" className="rounded-lg p-2 hover:bg-slate-100"><X size={20} /></button>
+        </div>
       </header>
       {children}
     </section>

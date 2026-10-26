@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.helloWorld = exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.ecommerceStore = exports.accountantWorkspace = exports.acceptCompanyInvitation = exports.manageCompanyMembership = exports.linkAccountantToCompanies = exports.findGlobalProfessional = exports.listManagedCompanies = exports.managePointOfSalePaymentSettings = exports.checkPointOfSalePayment = exports.createPointOfSalePayment = exports.managePointOfSaleRegister = exports.completePublicSale = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = exports.customerReferralProgram = void 0;
-exports.serviceScheduling = exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.dispatchDailyCompanyNotificationDigests = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.lookupProductBarcode = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = void 0;
+exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.ecommerceStore = exports.accountantWorkspace = exports.acceptCompanyInvitation = exports.manageCompanyMembership = exports.linkAccountantToCompanies = exports.findGlobalProfessional = exports.listManagedCompanies = exports.managePointOfSalePaymentSettings = exports.checkPointOfSalePayment = exports.createPointOfSalePayment = exports.managePointOfSaleRegister = exports.completePublicSale = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = exports.recordElectionPageView = exports.customerReferralProgram = void 0;
+exports.serviceScheduling = exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.dispatchDailyCompanyNotificationDigests = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.lookupProductBarcode = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = void 0;
 const functions = require("firebase-functions");
 var customerReferrals_1 = require("./customerReferrals");
 Object.defineProperty(exports, "customerReferralProgram", { enumerable: true, get: function () { return customerReferrals_1.customerReferralProgram; } });
@@ -9,6 +9,32 @@ const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const https = require("https");
+exports.recordElectionPageView = functions.https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'POST') {
+        res.status(405).json({ error: 'method-not-allowed' });
+        return;
+    }
+    try {
+        const date = new Date().toISOString().slice(0, 10);
+        await admin.firestore().collection('electionPageViews').doc(date).set({
+            date,
+            count: admin.firestore.FieldValue.increment(1),
+            lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        res.status(204).send('');
+    }
+    catch (error) {
+        console.error('Failed to record election page view', error);
+        res.status(500).json({ error: 'record-failed' });
+    }
+});
 var taxManagement_1 = require("./taxManagement");
 Object.defineProperty(exports, "mutateTaxRecord", { enumerable: true, get: function () { return taxManagement_1.mutateTaxRecord; } });
 Object.defineProperty(exports, "commandTaxRecord", { enumerable: true, get: function () { return taxManagement_1.commandTaxRecord; } });
