@@ -15,6 +15,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /portalPageViews/{viewId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
     function companyUser(companyId) {
       return isSignedIn() && (
         companyId == request.auth.uid ||

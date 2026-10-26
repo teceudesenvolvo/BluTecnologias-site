@@ -179,6 +179,7 @@ export type HqIncompleteCustomer = {
 
 export type HqOverview = {
   electionPageViews: { total: number; today: number; last30Days: number };
+  portalPageViews: { total: number; today: number; last30Days: number; pages: Array<{ path: string; total: number; today: number; last30Days: number }> };
   tenants: HqCustomerRow[];
   incompleteCustomers: HqIncompleteCustomer[];
   partners: HqPartner[];
@@ -243,7 +244,7 @@ export const hqService = {
     if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
-    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners, electionViews] = await Promise.all([
+    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners, electionViews, portalViews] = await Promise.all([
       asList<HqCompany>('companies'),
       asList<HqSubscription>('subscriptions'),
       asList<HqPlan>('plans'),
@@ -256,13 +257,14 @@ export const hqService = {
       asList<HqPlatformCustomer>('platformCustomers').catch(() => []),
       asList<HqPartner>('partners').catch(() => []),
       asList<{ id: string; date?: string; count?: number }>('electionPageViews').catch(() => []),
+      asList<{ id: string; date?: string; path?: string; count?: number }>('portalPageViews').catch(() => []),
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - 29);
     const startDate = start.toISOString().slice(0, 10);
-    const electionPageViews = electionViews.reduce((totals, item) => {
+    const historicalElectionPageViews = electionViews.reduce((totals, item) => {
       const count = Math.max(0, Number(item.count || 0));
       const date = item.date || item.id;
       totals.total += count;
@@ -270,6 +272,31 @@ export const hqService = {
       if (date >= startDate && date <= today) totals.last30Days += count;
       return totals;
     }, { total: 0, today: 0, last30Days: 0 });
+    const pageTotals = new Map<string, { path: string; total: number; today: number; last30Days: number }>();
+    portalViews.forEach((item) => {
+      const path = String(item.path || '/');
+      const date = item.date || item.id.slice(0, 10);
+      const count = Math.max(0, Number(item.count || 0));
+      const totals = pageTotals.get(path) || { path, total: 0, today: 0, last30Days: 0 };
+      totals.total += count;
+      if (date === today) totals.today += count;
+      if (date >= startDate && date <= today) totals.last30Days += count;
+      pageTotals.set(path, totals);
+    });
+    // Preserve historical apuração counts accumulated before portal-wide tracking.
+    const electionTotals = pageTotals.get('/eleicoes/apuracao') || { path: '/eleicoes/apuracao', total: 0, today: 0, last30Days: 0 };
+    electionTotals.total += historicalElectionPageViews.total;
+    electionTotals.today += historicalElectionPageViews.today;
+    electionTotals.last30Days += historicalElectionPageViews.last30Days;
+    pageTotals.set('/eleicoes/apuracao', electionTotals);
+    const portalPageViews = [...pageTotals.values()].reduce((totals, item) => ({
+      total: totals.total + item.total,
+      today: totals.today + item.today,
+      last30Days: totals.last30Days + item.last30Days,
+      pages: [...totals.pages, item],
+    }), { total: 0, today: 0, last30Days: 0, pages: [] as Array<{ path: string; total: number; today: number; last30Days: number }> });
+    portalPageViews.pages.sort((a, b) => b.total - a.total);
+    const electionPageViews = electionTotals;
 
     const activeMemberships = memberships.filter((membership) => !isDeletedRecord(membership) && String(membership.status || '').toLowerCase() !== 'inactive');
     const activePlatformCustomers = platformCustomers.filter((customer) => !isDeletedRecord(customer as any));
@@ -447,6 +474,7 @@ export const hqService = {
 
     return {
       electionPageViews,
+      portalPageViews,
       tenants,
       members,
       prospects: realProspects,

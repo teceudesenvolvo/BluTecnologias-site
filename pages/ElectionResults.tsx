@@ -2,7 +2,6 @@ import React from "react";
 import { SecondRoundPartial } from "./SecondRoundPartial";
 import { Activity, ArrowRight, ExternalLink, RefreshCw, Search, Scale, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { trackPageView } from "../services/analytics";
 
 const TSE_CONFIG_URL = "https://resultados.tse.jus.br/oficial/comum/config/ele-c.json";
 const REFRESH_INTERVAL = 60_000;
@@ -134,7 +133,6 @@ export const ElectionResultsPage: React.FC = () => {
   const [updatedAt, setUpdatedAt] = React.useState<Date | null>(null);
   const [checkedAt, setCheckedAt] = React.useState<Date | null>(null);
   const requestInFlight = React.useRef(false);
-  const pageViewTracked = React.useRef(false);
   const electionId = electionCode(selectedTurn);
 
   React.useEffect(() => {
@@ -148,12 +146,6 @@ export const ElectionResultsPage: React.FC = () => {
       .finally(() => { if (!controller.signal.aborted) setComparisonLoading(false); });
     return () => controller.abort();
   }, [showComparison, selectedTurn]);
-
-  React.useEffect(() => {
-    if (pageViewTracked.current) return;
-    pageViewTracked.current = true;
-    void trackPageView("/eleicoes/apuracao", "Apuração presidencial · Blu Tecnologias");
-  }, []);
 
   const refresh = React.useCallback(async (signal?: AbortSignal) => {
     if (requestInFlight.current) return;

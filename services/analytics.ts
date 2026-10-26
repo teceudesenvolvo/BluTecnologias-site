@@ -18,7 +18,12 @@ export async function trackPageView(path: string, title: string): Promise<void> 
   const isLocalDevelopment = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
   if (!isLocalDevelopment) {
     const endpoint = `https://${firebaseFunctionsRegion}-${firebaseConfig.projectId}.cloudfunctions.net/recordElectionPageView`;
-    void fetch(endpoint, { method: "POST", keepalive: true }).catch(() => undefined);
+    void fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+      keepalive: true,
+    }).catch(() => undefined);
   }
   const analytics = await getBrowserAnalytics();
   if (!analytics) return;

@@ -12,9 +12,13 @@ export const recordElectionPageView = functions.https.onRequest(async (req, res)
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method-not-allowed' }); return; }
   try {
+    const requestedPath = typeof req.body?.path === 'string' ? req.body.path : '/eleicoes/apuracao';
+    const path = requestedPath.startsWith('/') ? requestedPath.split('?')[0].slice(0, 300) : '/';
     const date = new Date().toISOString().slice(0, 10);
-    await admin.firestore().collection('electionPageViews').doc(date).set({
+    const pageId = Buffer.from(path).toString('base64url');
+    await admin.firestore().collection('portalPageViews').doc(`${date}_${pageId}`).set({
       date,
+      path,
       count: admin.firestore.FieldValue.increment(1),
       lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });

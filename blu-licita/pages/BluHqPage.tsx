@@ -106,7 +106,7 @@ const emptyPlan = (): PublicPlanDoc => ({
 });
 
 export const BluHqPage: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState<'overview' | 'customers' | 'billing' | 'emails' | 'platform' | 'privacy'>('overview');
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'customers' | 'billing' | 'emails' | 'platform' | 'privacy' | 'views'>('overview');
   const [data, setData] = React.useState<HqOverview | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -530,6 +530,7 @@ export const BluHqPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           {[
             ['overview', 'Visão geral'],
+            ['views', 'Visualizações'],
             ['customers', 'Clientes e funil'],
             ['billing', 'Planos e gateway'],
             ['emails', 'E-mails'],
@@ -571,7 +572,35 @@ export const BluHqPage: React.FC = () => {
             <Metric icon={<Users />} label="Cadastros incompletos" value={String(data?.metrics.incompleteCustomers || 0)} detail="Empresas ou vínculos que ainda pedem revisão" tone="amber" />
             <Metric icon={<Users />} label="Parceiros" value={String(data?.metrics.partners || 0)} detail="Revendedores e parceiros cadastrados" />
             <Metric icon={<ArrowUpRight />} label="Movimentos de plano" value={`${String(data?.metrics.upgrades || 0)} / ${String(data?.metrics.downgrades || 0)}`} detail="Upgrades / downgrades registrados" />
-            <Metric icon={<Eye />} label="Acessos à apuração" value={String(data?.electionPageViews.total || 0)} detail={`${data?.electionPageViews.today || 0} hoje · ${data?.electionPageViews.last30Days || 0} nos últimos 30 dias`} />
+            <Metric icon={<Eye />} label="Visualizações do portal" value={String(data?.portalPageViews.total || 0)} detail={`${data?.portalPageViews.today || 0} hoje · ${data?.portalPageViews.last30Days || 0} nos últimos 30 dias`} />
+          </section>}
+
+          {activeTab === 'views' && <section className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Metric icon={<Eye />} label="Visualizações totais" value={String(data?.portalPageViews.total || 0)} detail="Todas as páginas do portal" />
+              <Metric icon={<Eye />} label="Hoje" value={String(data?.portalPageViews.today || 0)} detail="Visualizações desde 00:00 UTC" />
+              <Metric icon={<Eye />} label="Últimos 30 dias" value={String(data?.portalPageViews.last30Days || 0)} detail="Atividade recente do portal" />
+            </div>
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/[0.05]">
+              <div className="border-b border-slate-100 p-5 dark:border-white/10">
+                <h2 className="text-xl font-black">Visualizações por página</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Acessos registrados em todas as rotas públicas e autenticadas.</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] text-left text-sm">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-400 dark:bg-white/[0.03]"><tr>{['Página', 'Total', 'Hoje', 'Últimos 30 dias'].map((label) => <th key={label} className="px-5 py-3">{label}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                    {(data?.portalPageViews.pages || []).map((page) => <tr key={page.path}>
+                      <td className="px-5 py-3 font-bold">{page.path}</td>
+                      <td className="px-5 py-3">{page.total.toLocaleString('pt-BR')}</td>
+                      <td className="px-5 py-3">{page.today.toLocaleString('pt-BR')}</td>
+                      <td className="px-5 py-3">{page.last30Days.toLocaleString('pt-BR')}</td>
+                    </tr>)}
+                    {!data?.portalPageViews.pages.length && <tr><td colSpan={4} className="p-10 text-center text-slate-400">Ainda não há visualizações registradas.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>}
 
           {activeTab === 'billing' && <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">

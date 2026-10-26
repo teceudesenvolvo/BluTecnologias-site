@@ -24,6 +24,7 @@ import { OnboardingPage } from './blu-licita/pages/OnboardingPage';
 import { PartnerProgramPage } from './pages/PartnerProgramPage';
 import { PublicStorePage } from './blu-licita/ecommerce/PublicStorePage';
 import { GlobalFeedback } from './blu-licita/components/GlobalFeedback';
+import { trackPageView } from './services/analytics';
 
 // Com Login
 import { BluRoutes } from './blu-licita/routes/BluRoutes';
@@ -31,6 +32,10 @@ import { BluRoutes } from './blu-licita/routes/BluRoutes';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
+  React.useEffect(() => {
+    const path = location.pathname;
+    void trackPageView(path, document.title || 'Blu Tecnologias');
+  }, [location.pathname]);
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');
   const isLanding = location.pathname === '/' || location.pathname === '/empresas' || location.pathname.startsWith('/empresas/');
   const isElectionResults = location.pathname === '/eleicoes/apuracao';
