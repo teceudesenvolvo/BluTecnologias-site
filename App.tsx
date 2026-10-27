@@ -9,6 +9,7 @@ import { BusinessLanding } from './pages/BusinessLanding';
 import { AudienceGateway } from './pages/AudienceGateway';
 import { Products } from './pages/Products';
 import { Blog } from './pages/Blog';
+import { BluToolsPage } from './pages/BluToolsPage';
 import { ElectionResultsPage } from './pages/ElectionResults';
 
 // Produtos
@@ -42,7 +43,7 @@ const AppContent: React.FC = () => {
   const firstSegment = location.pathname.split('/').filter(Boolean)[0] || '';
   const institutionalRoots = new Set([
     'blog', 'login', 'planos', 'parceria', 'cadastro', 'contact', 'products', 'empresas',
-    'privacy', 'admin', 'blu', 'eleicoes',
+    'privacy', 'admin', 'blu', 'eleicoes', 'ferramentas',
   ]);
   const isStorefront = Boolean(firstSegment) && !institutionalRoots.has(firstSegment);
   const hideFooter = location.pathname === '/login' || isSystem || isLanding || isStorefront || isElectionResults;
@@ -60,6 +61,8 @@ const AppContent: React.FC = () => {
             <Route path="/empresas/comercio" element={<BusinessLanding type="comercio" />} />
             <Route path="/empresas/servicos" element={<BusinessLanding type="servicos" />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/ferramentas" element={<BluToolsPage />} />
+            <Route path="/ferramentas/:slug" element={<BluToolsPage />} />
             <Route path="/blog/:id" element={<BlogPost />} />
             <Route path="/eleicoes/apuracao" element={<ElectionResultsPage />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />
