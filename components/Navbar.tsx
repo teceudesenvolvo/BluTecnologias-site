@@ -15,7 +15,7 @@ export const Navbar: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+    <nav className="sticky top-0 z-50 px-4 sm:px-6 py-3 md:py-4">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white/70 backdrop-blur-lg border border-white/40 rounded-2xl shadow-lg px-6 py-3 flex justify-between items-center">
           {/* Logo */}
@@ -57,7 +57,7 @@ export const Navbar: React.FC = () => {
 
         {/* Mobile Menu */}
         {isOpen && (
-          <div className="absolute top-24 left-6 right-6 bg-white/90 backdrop-blur-xl border border-white/50 rounded-2xl shadow-2xl p-6 flex flex-col gap-4 md:hidden animate-fade-in-down">
+          <div className="absolute top-full left-4 right-4 sm:left-6 sm:right-6 bg-white/90 backdrop-blur-xl border border-white/50 rounded-2xl shadow-2xl p-6 flex flex-col gap-4 md:hidden animate-fade-in-down">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
