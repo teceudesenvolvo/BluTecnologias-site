@@ -3,6 +3,9 @@ import {Link} from 'react-router-dom';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'indicacao-legislativa',name:'Gerador de indicação legislativa',description:'Prepare indicações com providências e justificativas.',category:'Legislativo',audiences:['Vereadores','Assessores','Câmaras'],icon:FileText},
+ {slug:'requerimento-informacoes',name:'Gerador de requerimento de informações',description:'Estruture solicitações de informações e documentos.',category:'Legislativo',audiences:['Vereadores','Assessores','Câmaras'],icon:ClipboardCheck},
+ {slug:'organizador-demandas',name:'Organizador de demandas dos cidadãos',description:'Acompanhe demandas sem cadastro e exporte uma lista CSV.',category:'Planejamento',audiences:['Vereadores','Assessores'],icon:Users},
  {slug:'gerador-atas-reuniao',name:'Gerador de atas de reunião',description:'Crie minutas de reuniões com deliberações e encaminhamentos.',category:'Documentos',audiences:['Assessores','Câmaras','Prefeituras'],icon:FileText},
  {slug:'gerador-pauta-sessao',name:'Gerador de pauta de sessão',description:'Organize matérias e autoria em uma pauta editável.',category:'Legislativo',audiences:['Assessores','Câmaras'],icon:ClipboardCheck},
  {slug:'calculadora-prazos',name:'Calculadora de prazos administrativos',description:'Simule datas em dias corridos ou úteis, sem feriados.',category:'Planejamento',audiences:['Assessores','Câmaras','Prefeituras'],icon:Calculator},
