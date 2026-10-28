@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'calculadora-financiamento',name:'Calculadora de financiamento de carro ou imóvel',description:'Calcule prestação, entrada, juros, prazo ou valor do bem a partir dos outros campos.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
  {slug:'indicacao-legislativa',name:'Gerador de indicação legislativa',description:'Prepare indicações com providências e justificativas.',category:'Legislativo',audiences:['Vereadores','Assessores','Câmaras'],icon:FileText},
  {slug:'requerimento-informacoes',name:'Gerador de requerimento de informações',description:'Estruture solicitações de informações e documentos.',category:'Legislativo',audiences:['Vereadores','Assessores','Câmaras'],icon:ClipboardCheck},
  {slug:'organizador-demandas',name:'Organizador de demandas dos cidadãos',description:'Acompanhe demandas sem cadastro e exporte uma lista CSV.',category:'Planejamento',audiences:['Vereadores','Assessores'],icon:Users},
@@ -18,7 +19,7 @@ const items:Item[]=[
  {slug:'gerador-documentos',name:'Gerador de documentos legislativos',description:'Crie minutas de ofícios, indicações, requerimentos e moções.',category:'Documentos',audiences:['Câmaras','Assessores','Vereadores'],icon:FileText},
  {slug:'calculadora-quorum',name:'Calculadora de quórum',description:'Simule quóruns e maiorias a partir do número de parlamentares.',category:'Legislativo',audiences:['Câmaras','Assessores','Vereadores'],icon:Users}
 ];
-const categories=['Todas','Transparência','Orçamento e finanças','Planejamento','Diagnósticos','Documentos','Legislativo'];
+const categories=['Todas','Finanças pessoais','Transparência','Orçamento e finanças','Planejamento','Diagnósticos','Documentos','Legislativo'];
 const audiences=['Todos','Câmaras','Prefeituras','Assessores','Vereadores'];
 export function ToolsDashboard(){
  const [search,setSearch]=useState(''),[category,setCategory]=useState('Todas'),[audience,setAudience]=useState('Todos');
