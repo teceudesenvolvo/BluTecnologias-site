@@ -3,6 +3,9 @@ import {Link} from 'react-router-dom';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'gerador-atas-reuniao',name:'Gerador de atas de reunião',description:'Crie minutas de reuniões com deliberações e encaminhamentos.',category:'Documentos',audiences:['Assessores','Câmaras','Prefeituras'],icon:FileText},
+ {slug:'gerador-pauta-sessao',name:'Gerador de pauta de sessão',description:'Organize matérias e autoria em uma pauta editável.',category:'Legislativo',audiences:['Assessores','Câmaras'],icon:ClipboardCheck},
+ {slug:'calculadora-prazos',name:'Calculadora de prazos administrativos',description:'Simule datas em dias corridos ou úteis, sem feriados.',category:'Planejamento',audiences:['Assessores','Câmaras','Prefeituras'],icon:Calculator},
  {slug:'analisador-transparencia-pntp',name:'Analisador de transparência',description:'Examine indícios de informações públicas a partir da URL de um portal.',category:'Transparência',audiences:['Prefeituras','Câmaras'],icon:ShieldCheck},
  {slug:'simulador-impacto-orcamentario',name:'Simulador de impacto orçamentário',description:'Projete custos de iniciativas, serviços e programas municipais.',category:'Orçamento e finanças',audiences:['Prefeituras','Assessores'],icon:Calculator},
  {slug:'simulador-duodecimo',name:'Simulador de duodécimo',description:'Estime parcelas mensais a partir de um orçamento anual informado.',category:'Orçamento e finanças',audiences:['Câmaras'],icon:Calculator},
