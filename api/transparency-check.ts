@@ -1,6 +1,5 @@
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
-import type {VercelRequest,VercelResponse} from '@vercel/node';
 
 function publicIp(ip:string){
  if(isIP(ip)===4){const p=ip.split('.').map(Number);return !(p[0]===0||p[0]===10||p[0]===127||p[0]>=224||(p[0]===169&&p[1]===254)||(p[0]===172&&p[1]>=16&&p[1]<=31)||(p[0]===192&&p[1]===168)||(p[0]===100&&p[1]>=64&&p[1]<=127)||(p[0]===192&&p[1]===0)||(p[0]===198&&(p[1]===18||p[1]===19)));}
@@ -19,7 +18,7 @@ const checks=[
  {id:'lgpd',name:'Privacidade e LGPD',words:['lgpd','política de privacidade','proteção de dados']},
  {id:'planejamento',name:'Planejamento e contas',words:['ppa','loa','ldo','prestação de contas']}
 ];
-export default async function handler(req:VercelRequest,res:VercelResponse){
+export default async function handler(req:any,res:any){
  if(req.method!=='POST')return res.status(405).json({error:'Método não permitido'});
  const raw=typeof req.body?.url==='string'?req.body.url.trim():'';
  if(raw.length>500)return res.status(400).json({error:'URL inválida'});
