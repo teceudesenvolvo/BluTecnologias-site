@@ -6,7 +6,7 @@ type Transfer={municipio:string;valor:number;ano:string;mes:string};
 const array=(raw:any):any[]=>{if(Array.isArray(raw))return raw;if(!raw||typeof raw!=='object')return [];for(const k of ['items','data','rows','result','resultado','municipios','transferencias'])if(Array.isArray(raw[k]))return raw[k];for(const v of Object.values(raw))if(Array.isArray(v))return v as any[];return []};
 const items=(raw:any):Item[]=>array(raw).map((v:any)=>({codigo:String(v.codigo??v.id??''),nome:String(v.nome??v.uf??'')})).filter(x=>x.codigo&&x.nome);
 const currency=(v:number)=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const numeric=(v:any)=>typeof v==='number'?v:Number(String(v??'').replace(/\./g,'').replace(',','.'));
+const numeric=(v:any)=>typeof v==='number'?v:Number(String(v??'').includes(',')?String(v).replace(/\./g,'').replace(',','.'):String(v??''));
 const endpoint=(params:Record<string,string>)=>'/api/fpm-ceara?'+new URLSearchParams(params).toString();
 export function FpmCearaPage(){
  const [state,setState]=useState(''),[type,setType]=useState(''),[types,setTypes]=useState<Item[]>([]),[cities,setCities]=useState<Item[]>([]),[records,setRecords]=useState<Transfer[]>([]),[year,setYear]=useState('2026'),[month,setMonth]=useState(String(new Date().getMonth()+1)),[search,setSearch]=useState(''),[selected,setSelected]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[updated,setUpdated]=useState('');
