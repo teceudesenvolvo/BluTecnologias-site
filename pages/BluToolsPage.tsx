@@ -11,7 +11,7 @@ import { BoardElectionTool } from './BoardElectionTool';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
- {slug:'eleicao-mesa-diretora',name:'Simulador de eleição da Mesa Diretora',description:'Crie uma sala compartilhável para simular votação nominal em chapas com liberação pelo organizador.'},
+ {slug:'eleicao-mesa-diretora',name:'Eleição da Mesa Diretora',description:'Crie uma sala compartilhável para realizar votação nominal em chapas com liberação pelo organizador.'},
  {slug:'simulador-investimentos',name:'Simulador de investimentos e juros',description:'Projete rendimentos e compare taxas históricas do Tesouro com cenários de CDB, LCI e LCA.'},
  {slug:'calculadora-financiamento',name:'Calculadora de financiamento de carro ou imóvel',description:'Descubra o valor do bem, entrada, taxa de juros, prazo ou prestação deixando um campo vazio.'},
  {slug:'indicacao-legislativa',name:'Gerador de indicação legislativa',description:'Elabore minutas de indicações com justificativa e providência solicitada.'},
