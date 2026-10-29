@@ -4,6 +4,7 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'eleicao-mesa-diretora',name:'Simulador de eleição da Mesa Diretora',description:'Crie uma sala, cadastre chapas e compartilhe votação nominal com liberação pelo organizador.',category:'Legislativo',audiences:['Câmaras','Vereadores','Assessores'],icon:Users},
  {slug:'simulador-investimentos',name:'Simulador de investimentos e juros',description:'Simule renda fixa e compare cenários de Tesouro, CDB, LCI e LCA.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
  {slug:'calculadora-financiamento',name:'Calculadora de financiamento de carro ou imóvel',description:'Calcule prestação, entrada, juros, prazo ou valor do bem a partir dos outros campos.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
  {slug:'indicacao-legislativa',name:'Gerador de indicação legislativa',description:'Prepare indicações com providências e justificativas.',category:'Legislativo',audiences:['Vereadores','Assessores','Câmaras'],icon:FileText},
