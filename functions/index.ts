@@ -16,12 +16,29 @@ export const recordElectionPageView = functions.https.onRequest(async (req, res)
     const path = requestedPath.startsWith('/') ? requestedPath.split('?')[0].slice(0, 300) : '/';
     const date = new Date().toISOString().slice(0, 10);
     const pageId = Buffer.from(path).toString('base64url');
-    await admin.firestore().collection('portalPageViews').doc(`${date}_${pageId}`).set({
-      date,
-      path,
-      count: admin.firestore.FieldValue.increment(1),
-      lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    const database = admin.firestore();
+    const pageRef = database.collection('portalPageViews').doc(`${date}_${pageId}`);
+    const sessionId = typeof req.body?.sessionId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(req.body.sessionId)
+      ? req.body.sessionId
+      : '';
+    await database.runTransaction(async (transaction) => {
+      const sessionRef = sessionId ? database.collection('portalPageViewSessions').doc(sessionId) : null;
+      const session = sessionRef ? await transaction.get(sessionRef) : null;
+      transaction.set(pageRef, {
+        date,
+        path,
+        count: admin.firestore.FieldValue.increment(1),
+        lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      if (sessionRef) {
+        const existingEvents = session?.data()?.events;
+        const events = Array.isArray(existingEvents) ? existingEvents : [];
+        transaction.set(sessionRef, {
+          events: [...events, { path, at: Date.now() }].slice(-80),
+          lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+    });
     res.status(204).send('');
   } catch (error) {
     console.error('Failed to record election page view', error);

@@ -32,8 +32,11 @@ import { BluRoutes } from './blu-licita/routes/BluRoutes';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
+  const trackedPath = React.useRef('');
   React.useEffect(() => {
     const path = location.pathname;
+    if (path === '/admin/hq' || trackedPath.current === path) return;
+    trackedPath.current = path;
     void trackPageView(path, document.title || 'Blu Tecnologias');
   }, [location.pathname]);
   const isSystem = location.pathname.startsWith('/admin') || location.pathname.startsWith('/blu');

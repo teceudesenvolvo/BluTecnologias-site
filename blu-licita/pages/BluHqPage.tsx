@@ -107,6 +107,7 @@ const emptyPlan = (): PublicPlanDoc => ({
 
 export const BluHqPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<'overview' | 'customers' | 'billing' | 'emails' | 'platform' | 'privacy' | 'views'>('overview');
+  const [selectedAnalyticsPagePath, setSelectedAnalyticsPagePath] = React.useState('');
   const [data, setData] = React.useState<HqOverview | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -591,7 +592,7 @@ export const BluHqPage: React.FC = () => {
                   <thead className="bg-slate-50 text-[10px] uppercase text-slate-400 dark:bg-white/[0.03]"><tr>{['Página', 'Total', 'Hoje', 'Últimos 30 dias'].map((label) => <th key={label} className="px-5 py-3">{label}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                     {(data?.portalPageViews.pages || []).map((page) => <tr key={page.path}>
-                      <td className="px-5 py-3 font-bold">{page.path}</td>
+                      <td className="px-5 py-3"><button type="button" onClick={() => setSelectedAnalyticsPagePath(page.path)} className="font-bold text-blue-700 hover:underline dark:text-blue-300">{page.path}</button></td>
                       <td className="px-5 py-3">{page.total.toLocaleString('pt-BR')}</td>
                       <td className="px-5 py-3">{page.today.toLocaleString('pt-BR')}</td>
                       <td className="px-5 py-3">{page.last30Days.toLocaleString('pt-BR')}</td>
@@ -601,6 +602,48 @@ export const BluHqPage: React.FC = () => {
                 </table>
               </div>
             </div>
+            {(() => {
+              const page = data?.portalPageViews.pages.find((item) => item.path === selectedAnalyticsPagePath);
+              if (!page) return null;
+              const days = Array.from({ length: 30 }, (_, index) => {
+                const date = new Date(Date.now() - (29 - index) * 86_400_000).toISOString().slice(0, 10);
+                return { date, count: page.days.find((item) => item.date === date)?.count || 0 };
+              });
+              const maxDailyCount = Math.max(1, ...days.map((item) => item.count));
+              const journeys = (data?.portalPageViews.sessions || [])
+                .filter((session) => session.events.some((event) => event.path === page.path))
+                .slice(0, 20);
+              return <section className="overflow-hidden rounded-3xl border border-blue-200 bg-white/80 shadow-sm dark:border-blue-300/20 dark:bg-white/[0.05]">
+                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-5 dark:border-white/10">
+                  <div><p className="text-xs font-black uppercase tracking-[.18em] text-blue-600">Detalhe da página</p><h2 className="mt-1 break-all text-xl font-black">{page.path}</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-300">{page.total.toLocaleString('pt-BR')} visualizações no histórico registrado</p></div>
+                  <button type="button" onClick={() => setSelectedAnalyticsPagePath('')} aria-label="Fechar detalhe da página" className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"><X size={18}/></button>
+                </header>
+                <div className="grid gap-5 p-5 xl:grid-cols-[1.15fr_.85fr]">
+                  <div>
+                    <h3 className="font-bold">Visualizações por dia · últimos 30 dias</h3>
+                    <div className="mt-4 flex h-44 items-end gap-1.5 border-b border-slate-200 dark:border-white/10" role="img" aria-label={`Visualizações diárias de ${page.path} nos últimos 30 dias`}>
+                      {days.map((item) => <div key={item.date} title={`${new Date(`${item.date}T12:00:00Z`).toLocaleDateString('pt-BR')}: ${item.count}`} className="flex h-full flex-1 flex-col justify-end"><div className="min-h-0 rounded-t bg-blue-500/85" style={{ height: item.count ? `${Math.max(4, item.count / maxDailyCount * 100)}%` : '0%' }}/></div>)}
+                    </div>
+                    <div className="mt-2 flex justify-between text-[10px] text-slate-400"><span>{new Date(`${days[0].date}T12:00:00Z`).toLocaleDateString('pt-BR')}</span><span>{new Date(`${days[days.length - 1].date}T12:00:00Z`).toLocaleDateString('pt-BR')}</span></div>
+                  </div>
+                  <div>
+                    <h3 className="font-bold">Jornadas recentes que abriram esta página</h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Sequência de rotas nesta aba anônima do navegador.</p>
+                    <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                      {journeys.map((session) => <article key={session.id} className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+                        <p className="mb-2 text-[10px] text-slate-400">Atividade mais recente: {session.lastActivityAt ? new Date(session.lastActivityAt).toLocaleString('pt-BR') : '—'}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">{session.events.map((event, index) => <React.Fragment key={`${session.id}-${event.at}-${index}`}>
+                          {index > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
+                          <span className={`max-w-full break-all rounded-md px-2 py-1 text-[10px] ${event.path === page.path ? 'bg-blue-100 font-bold text-blue-800 dark:bg-blue-400/15 dark:text-blue-200' : 'bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300'}`}>{event.path}</span>
+                        </React.Fragment>)}</div>
+                      </article>)}
+                      {!journeys.length && <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-400 dark:border-white/10">As jornadas estarão disponíveis à medida que as próximas visitas forem registradas.</p>}
+                    </div>
+                  </div>
+                </div>
+                <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400 dark:border-white/10">As jornadas usam um identificador aleatório temporário por aba; não incluem conta, nome ou e-mail do visitante. São exibidas até as últimas 80 rotas de cada aba e até 100 abas recentes.</p>
+              </section>;
+            })()}
           </section>}
 
           {activeTab === 'billing' && <section className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_24px_80px_rgba(0,0,0,.35)]">

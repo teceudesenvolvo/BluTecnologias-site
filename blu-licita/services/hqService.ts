@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
 
 export type HqCompany = {
@@ -179,7 +179,13 @@ export type HqIncompleteCustomer = {
 
 export type HqOverview = {
   electionPageViews: { total: number; today: number; last30Days: number };
-  portalPageViews: { total: number; today: number; last30Days: number; pages: Array<{ path: string; total: number; today: number; last30Days: number }> };
+  portalPageViews: {
+    total: number;
+    today: number;
+    last30Days: number;
+    pages: Array<{ path: string; total: number; today: number; last30Days: number; days: Array<{ date: string; count: number }> }>;
+    sessions: Array<{ id: string; lastActivityAt: number; events: Array<{ path: string; at: number }> }>;
+  };
   tenants: HqCustomerRow[];
   incompleteCustomers: HqIncompleteCustomer[];
   partners: HqPartner[];
@@ -214,6 +220,18 @@ const asList = async <T,>(name: string): Promise<T[]> => {
   const snapshot = await getDocs(collection(db, name));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T);
 };
+const asRecentPageViewSessions = async () => {
+  const snapshot = await getDocs(query(collection(db, 'portalPageViewSessions'), orderBy('lastActivityAt', 'desc'), limit(100)));
+  return snapshot.docs.map((item) => {
+    const value = item.data();
+    const rawActivity = value.lastActivityAt;
+    const lastActivityAt = typeof rawActivity?.toMillis === 'function' ? rawActivity.toMillis() : Number(rawActivity || 0);
+    const events = Array.isArray(value.events) ? value.events
+      .filter((event: any) => event && typeof event.path === 'string' && Number.isFinite(Number(event.at)))
+      .map((event: any) => ({ path: event.path, at: Number(event.at) })) : [];
+    return { id: item.id, lastActivityAt, events };
+  });
+};
 
 const normalizeStatus = (status?: string) => {
   const value = String(status || '').toUpperCase();
@@ -244,7 +262,7 @@ export const hqService = {
     if (!email) throw new Error('Aguardando autenticação do administrador da Blu.');
     if (email !== platformAdminEmail) throw new Error('Acesso restrito ao administrador da Blu.');
 
-    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners, electionViews, portalViews] = await Promise.all([
+    const [companies, subscriptions, plans, payments, orders, tickets, prospects, clients, memberships, platformCustomers, partners, electionViews, portalViews, portalSessions] = await Promise.all([
       asList<HqCompany>('companies'),
       asList<HqSubscription>('subscriptions'),
       asList<HqPlan>('plans'),
@@ -258,6 +276,7 @@ export const hqService = {
       asList<HqPartner>('partners').catch(() => []),
       asList<{ id: string; date?: string; count?: number }>('electionPageViews').catch(() => []),
       asList<{ id: string; date?: string; path?: string; count?: number }>('portalPageViews').catch(() => []),
+      asRecentPageViewSessions().catch(() => []),
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
@@ -272,19 +291,26 @@ export const hqService = {
       if (date >= startDate && date <= today) totals.last30Days += count;
       return totals;
     }, { total: 0, today: 0, last30Days: 0 });
-    const pageTotals = new Map<string, { path: string; total: number; today: number; last30Days: number }>();
+    const pageTotals = new Map<string, { path: string; total: number; today: number; last30Days: number; days: Record<string, number> }>();
     portalViews.forEach((item) => {
       const path = String(item.path || '/');
       const date = item.date || item.id.slice(0, 10);
       const count = Math.max(0, Number(item.count || 0));
-      const totals = pageTotals.get(path) || { path, total: 0, today: 0, last30Days: 0 };
+      const totals = pageTotals.get(path) || { path, total: 0, today: 0, last30Days: 0, days: {} };
       totals.total += count;
+      totals.days[date] = (totals.days[date] || 0) + count;
       if (date === today) totals.today += count;
       if (date >= startDate && date <= today) totals.last30Days += count;
       pageTotals.set(path, totals);
     });
     // Preserve historical apuração counts accumulated before portal-wide tracking.
-    const electionTotals = pageTotals.get('/eleicoes/apuracao') || { path: '/eleicoes/apuracao', total: 0, today: 0, last30Days: 0 };
+    electionViews.forEach((item) => {
+      const date = item.date || item.id;
+      const totals = pageTotals.get('/eleicoes/apuracao') || { path: '/eleicoes/apuracao', total: 0, today: 0, last30Days: 0, days: {} };
+      totals.days[date] = (totals.days[date] || 0) + Math.max(0, Number(item.count || 0));
+      pageTotals.set('/eleicoes/apuracao', totals);
+    });
+    const electionTotals = pageTotals.get('/eleicoes/apuracao') || { path: '/eleicoes/apuracao', total: 0, today: 0, last30Days: 0, days: {} };
     electionTotals.total += historicalElectionPageViews.total;
     electionTotals.today += historicalElectionPageViews.today;
     electionTotals.last30Days += historicalElectionPageViews.last30Days;
@@ -293,8 +319,9 @@ export const hqService = {
       total: totals.total + item.total,
       today: totals.today + item.today,
       last30Days: totals.last30Days + item.last30Days,
-      pages: [...totals.pages, item],
-    }), { total: 0, today: 0, last30Days: 0, pages: [] as Array<{ path: string; total: number; today: number; last30Days: number }> });
+      pages: [...totals.pages, { ...item, days: Object.entries(item.days).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)) }],
+      sessions: totals.sessions,
+    }), { total: 0, today: 0, last30Days: 0, pages: [] as Array<{ path: string; total: number; today: number; last30Days: number; days: Array<{ date: string; count: number }> }>, sessions: portalSessions });
     portalPageViews.pages.sort((a, b) => b.total - a.total);
     const electionPageViews = electionTotals;
 

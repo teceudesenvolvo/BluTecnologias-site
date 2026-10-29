@@ -32,6 +32,15 @@ type TseData = {
 type StateResult = { uf: string; name: string; data: TseData; candidates: TseCandidate[] };
 type ApuracaoSnapshot = { timestamp: number; turn: 1 | 2; sections: number; candidates: Array<{ key: string; name: string; percent: number; votes: number }> };
 type Municipality = { code: string; name: string };
+type ElectionOfficeKey = "president" | "governor" | "senator" | "federalDeputy" | "stateDeputy";
+type ElectionOffice = { key: ElectionOfficeKey; label: string; title: string; code: number; twoRounds: boolean };
+const ELECTION_OFFICES: ElectionOffice[] = [
+  { key: "president", label: "Presidente", title: "Presidente do Brasil", code: 1, twoRounds: true },
+  { key: "governor", label: "Governador", title: "Governador", code: 3, twoRounds: true },
+  { key: "senator", label: "Senador", title: "Senador", code: 5, twoRounds: false },
+  { key: "federalDeputy", label: "Deputado federal", title: "Deputado federal", code: 6, twoRounds: false },
+  { key: "stateDeputy", label: "Deputado estadual/distrital", title: "Deputado estadual/distrital", code: 7, twoRounds: false },
+];
 type GeoFeature = { type: string; id?: string | number; properties?: Record<string, string | number>; geometry?: { type: string; coordinates: unknown } };
 type GeoCollection = { type: string; features: GeoFeature[] };
 type AnyMapApi = { map: () => any; scales: { linearColor: (from: string, to: string) => any } };
@@ -42,8 +51,11 @@ const number = (value: string | number | undefined) => Number(String(value ?? 0)
 const integer = (value: string | number | undefined) => new Intl.NumberFormat("pt-BR").format(number(value));
 const percent = (value: string | number | undefined) => `${number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const electionCode = (turn: 1 | 2) => turn === 1 ? 6257 : 6258;
-const resultUrl = (uf: string, electionId: number) => `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/dados/${uf}/${uf}-c0001-e${String(electionId).padStart(6, "0")}-u.json`;
-const officialResultsUrl = (electionId: number) => `https://resultados.tse.jus.br/oficial/app/index.html#/eleicao/${electionId}/uf/br/cargo/1/vis/nominal/resultados`;
+const resultUrl = (uf: string, electionId: number, officeCode = 1) => {
+  const code = uf === "df" && officeCode === 7 ? 8 : officeCode;
+  return `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/dados/${uf}/${uf}-c${String(code).padStart(4, "0")}-e${String(electionId).padStart(6, "0")}-u.json`;
+};
+const officialResultsUrl = (electionId: number, officeCode = 1, uf = "br") => `https://resultados.tse.jus.br/oficial/app/index.html#/eleicao/${electionId}/uf/${uf}/cargo/${officeCode}/vis/nominal/resultados`;
 const municipalityConfigUrl = (electionId: number) => `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/config/mun-e${String(electionId).padStart(6, "0")}-cm.json`;
 const municipalityResultUrl = (uf: string, code: string, electionId: number) => `https://resultados.tse.jus.br/oficial/ele2026/${electionId}/dados/${uf}/${uf}${code.padStart(5, "0")}-c0001-e${String(electionId).padStart(6, "0")}-u.json`;
 const stateMapUrl = (uf: string) => `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${uf.toUpperCase()}?formato=application/vnd.geo+json&qualidade=minima`;
@@ -91,8 +103,8 @@ async function fetchResult(url: string, signal?: AbortSignal) {
   return await response.json() as TseData;
 }
 
-function extractCandidates(data: TseData): TseCandidate[] {
-  const candidates = (data.carg || []).filter((office) => String(office.cd) === "1")
+function extractCandidates(data: TseData, officeCode = 1): TseCandidate[] {
+  const candidates = (data.carg || []).filter((office) => String(office.cd) === String(officeCode))
     .flatMap((office) => office.agr || [])
     .flatMap((group) => group.par || [])
     .flatMap((party) => (party.cand || []).map((candidate) => ({ ...candidate, sg: candidate.sg || party.sg })));
@@ -101,6 +113,10 @@ function extractCandidates(data: TseData): TseCandidate[] {
 
 export const ElectionResultsPage: React.FC = () => {
   const [selectedTurn, setSelectedTurn] = React.useState<1 | 2>(2);
+  const [selectedOfficeKey, setSelectedOfficeKey] = React.useState<ElectionOfficeKey>("president");
+  const [officeData, setOfficeData] = React.useState<TseData | null>(null);
+  const [officeLoading, setOfficeLoading] = React.useState(false);
+  const [officeError, setOfficeError] = React.useState("");
   const [showBluIntro, setShowBluIntro] = React.useState(false);
   React.useEffect(() => {
     try { if (sessionStorage.getItem("blu-election-intro-dismissed") === "1") return; } catch { /* storage disabled */ }
@@ -134,9 +150,10 @@ export const ElectionResultsPage: React.FC = () => {
   const [checkedAt, setCheckedAt] = React.useState<Date | null>(null);
   const requestInFlight = React.useRef(false);
   const electionId = electionCode(selectedTurn);
+  const selectedOffice = ELECTION_OFFICES.find((office) => office.key === selectedOfficeKey) || ELECTION_OFFICES[0];
 
   React.useEffect(() => {
-    if (!showComparison) return;
+    if (!showComparison || selectedOfficeKey !== "president") return;
     const controller = new AbortController();
     setComparisonLoading(true);
     setComparisonData(null);
@@ -145,9 +162,40 @@ export const ElectionResultsPage: React.FC = () => {
       .catch(() => { if (!controller.signal.aborted) setComparisonData(null); })
       .finally(() => { if (!controller.signal.aborted) setComparisonLoading(false); });
     return () => controller.abort();
-  }, [showComparison, selectedTurn]);
+  }, [showComparison, selectedTurn, selectedOfficeKey]);
+
+  React.useEffect(() => {
+    if (selectedOfficeKey === "president") {
+      setOfficeData(null);
+      setOfficeError("");
+      return;
+    }
+    const controller = new AbortController();
+    const loadOfficeResults = async () => {
+      setOfficeLoading(true);
+      setOfficeError("");
+      try {
+        const code = selectedOfficeKey === "stateDeputy" && selectedUf === "df" ? 8 : selectedOffice.code;
+        const result = await fetchResult(resultUrl(selectedUf, electionId, code), controller.signal);
+        if (!controller.signal.aborted) setOfficeData(result);
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setOfficeData(null);
+          setOfficeError(cause instanceof Error && cause.message === "TSE 404"
+            ? "O TSE ainda não publicou resultados para este cargo, turno e UF."
+            : "Não foi possível consultar os dados do TSE.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setOfficeLoading(false);
+      }
+    };
+    void loadOfficeResults();
+    const timer = window.setInterval(() => void loadOfficeResults(), REFRESH_INTERVAL);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [selectedOfficeKey, selectedUf, electionId, selectedOffice.code]);
 
   const refresh = React.useCallback(async (signal?: AbortSignal) => {
+    if (selectedOfficeKey !== "president") { setLoading(false); return; }
     if (requestInFlight.current) return;
     requestInFlight.current = true;
     try {
@@ -192,7 +240,7 @@ export const ElectionResultsPage: React.FC = () => {
       setLoading(false);
       requestInFlight.current = false;
     }
-  }, [electionId, selectedTurn]);
+  }, [electionId, selectedTurn, selectedOfficeKey]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -394,22 +442,49 @@ export const ElectionResultsPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             <Link to="/empresas" className="hidden text-right sm:block"><span className="block text-xs font-black text-white">Blu Tecnologias</span><span className="text-[10px] text-slate-400">Soluções digitais para empresas e órgãos públicos</span></Link>
             <Link to="/empresas" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-400 px-3 py-2.5 text-xs font-black text-[#061321] transition hover:bg-sky-300 sm:px-4 sm:text-sm">Conheça a Blu <ArrowRight size={14}/></Link>
-            <a href={officialResultsUrl(electionId)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-white/85 transition hover:bg-white/10 sm:gap-2 sm:px-4 sm:text-sm">
+            <a href={officialResultsUrl(electionId, selectedOfficeKey === "stateDeputy" && selectedUf === "df" ? 8 : selectedOffice.code, selectedOfficeKey === "president" ? "br" : selectedUf)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-white/85 transition hover:bg-white/10 sm:gap-2 sm:px-4 sm:text-sm">
               Resultado oficial do TSE <ExternalLink size={14}/>
             </a>
           </div>
         </header>
 
+        <nav aria-label="Cargo em apuração" className="mt-7 flex flex-wrap gap-2">
+          {ELECTION_OFFICES.map((office) => <button key={office.key} type="button" onClick={() => {
+            setSelectedOfficeKey(office.key);
+            if (!office.twoRounds) setSelectedTurn(1);
+            setShowPartial(false);
+            setShowComparison(false);
+          }} aria-pressed={selectedOfficeKey === office.key} className={`rounded-xl border px-4 py-3 text-sm font-black transition ${selectedOfficeKey === office.key ? "border-sky-300/40 bg-sky-300 text-[#061321]" : "border-white/10 bg-[#0d1b2b] text-slate-300 hover:bg-white/10"}`}>{office.label}</button>)}
+        </nav>
+
         <nav aria-label="Turno da eleição" className="mt-7 inline-flex flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-[#0d1b2b] p-1.5">
           {([1, 2] as const).map((turn) => {
             const active = !showPartial && !showComparison && selectedTurn === turn;
-            return <button key={turn} type="button" onClick={() => { setSelectedTurn(turn); setShowPartial(false); setShowComparison(false); }} aria-pressed={active} className={`rounded-xl px-5 py-3 text-sm font-black transition ${active ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${active ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : "25 de outubro"}</span></button>;
+            const unavailable = turn === 2 && !selectedOffice.twoRounds;
+            return <button key={turn} type="button" disabled={unavailable} onClick={() => { setSelectedTurn(turn); setShowPartial(false); setShowComparison(false); }} aria-pressed={active} title={unavailable ? "Este cargo é definido no primeiro turno" : undefined} className={`rounded-xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-35 ${active ? "bg-sky-400 text-[#061321] shadow-lg" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{turn}º turno <span className={`ml-1 hidden text-xs font-medium sm:inline ${active ? "text-[#123047]/75" : "text-slate-500"}`}>{turn === 1 ? "4 de outubro" : unavailable ? "não se aplica" : "25 de outubro"}</span></button>;
           })}
-          <button type="button" onClick={() => { setShowComparison(true); setShowPartial(false); }} aria-pressed={showComparison} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${showComparison ? "border-violet-300/40 bg-violet-300 text-[#160b2b] shadow-lg" : "border-violet-300/20 text-violet-200 hover:bg-violet-300/10"}`}><Scale size={15}/>Comparativo</button>
-          <button type="button" onClick={() => { setSelectedTurn(2); setShowComparison(false); setShowPartial(true); }} aria-pressed={showPartial} className={`ml-1 rounded-xl border px-5 py-3 text-sm font-black transition ${showPartial ? "border-amber-300/40 bg-amber-300 text-[#221600] shadow-lg" : "border-amber-300/20 text-amber-200 hover:bg-amber-300/10"}`}>Parcial 2º turno · exterior</button>
+          {selectedOfficeKey === "president" && <>
+            <button type="button" onClick={() => { setShowComparison(true); setShowPartial(false); }} aria-pressed={showComparison} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${showComparison ? "border-violet-300/40 bg-violet-300 text-[#160b2b] shadow-lg" : "border-violet-300/20 text-violet-200 hover:bg-violet-300/10"}`}><Scale size={15}/>Comparativo</button>
+            <button type="button" onClick={() => { setSelectedTurn(2); setShowComparison(false); setShowPartial(true); }} aria-pressed={showPartial} className={`ml-1 rounded-xl border px-5 py-3 text-sm font-black transition ${showPartial ? "border-amber-300/40 bg-amber-300 text-[#221600] shadow-lg" : "border-amber-300/20 text-amber-200 hover:bg-amber-300/10"}`}>Parcial 2º turno · exterior</button>
+          </>}
         </nav>
 
-        {showPartial ? <SecondRoundPartial /> : showComparison ? <>
+        {selectedOfficeKey !== "president" ? <>
+          <section className="mt-10 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#102844] via-[#10213a] to-[#10192b] p-6 shadow-2xl sm:p-9">
+            <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[.2em] text-sky-300"><Activity size={15}/>Apuração oficial · {selectedTurn}º turno</p>
+            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{selectedOffice.title}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Resumo da totalização oficial do TSE por unidade da federação. Consulte a página oficial para ver os detalhes das candidaturas.</p>
+          </section>
+          <section className="mt-7 rounded-[1.75rem] border border-white/10 bg-[#0d1b2b] p-5 sm:p-7">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400">Unidade da federação</p><h2 className="mt-1 text-xl font-black">Selecione o estado</h2></div><span className="text-xs text-slate-400">{selectedUf.toUpperCase()} · atualização automática a cada minuto</span></div>
+            <div className="mt-4 flex flex-wrap gap-2">{STATE_CODES.map(([uf, name]) => <button key={uf} type="button" onClick={() => setSelectedUf(uf)} aria-pressed={selectedUf === uf} aria-label={name} className={`rounded-lg px-3 py-2 text-xs font-black transition ${selectedUf === uf ? "bg-sky-300 text-[#061321]" : "bg-white/8 text-slate-300 hover:bg-white/15"}`}>{uf.toUpperCase()}</button>)}</div>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/8 pt-5"><div><h3 className="text-lg font-black">{STATE_CODES.find(([uf]) => uf === selectedUf)?.[1]} · {selectedOffice.title}</h3><p className="mt-1 text-xs text-slate-400">{selectedOffice.twoRounds ? "Este cargo pode ter segundo turno quando aplicável." : "Este cargo é definido no primeiro turno."}</p></div><a href={officialResultsUrl(electionId, selectedOfficeKey === "stateDeputy" && selectedUf === "df" ? 8 : selectedOffice.code, selectedUf)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold text-white/85 transition hover:bg-white/10">Abrir no TSE <ExternalLink size={14}/></a></div>
+            {officeLoading ? <div className="grid min-h-44 place-items-center text-sm text-slate-400"><RefreshCw size={19} className="animate-spin"/></div> : officeError ? <p className="mt-5 rounded-xl border border-amber-300/15 bg-amber-300/5 p-4 text-sm text-amber-100">{officeError}</p> : officeData ? <>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Seções apuradas" value={`${integer(officeData.s?.st)} / ${integer(officeData.s?.ts)}`} detail={`${percent(officeData.s?.pst)} do total`} /><Metric label="Votos computados" value={integer(officeData.v?.tv)} /><Metric label="Votos válidos" value={integer(officeData.v?.vv)} /></div>
+              <p className="mt-5 border-t border-white/8 pt-4 text-xs leading-5 text-slate-400">O detalhamento oficial das candidaturas e da votação está disponível no TSE pelo botão “Abrir no TSE”.</p>
+            </> : <p className="mt-5 py-10 text-center text-sm text-slate-400">Os resultados deste cargo ainda não estão disponíveis.</p>}
+          </section>
+        </> : showPartial ? <SecondRoundPartial /> : showComparison ? <>
           <section className="mt-10 rounded-[2rem] border border-violet-300/20 bg-gradient-to-br from-[#21183a] via-[#151d35] to-[#10192b] p-6 shadow-2xl sm:p-9">
             <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-violet-200"><Scale size={15}/>Comparação de resultados oficiais</p>
             <h1 className="mt-3 text-3xl font-black sm:text-4xl">Comparativo entre os turnos</h1>
@@ -576,7 +651,7 @@ export const ElectionResultsPage: React.FC = () => {
           </div>
         </section>
         </>}
-        <footer className="mt-8 text-center text-xs text-slate-500">Fontes: <a className="underline hover:text-slate-300" href={TSE_CONFIG_URL} target="_blank" rel="noreferrer">arquivos oficiais de resultados do TSE</a> · <a className="underline hover:text-slate-300" href="https://servicodados.ibge.gov.br/api/docs/malhas?versao=3" target="_blank" rel="noreferrer">malha geográfica do IBGE</a> · Eleição {electionId} · Cargo 1</footer>
+        <footer className="mt-8 text-center text-xs text-slate-500">Fontes: <a className="underline hover:text-slate-300" href={TSE_CONFIG_URL} target="_blank" rel="noreferrer">arquivos oficiais de resultados do TSE</a> · <a className="underline hover:text-slate-300" href="https://servicodados.ibge.gov.br/api/docs/malhas?versao=3" target="_blank" rel="noreferrer">malha geográfica do IBGE</a> · Eleição {electionId} · Cargo {selectedOfficeKey === "stateDeputy" && selectedUf === "df" ? 8 : selectedOffice.code}</footer>
       </div>
     </main>
   );
