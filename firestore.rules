@@ -16,13 +16,23 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly(['name','city','seats','owner','status','slates','createdAt'])
+        && request.resource.data.keys().hasOnly(['name','city','state','termStart','termEnd','electionDate','adminName','votingRule','seats','owner','status','slates','createdAt'])
         && request.resource.data.owner == request.auth.uid
         && request.resource.data.status == 'draft'
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 120
         && request.resource.data.city is string
         && request.resource.data.city.size() <= 100
+        && request.resource.data.state is string
+        && request.resource.data.state.size() == 2
+        && request.resource.data.adminName is string
+        && request.resource.data.adminName.size() > 0
+        && request.resource.data.adminName.size() <= 100
+        && request.resource.data.termStart is int
+        && request.resource.data.termEnd is int
+        && request.resource.data.termEnd >= request.resource.data.termStart
+        && request.resource.data.electionDate is string
+        && request.resource.data.votingRule in ['Maioria absoluta dos membros','Maioria dos votos válidos']
         && request.resource.data.seats is int
         && request.resource.data.seats >= 1
         && request.resource.data.seats <= 55
