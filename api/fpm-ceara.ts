@@ -3,15 +3,29 @@ const paths:Record<string,string>={states:'estados',types:'transferencias',citie
 const rows=(raw:any):any[]=>{
  if(Array.isArray(raw))return raw;
  if(!raw||typeof raw!=='object')return [];
- for(const key of ['registros','items','data','result','resultado','results','rows','value','response']){
+ for(const key of ['registros','items','data','result','resultado','results','rows','value','response','transferencias','estados']){
   if(raw[key]!==undefined){const found=rows(raw[key]);if(found.length)return found}
  }
- if(raw.codigo!==undefined||raw.CODIGO!==undefined)return [raw];
+ if(raw.codigo!==undefined||raw.CODIGO!==undefined||raw.transferencia!==undefined||raw.TRANSFERENCIA!==undefined)return [raw];
  const values=Object.values(raw);
- if(values.length&&values.every(v=>v&&typeof v==='object'&&!Array.isArray(v)&&('codigo' in (v as any)||'nome' in (v as any))))return values as any[];
+ if(values.length&&values.every(v=>v&&typeof v==='object'&&!Array.isArray(v)&&('codigo' in (v as any)||'nome' in (v as any)||'CODIGO' in (v as any)||'NOME' in (v as any))))return values as any[];
  return [];
 };
-async function treasury(url:string){const response=await fetch(url,{headers:{Accept:'*/*'},signal:AbortSignal.timeout(20000)});if(!response.ok)throw new Error('Tesouro retornou HTTP '+response.status);return response.json()}
+async function treasury(url:string){
+ let lastError:Error|null=null;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(18000)});
+   if(!response.ok){
+    const err=new Error('Tesouro retornou HTTP '+response.status+' em '+new URL(url).pathname.split('/').pop());
+    if(![429,500,502,503,504].includes(response.status))throw err;
+    lastError=err;
+   }else return await response.json();
+  }catch(e){lastError=e instanceof Error?e:new Error('Falha na consulta oficial')}
+  if(attempt<2)await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));
+ }
+ throw lastError||new Error('API oficial indisponível');
+}
 export default async function handler(req:any,res:any){
  if(req.method!=='GET')return res.status(405).json({error:'Método não permitido'});
  const kind=String(req.query.kind||'');
@@ -31,11 +45,11 @@ export default async function handler(req:any,res:any){
  try{
   let data:any;
   if(kind==='data'){
-   const all:any[]=[];const pageSize=1000;let complete=false;
-   for(let page=1;page<=8;page++){
+   const all:any[]=[];const pageSize=250;let complete=false;
+   for(let page=1;page<=30;page++){
     const p=new URLSearchParams(params);p.set('page',String(page));p.set('pageSize',String(pageSize));
     const raw=await treasury(base+'?'+p.toString());const batch=rows(raw);all.push(...batch);
-    if(batch.length<pageSize){complete=true;break}
+    if(raw?.hasMore===false||raw?.has_more===false||raw?.next===null||batch.length<pageSize){complete=true;break}
    }
    if(!complete)return res.status(503).json({error:'O Tesouro retornou mais registros do que o limite seguro de consulta. Nenhum total parcial será exibido.'});
    data=all;
