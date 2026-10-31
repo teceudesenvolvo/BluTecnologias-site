@@ -11,7 +11,21 @@ const rows=(raw:any):any[]=>{
  if(values.length&&values.every(v=>v&&typeof v==='object'&&!Array.isArray(v)&&('codigo' in (v as any)||'nome' in (v as any)||'CODIGO' in (v as any)||'NOME' in (v as any))))return values as any[];
  return [];
 };
-async function treasury(url:string){const response=await fetch(url,{headers:{Accept:'*/*'},signal:AbortSignal.timeout(20000)});if(!response.ok)throw new Error('Tesouro retornou HTTP '+response.status+' no endpoint '+new URL(url).pathname.split('/').pop());return response.json()}
+async function treasury(url:string){
+ let lastError:Error|null=null;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(18000)});
+   if(!response.ok){
+    const err=new Error('Tesouro retornou HTTP '+response.status+' em '+new URL(url).pathname.split('/').pop());
+    if(![429,500,502,503,504].includes(response.status))throw err;
+    lastError=err;
+   }else return await response.json();
+  }catch(e){lastError=e instanceof Error?e:new Error('Falha na consulta oficial')}
+  if(attempt<2)await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));
+ }
+ throw lastError||new Error('API oficial indisponível');
+}
 export default async function handler(req:any,res:any){
  if(req.method!=='GET')return res.status(405).json({error:'Método não permitido'});
  const kind=String(req.query.kind||'');
