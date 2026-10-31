@@ -7,10 +7,14 @@ import { MeetingMinutes, SessionAgenda, DeadlineCalculator } from './AdvisorTool
 import { LegislativeIndication, InformationRequest, CitizenDemands } from './CouncilorTools';
 import { FinancingCalculator } from './FinancingCalculator';
 import { InvestmentSimulator } from './InvestmentSimulator';
+import { CearaWeatherRadar } from './CearaWeatherRadar';
+import { Enem2026Center } from './Enem2026Center';
 import { BoardElectionTool } from './BoardElectionTool';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
+ {slug:'radar-chuvas-ceara',name:'Radar de Chuvas e Raios do Ceará',description:'Acesse mapas, monitoramento e boletins meteorológicos oficiais da Funceme.'},
+ {slug:'central-enem-2026',name:'Central ENEM 2026',description:'Calendário, contagem regressiva, checklist e acesso à Página do Participante.'},
  {slug:'eleicao-mesa-diretora',name:'Eleição da Mesa Diretora',description:'Crie uma sala compartilhável para realizar votação nominal em chapas com liberação pelo organizador.'},
  {slug:'simulador-investimentos',name:'Simulador de investimentos e juros',description:'Projete rendimentos e compare taxas históricas do Tesouro com cenários de CDB, LCI e LCA.'},
  {slug:'calculadora-financiamento',name:'Calculadora de financiamento de carro ou imóvel',description:'Descubra o valor do bem, entrada, taxa de juros, prazo ou prestação deixando um campo vazio.'},
@@ -58,6 +62,8 @@ export function BluToolsPage(){
  const {slug}=useParams();const tool=tools.find(t=>t.slug===slug);
  useSeo(tool?.name||'Ferramentas gratuitas para câmaras e prefeituras',tool?.description||'Ferramentas gratuitas para vereadores, assessores, presidentes de câmaras e gestores municipais.');
  if(!slug) return <ToolsDashboard/>;
+ if(slug==='radar-chuvas-ceara') return <div className="max-w-5xl mx-auto px-5 py-12"><CearaWeatherRadar/></div>;
+ if(slug==='central-enem-2026') return <div className="max-w-5xl mx-auto px-5 py-12"><Enem2026Center/></div>;
  if(slug==='eleicao-mesa-diretora') return <BoardElectionTool/>;
  return <div className="min-h-screen bg-white text-slate-900"><div className="max-w-5xl mx-auto px-5 py-14"><Link to="/ferramentas" className="text-sm text-slate-500">Blu Tools · Ferramentas gratuitas</Link><h1 className="text-4xl md:text-5xl font-bold mt-5 mb-4">{tool?.name||'Ferramentas gratuitas para câmaras e prefeituras'}</h1><p className="text-lg text-slate-600 mb-10">{tool?.description||'Ferramentas para presidentes de câmaras e prefeitos: planejamento, orçamento, documentos e diagnósticos digitais. Gratuito e sem login.'}</p>{!slug?<div className="grid md:grid-cols-3 gap-5">{tools.map(t=><Link key={t.slug} to={'/ferramentas/'+t.slug} className="rounded-2xl border p-6 hover:shadow-lg transition"><h2 className="text-xl font-bold mb-3">{t.name}</h2><p className="text-slate-600">{t.description}</p><span className="inline-block mt-5 font-semibold">Usar gratuitamente →</span></Link>)}</div>:!tool?<p>Ferramenta não encontrada. <Link to="/ferramentas">Ver todas</Link></p>:<div className="max-w-3xl">{slug==='simulador-investimentos'?<InvestmentSimulator/>:slug==='calculadora-financiamento'?<FinancingCalculator/>:slug==='indicacao-legislativa'?<LegislativeIndication/>:slug==='requerimento-informacoes'?<InformationRequest/>:slug==='organizador-demandas'?<CitizenDemands/>:slug==='gerador-atas-reuniao'?<MeetingMinutes/>:slug==='gerador-pauta-sessao'?<SessionAgenda/>:slug==='calculadora-prazos'?<DeadlineCalculator/>:slug==='analisador-transparencia-pntp'?<TransparencyChecker/>:slug==='simulador-impacto-orcamentario'?<MunicipalBudget/>:slug==='plano-acao-municipal'?<MunicipalPlan/>:slug==='diagnostico-prefeitura'?<MunicipalDiagnosis/>:slug==='gerador-documentos'?<Documents/>:slug==='calculadora-quorum'?<Quorum/>:slug==='simulador-duodecimo'?<Duodecimo/>:<Diagnosis/>}</div>}<div className="mt-16 border-t pt-8 text-slate-600"><p>Conheça também as soluções completas da Blu para gestão legislativa e atendimento ao cidadão.</p><Link to="/products/3" className="font-semibold underline">Conhecer plataforma para câmaras</Link></div></div></div>;
 }
