@@ -4,8 +4,6 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
- {slug:'radar-chuvas-ceara',name:'Radar de Chuvas e Raios do Ceará',description:'Mapas e boletins oficiais da Funceme para acompanhar as condições meteorológicas.',category:'Clima',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Layers3},
- {slug:'central-enem-2026',name:'Central ENEM 2026',description:'Calendário, contagem regressiva e checklist com links oficiais do Inep.',category:'Educação',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:FileText},
  {slug:'eleicao-mesa-diretora',name:'Eleição da Mesa Diretora',description:'Crie uma sala, cadastre chapas e compartilhe votação nominal com liberação pelo organizador.',category:'Legislativo',audiences:['Câmaras','Vereadores','Assessores'],icon:Users},
  {slug:'simulador-investimentos',name:'Simulador de investimentos e juros',description:'Simule renda fixa e compare cenários de Tesouro, CDB, LCI e LCA.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
  {slug:'calculadora-financiamento',name:'Calculadora de financiamento de carro ou imóvel',description:'Calcule prestação, entrada, juros, prazo ou valor do bem a partir dos outros campos.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
@@ -24,7 +22,7 @@ const items:Item[]=[
  {slug:'gerador-documentos',name:'Gerador de documentos legislativos',description:'Crie minutas de ofícios, indicações, requerimentos e moções.',category:'Documentos',audiences:['Câmaras','Assessores','Vereadores'],icon:FileText},
  {slug:'calculadora-quorum',name:'Calculadora de quórum',description:'Simule quóruns e maiorias a partir do número de parlamentares.',category:'Legislativo',audiences:['Câmaras','Assessores','Vereadores'],icon:Users}
 ];
-const categories=['Todas','Clima','Educação','Finanças pessoais','Transparência','Orçamento e finanças','Planejamento','Diagnósticos','Documentos','Legislativo'];
+const categories=['Todas','Finanças pessoais','Transparência','Orçamento e finanças','Planejamento','Diagnósticos','Documentos','Legislativo'];
 const audiences=['Todos','Câmaras','Prefeituras','Assessores','Vereadores'];
 export function ToolsDashboard(){
  const [search,setSearch]=useState(''),[category,setCategory]=useState('Todas'),[audience,setAudience]=useState('Todos');
