@@ -19,11 +19,13 @@ export default async function handler(req:any,res:any){
  const params=new URLSearchParams();
  if(kind==='cities'){if(!/^\d+$/.test(String(req.query.state||'')))return res.status(400).json({error:'Estado inválido'});params.set('p_uf',String(req.query.state))}
  if(kind==='data'){
-  for(const [key,param] of [['state','p_estado'],['year','p_ano'],['month','p_mes'],['type','p_transferencia']] as const){
+  for(const [key,param] of [['state','p_estado'],['year','p_ano'],['month','p_mes']] as const){
    const v=String(req.query[key]||'');
    if(!/^\d+$/.test(v))return res.status(400).json({error:'Parâmetros incompletos ou inválidos'});
    params.set(param,v);
   }
+  const transferType=String(req.query.type||'');
+  if(transferType){if(!/^\\d+$/.test(transferType))return res.status(400).json({error:'Transferência inválida'});params.set('p_transferencia',transferType)}
  }
  const base=BASE+'/'+paths[kind];
  try{
