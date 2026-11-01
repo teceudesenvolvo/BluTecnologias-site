@@ -9,19 +9,18 @@ export interface FiscalProvider {
   canIssue: boolean;
 }
 
-export const tecnospeedPlugNotasProvider: FiscalProvider = {
-  id: "tecnospeed_plugnotas",
-  name: "TecnoSpeed PlugNotas",
+export const nationalNfseProvider: FiscalProvider = {
+  id: "nfse_nacional",
+  name: "NFS-e Nacional",
   supportedDocuments: ["nfe", "nfce", "nfse"],
   status: "not_configured",
   canIssue: false,
 };
 
 export const fiscalIntegrationRequirements = [
-  "Plano PlugNotas contratado",
-  "API key armazenada no Secret Manager",
-  "Empresa emitente cadastrada no PlugNotas",
-  "Certificado digital e inscrições validados",
-  "Série, numeração, regime e regras tributárias configurados",
-  "Município e provedor homologados para NFS-e",
+  "CNPJ e inscrição municipal da Blu Tecnologias",
+  "Certificado A1 instalado com segurança no backend",
+  "Dados de serviço, tributação e regime fiscal para Fortaleza/CE",
+  "Geração e assinatura da DPS conforme o leiaute nacional vigente",
+  "Credenciamento da empresa e do município no ambiente restrito",
 ] as const;
