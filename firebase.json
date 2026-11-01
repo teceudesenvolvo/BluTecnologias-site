@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/api/selic",
+        "function": "selicPanel"
+      },
+      {
         "source": "/api/pncp/**",
         "function": "pncpProxy"
       },
