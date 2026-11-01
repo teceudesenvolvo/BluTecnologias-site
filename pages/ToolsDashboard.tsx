@@ -4,7 +4,7 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
- {slug:'painel-selic',name:'Painel da Selic',description:'Evolução da taxa Selic em 1 mês, trimestre, semestre, ano e até 10 anos, com comunicados do Copom.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Landmark},
+ {slug:'painel-selic',name:'Observatório Macroeconômico do Brasil',description:'Selic, dólar, inflação, PIB mensal e atividade econômica em gráficos oficiais.',category:'Orçamento e finanças',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Landmark},
  {slug:'tutorial-nfse-nacional-2026',name:'Guia NFS-e Nacional',description:'Tutorial interativo para emissão de notas fiscais de serviço em novembro de 2026.',category:'Documentos',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:FileText},
 
  {slug:'comparador-comprar-ou-alugar',name:'Comprar ou alugar?',description:'Compare aquisição e locação de veículos, máquinas e equipamentos com projeção financeira.',category:'Orçamento e finanças',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
