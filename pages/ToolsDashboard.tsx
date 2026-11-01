@@ -4,6 +4,8 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'tutorial-nfse-nacional-2026',name:'Guia NFS-e Nacional',description:'Tutorial interativo para emissão de notas fiscais de serviço em novembro de 2026.',category:'Documentos',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:FileText},
+
  {slug:'comparador-comprar-ou-alugar',name:'Comprar ou alugar?',description:'Compare aquisição e locação de veículos, máquinas e equipamentos com projeção financeira.',category:'Orçamento e finanças',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
  {slug:'eleicao-mesa-diretora',name:'Eleição da Mesa Diretora',description:'Crie uma sala, cadastre chapas e compartilhe votação nominal com liberação pelo organizador.',category:'Legislativo',audiences:['Câmaras','Vereadores','Assessores'],icon:Users},
  {slug:'simulador-investimentos',name:'Simulador de investimentos e juros',description:'Simule renda fixa e compare cenários de Tesouro, CDB, LCI e LCA.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Calculator},
