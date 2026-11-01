@@ -9,12 +9,12 @@ import { FinancingCalculator } from './FinancingCalculator';
 import { InvestmentSimulator } from './InvestmentSimulator';
 import { BoardElectionTool } from './BoardElectionTool';
 import { BuyOrRentComparator } from './BuyOrRentComparator';
-import { SelicPanel } from './SelicPanel';
+import { MacroeconomiaPanel } from './MacroeconomiaPanel';
 import { NationalInvoiceGuide } from './NationalInvoiceGuide';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
- {slug:'painel-selic',name:'Painel da Selic',description:'Evolução mensal, trimestral, semestral e anual da taxa Selic com dados oficiais e comunicados do Copom.'},
+ {slug:'painel-selic',name:'Observatório Macroeconômico do Brasil',description:'Selic, dólar, IPCA, PIB mensal e atividade econômica com dados oficiais do Banco Central.'},
  {slug:'tutorial-nfse-nacional-2026',name:'Tutorial NFS-e Nacional 2026',description:'Passo a passo interativo para emitir nota fiscal de serviços no novo padrão nacional a partir de novembro de 2026.'},
  {slug:'comparador-comprar-ou-alugar',name:'Comparador comprar ou alugar',description:'Compare os custos de aquisição e locação de bens.'},
  {slug:'eleicao-mesa-diretora',name:'Eleição da Mesa Diretora',description:'Crie uma sala compartilhável para realizar votação nominal em chapas com liberação pelo organizador.'},
@@ -64,7 +64,7 @@ export function BluToolsPage(){
  const {slug}=useParams();const tool=tools.find(t=>t.slug===slug);
  useSeo(tool?.name||'Ferramentas gratuitas para câmaras e prefeituras',tool?.description||'Ferramentas gratuitas para vereadores, assessores, presidentes de câmaras e gestores municipais.');
  if(!slug) return <ToolsDashboard/>;
- if(slug==='painel-selic') return <SelicPanel/>;
+ if(slug==='painel-selic') return <MacroeconomiaPanel/>;
  if(slug==='tutorial-nfse-nacional-2026') return <NationalInvoiceGuide/>;
  if(slug==='comparador-comprar-ou-alugar') return <BuyOrRentComparator/>;
  if(slug==='eleicao-mesa-diretora') return <BoardElectionTool/>;
