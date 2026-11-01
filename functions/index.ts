@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+export { selicPanel } from './selicPanel';
 export { customerReferralProgram } from './customerReferrals';
 import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer';
