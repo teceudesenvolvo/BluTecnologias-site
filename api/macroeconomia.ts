@@ -9,7 +9,9 @@ const definitions=[
  {id:'pibMensal',name:'PIB mensal em valores correntes (estimativa BCB)',code:4380,unit:'R$ milhões',category:'Atividade',frequency:'Mensal'}
 ] as const;
 async function load(def:typeof definitions[number]){
- const url='https://api.bcb.gov.br/dados/serie/bcdata.sgs.'+def.code+'/dados/ultimos/120?formato=json';
+ const now=new Date(); const end=[String(now.getUTCDate()).padStart(2,'0'),String(now.getUTCMonth()+1).padStart(2,'0'),now.getUTCFullYear()].join('/');
+ const startDate=new Date(Date.UTC(now.getUTCFullYear()-9,now.getUTCMonth(),now.getUTCDate())); const start=[String(startDate.getUTCDate()).padStart(2,'0'),String(startDate.getUTCMonth()+1).padStart(2,'0'),startDate.getUTCFullYear()].join('/');
+ const url='https://api.bcb.gov.br/dados/serie/bcdata.sgs.'+def.code+'/dados?formato=json&dataInicial='+start+'&dataFinal='+end;
  try{
   const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(16000)});
   if(!response.ok)throw Error('HTTP '+response.status);
@@ -23,6 +25,8 @@ async function load(def:typeof definitions[number]){
 export default async function handler(req:any,res:any){
  if(req.method!=='GET')return res.status(405).json({error:'Método não permitido'});
  res.setHeader('Cache-Control','public, s-maxage=3600, stale-while-revalidate=3600');
- const indicators=await Promise.all(definitions.map(load));
+ const indicators:Awaited<ReturnType<typeof load>>[]=[];
+ // Avoid simultaneous bursts against the BCB public API.
+ for(let i=0;i<definitions.length;i+=2){indicators.push(...await Promise.all(definitions.slice(i,i+2).map(load)));}
  return res.status(200).json({indicators,updatedAt:new Date().toISOString(),note:'Dados oficiais sujeitos à periodicidade e revisão da fonte. Juros futuros e comércio exterior aguardam integração validada.'});
 }
