@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { FreeToolsLeadPopup } from './components/FreeToolsLeadPopup';
 
 // Sem Login
 import { Home } from './pages/Home';
@@ -57,6 +58,7 @@ const AppContent: React.FC = () => {
   return (
       <div className={`font-sans text-slate-900 min-h-screen flex flex-col ${isLanding ? 'bg-white' : 'bg-slate-100'}`}>
         <GlobalFeedback />
+        {location.pathname.startsWith('/ferramentas') && <FreeToolsLeadPopup />}
         {!hideNavbar && <Navbar />}
         <main className="flex-grow">
           <Routes>
