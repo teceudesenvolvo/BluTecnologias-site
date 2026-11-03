@@ -11,6 +11,477 @@ service cloud.firestore {
     }
 
 
+    // Contatos opcionais enviados exclusivamente pelas ferramentas gratuitas.
+    // Nunca permitir leitura pública de dados pessoais.
+    match /freeToolsLeads/{leadId} {
+      allow create: if request.resource.data.keys().hasOnly(['name','email','phone','source','toolPath','consent','consentTextVersion','createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 120
+        && request.resource.data.email is string && request.resource.data.email.size() <= 180
+        && request.resource.data.phone is string && request.resource.data.phone.size() >= 10 && request.resource.data.phone.size() <= 15
+        && request.resource.data.source == 'blu-tools'
+        && request.resource.data.toolPath is string && request.resource.data.toolPath.matches('^/ferramentas(/.*)? (não oficiais).
+    match /boardElectionRooms/{roomId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['name','city','state','termStart','termEnd','electionDate','adminName','votingRule','seats','owner','status','slates','createdAt'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.city is string
+        && request.resource.data.city.size() <= 100
+        && request.resource.data.state is string
+        && request.resource.data.state.size() == 2
+        && request.resource.data.adminName is string
+        && request.resource.data.adminName.size() > 0
+        && request.resource.data.adminName.size() <= 100
+        && request.resource.data.termStart is int
+        && request.resource.data.termEnd is int
+        && request.resource.data.termEnd >= request.resource.data.termStart
+        && request.resource.data.electionDate is string
+        && request.resource.data.votingRule in ['Maioria absoluta dos membros','Maioria dos votos válidos']
+        && request.resource.data.seats is int
+        && request.resource.data.seats >= 1
+        && request.resource.data.seats <= 55
+        && request.resource.data.slates is list
+        && request.resource.data.slates.size() >= 1
+        && request.resource.data.slates.size() <= 10;
+      allow update: if isSignedIn()
+        && resource.data.owner == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && ((resource.data.status == 'draft' && request.resource.data.status == 'open')
+          || (resource.data.status == 'open' && request.resource.data.status == 'closed'));
+      allow delete: if false;
+      match /seats/{seatId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn()
+          && !exists(/databases/$(database)/documents/boardElectionRooms/$(roomId)/voters/$(request.auth.uid))
+          && get(/databases/$(database)/documents/boardElectionRooms/$(roomId)).data.status != 'closed'
+          && int(seatId) >= 1
+          && int(seatId) <= get(/databases/$(database)/documents/boardElectionRooms/$(roomId)).data.seats
+          && request.resource.data.keys().hasOnly(['uid'])
+          && request.resource.data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/boardElectionRooms/$(roomId)/voters/$(request.auth.uid)).data.seat == int(seatId);
+        allow update, delete: if false;
+      }
+      match /voters/{voterId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn()
+          && voterId == request.auth.uid
+          && get(/databases/$(database)/documents/boardElectionRooms/$(roomId)).data.status != 'closed'
+          && request.resource.data.keys().hasOnly(['name','seat','joinedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.seat is int
+          && request.resource.data.seat >= 1
+          && request.resource.data.seat <= get(/databases/$(database)/documents/boardElectionRooms/$(roomId)).data.seats
+          && getAfter(/databases/$(database)/documents/boardElectionRooms/$(roomId)/seats/$(request.resource.data.seat)).data.uid == request.auth.uid;
+        allow update: if isSignedIn()
+          && voterId == request.auth.uid
+          && get(/databases/$(database)/documents/boardElectionRooms/$(roomId)).data.status == 'open'
+          && !('choice' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['choice'])
+          && request.resource.data.choice is string
+          && request.resource.data.choice.size() <= 24;
+        allow delete: if false;
+      }
+    }
+    match /electionPageViews/{viewDate} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /portalPageViews/{viewId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /portalPageViewSessions/{sessionId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    function companyUser(companyId) {
+      return isSignedIn() && (
+        companyId == request.auth.uid ||
+        companyId == 'company-' + request.auth.uid ||
+        (exists(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid))
+          && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.status == 'active') ||
+        (exists(/databases/$(database)/documents/companyUsers/$(companyId + '_' + request.auth.uid))
+          && (!('status' in get(/databases/$(database)/documents/companyUsers/$(companyId + '_' + request.auth.uid)).data)
+            || get(/databases/$(database)/documents/companyUsers/$(companyId + '_' + request.auth.uid)).data.status == 'active'))
+      );
+    }
+
+    function companyAdmin(companyId) {
+      return isSignedIn() && (
+        companyId == request.auth.uid || companyId == 'company-' + request.auth.uid ||
+        (exists(/databases/$(database)/documents/companies/$(companyId))
+          && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerUserId == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid))
+          && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.status == 'active'
+          && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.role in ['Administrador', 'Proprietário'])
+      );
+    }
+
+    function hasPermission(companyId, module, action) {
+      return companyAdmin(companyId) || (
+        exists(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid))
+        && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.status == 'active'
+        && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.permissions[module][action] == true
+      );
+    }
+
+    function isAccountant(companyId) {
+      return exists(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid))
+        && get(/databases/$(database)/documents/companyMemberships/$(companyId + '_' + request.auth.uid)).data.role == 'Contador';
+    }
+
+    function companyRead(companyId, module) {
+      return companyUser(companyId) && (!isAccountant(companyId) || hasPermission(companyId, module, 'view'));
+    }
+
+    function sameCompany() {
+      return companyUser(resource.data.companyId);
+    }
+
+    function createsForOwnCompany() {
+      return request.resource.data.companyId is string && companyUser(request.resource.data.companyId);
+    }
+
+    match /companies/{companyId} {
+      allow read: if isPlatformAdmin() || companyUser(companyId);
+      allow update: if companyAdmin(companyId);
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      match /opportunityFavorites/{favoriteId} {
+        allow read, write: if companyUser(companyId);
+      }
+      match /settings/{settingId} {
+        allow read, write: if companyUser(companyId);
+      }
+    }
+
+    match /companyUsers/{membershipId} {
+      allow read: if isPlatformAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.invitationId is string
+        && exists(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId))
+        && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+        && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.companyId == request.resource.data.companyId;
+    }
+
+    match /companyMemberships/{membershipId} {
+      allow read: if isPlatformAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || companyAdmin(resource.data.companyId)));
+      allow write: if false;
+    }
+
+    match /accountingDocumentRequests/{requestId} {
+      allow read: if isPlatformAdmin() || (sameCompany() && hasPermission(resource.data.companyId, 'accountingDocuments', 'view'));
+      allow create: if createsForOwnCompany() && hasPermission(request.resource.data.companyId, 'accountingDocuments', 'create');
+      allow update: if sameCompany() && hasPermission(resource.data.companyId, 'accountingDocuments', 'edit') && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if false;
+    }
+
+    match /accountingCompetencies/{competencyId} {
+      allow read: if isPlatformAdmin() || (sameCompany() && hasPermission(resource.data.companyId, 'accountingDocuments', 'view'));
+      allow write: if false;
+    }
+
+    // O domínio contábil é escrito exclusivamente pela Cloud Function
+    // accountantWorkspace, que valida vínculo, empresa, módulo e ação e grava
+    // auditoria. Isso também impede alteração por troca manual do companyId.
+    match /{accountingCollection}/{documentId} {
+      allow read: if accountingCollection in ['accountingObligations','accountingClosings','accountingPendingItems','accountingRequests','accountingBundles','accountingExports']
+        && isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isPlatformAdmin() || (sameCompany() && (resource.data.userId == request.auth.uid || companyAdmin(resource.data.companyId)));
+      allow write: if false;
+    }
+
+    match /plans/{planId} {
+      allow read: if (resource.data.active == true && resource.data.public == true) || isSignedIn();
+      allow write: if false;
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.customerCompanyId);
+      allow create, update: if isPlatformAdmin();
+      allow delete: if false;
+    }
+
+    match /subscriptionUsage/{usageId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId) || companyUser(resource.data.customerCompanyId);
+      allow write: if false;
+    }
+
+    match /billingOrders/{orderId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /billingProviders/{providerId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /billingWebhookEvents/{eventId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    match /billingAuditLogs/{logId} {
+      allow read: if isPlatformAdmin() || companyUser(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isPlatformAdmin() || (sameCompany() && request.resource.data.companyId == resource.data.companyId);
+      allow delete: if false;
+    }
+
+    match /supportMessages/{messageId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow create: if createsForOwnCompany() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /teamInvitations/{invitationId} {
+      allow get: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow update: if isSignedIn()
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.email == resource.data.email;
+    }
+
+    match /teamMembers/{memberId} {
+      allow read: if sameCompany() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid
+        || (isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.invitationId is string
+          && exists(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId))
+          && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+          && get(/databases/$(database)/documents/teamInvitations/$(request.resource.data.invitationId)).data.companyId == request.resource.data.companyId);
+      allow update, delete: if sameCompany();
+    }
+
+    // Configurações financeiras: leitura segregada por empresa. Toda escrita
+    // passa pela Cloud Function, que valida papel, tenant e registra auditoria.
+    match /{financialCollection}/{documentId} {
+      allow read: if financialCollection in ['financialCategories', 'financialConfigurationItems', 'financialApprovalFlows', 'dreAccounts'] && (isPlatformAdmin() || sameCompany());
+      allow write: if false;
+    }
+
+    match /financialAuditLogs/{logId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow write: if false;
+    }
+
+    match /pointOfSaleRegisters/{registerId} {
+      allow read: if isPlatformAdmin() || (sameCompany() && resource.data.operatorId == request.auth.uid) || companyAdmin(resource.data.companyId);
+      allow write: if false;
+    }
+
+    match /pointOfSaleSales/{saleId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow write: if false;
+    }
+
+    match /bankAccounts/{accountId} {
+      allow read: if isPlatformAdmin() || sameCompany();
+      allow write: if false;
+    }
+    match /bankAccountSecrets/{accountId} {
+      allow read, write: if false;
+    }
+    match /bankTransfers/{transferId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /legalEntities/{entityId} {
+      function ownLegacyEntity() {
+        return isSignedIn() && (
+          resource.data.createdBy == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          resource.data.updatedBy == request.auth.uid
+        );
+      }
+
+      allow read, delete: if sameCompany() || ownLegacyEntity();
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if (
+        (sameCompany() && request.resource.data.companyId == resource.data.companyId) ||
+        (ownLegacyEntity() && createsForOwnCompany())
+      );
+    }
+    match /idempotencyKeys/{keyId} {
+      allow read, write: if false;
+    }
+    match /costCenters/{costCenterId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /financialAllocations/{allocationId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /projects/{projectId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /projectMembers/{memberId} {
+      allow read: if sameCompany();
+      allow write: if false;
+    }
+    match /financialSettlements/{settlementId} {
+      allow read: if companyRead(resource.data.companyId, 'financial');
+      allow write: if false;
+    }
+
+    match /{accountingFinancialCollection}/{documentId} {
+      allow read: if accountingFinancialCollection in ['accountsPayable','accountsReceivable','financialTransactions']
+        && companyRead(resource.data.companyId, 'financial');
+      allow create: if accountingFinancialCollection in ['accountsPayable','accountsReceivable','financialTransactions']
+        && createsForOwnCompany()
+        && (!isAccountant(request.resource.data.companyId) || hasPermission(request.resource.data.companyId, 'financial', 'create'));
+      allow update: if accountingFinancialCollection in ['accountsPayable','accountsReceivable','financialTransactions']
+        && sameCompany() && request.resource.data.companyId == resource.data.companyId
+        && (!isAccountant(resource.data.companyId) || hasPermission(resource.data.companyId, 'financial', 'edit'));
+      allow delete: if accountingFinancialCollection in ['accountsPayable','accountsReceivable','financialTransactions']
+        && sameCompany()
+        && (!isAccountant(resource.data.companyId) || hasPermission(resource.data.companyId, 'financial', 'delete'));
+    }
+
+    match /collections/{collectionId} {
+      allow read: if companyRead(resource.data.companyId, 'financial');
+      allow write: if false;
+    }
+
+    match /collectionEvents/{eventId} {
+      allow read: if companyRead(resource.data.companyId, 'financial');
+      allow write: if false;
+    }
+
+    match /fiscalDocuments/{documentId} {
+      allow read: if companyRead(resource.data.companyId, 'fiscal');
+      allow write: if false;
+    }
+    match /taxRecords/{taxId} {
+      allow read: if companyRead(resource.data.companyId, 'fiscal');
+      allow write: if false;
+    }
+    match /{reconciliationCollection}/{documentId} {
+      allow read: if reconciliationCollection in ['bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory'] && companyRead(resource.data.companyId, 'financial');
+      allow write: if false;
+    }
+    match /{budgetCollection}/{documentId} {
+      allow read: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && companyRead(resource.data.companyId, 'financial');
+      allow create: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if budgetCollection in ['budgets','budgetItems','budgetProjections'] && sameCompany();
+    }
+    match /{dreControlCollection}/{documentId} {
+      allow read: if dreControlCollection in ['drePeriodClosures','dreClosureHistory'] && companyRead(resource.data.companyId, 'dre');
+      allow write: if false;
+    }
+    match /{reportCollection}/{documentId} {
+      allow read: if reportCollection in ['financialReportConfigs','financialReportExports'] && companyRead(resource.data.companyId, 'reports');
+      allow write: if false;
+    }
+
+    // Fundação do módulo Serviços. As mutações passam exclusivamente pela
+    // Cloud Function para validar vínculo, permissão e isolamento da empresa.
+    match /{serviceCollection}/{documentId} {
+      allow read: if serviceCollection in ['serviceDefinitions','serviceCategories','serviceLocations','serviceBusinessHours','serviceSpecialHours','serviceSettings','serviceAppointments','serviceResources','servicePackages','serviceCommissions']
+        && (isPlatformAdmin() || sameCompany());
+      allow write: if false;
+    }
+
+    // A configuração, os slugs e os eventos do e-commerce são mutados apenas
+    // pela Cloud Function, que garante unicidade global e autorização tenant.
+    match /{ecommerceCollection}/{documentId} {
+      allow read: if ecommerceCollection in ['ecommerceStores','storeSlugHistory','ecommerceOrders','ecommercePayments','salesChannelEvents']
+        && isPlatformAdmin();
+      allow write: if false;
+    }
+    match /storeSlugs/{slug} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      match /settings/{settingId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow create: if createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if sameCompany();
+    }
+
+    // Políticas públicas dos aplicativos: leitura anônima para a página legal
+    // e gerenciamento restrito ao administrador da plataforma.
+    match /privacyPolicies/{policyId} {
+      allow read: if true;
+      allow create, update, delete: if isPlatformAdmin();
+    }
+
+    // Catálogo global, sem segredos. Escritas somente por processo administrativo futuro.
+    match /integrationProviders/{providerId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Coleções de integração segregadas por empresa. Tokens, senhas, certificados,
+    // cookies e client secrets não podem ser gravados nestes documentos.
+    match /{integrationCollection}/{documentId} {
+      allow read, delete: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && sameCompany();
+      allow create: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if integrationCollection in ['companyIntegrations', 'syncJobs', 'syncLogs', 'externalOpportunities', 'opportunitySources'] && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+    }
+
+    match /{collection}/{documentId} {
+      allow read: if !(collection in ['customerReferrals', 'customerReferralClosures']) && !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports','accountingObligations','accountingClosings','accountingPendingItems','accountingRequests','accountingBundles','accountingExports','accountsPayable','accountsReceivable','financialTransactions','ecommerceStores','storeSlugs','storeSlugHistory','ecommerceOrders','ecommercePayments','salesChannelEvents','serviceDefinitions','serviceCategories','serviceLocations','serviceBusinessHours','serviceSpecialHours','serviceSettings','serviceAppointments','serviceResources','servicePackages','serviceCommissions','storeCustomers']) && (isPlatformAdmin() || sameCompany());
+      allow delete: if !(collection in ['customerReferrals', 'customerReferralClosures']) && !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports','accountingObligations','accountingClosings','accountingPendingItems','accountingRequests','accountingBundles','accountingExports','accountsPayable','accountsReceivable','financialTransactions','ecommerceStores','storeSlugs','storeSlugHistory','ecommerceOrders','ecommercePayments','salesChannelEvents','serviceDefinitions','serviceCategories','serviceLocations','serviceBusinessHours','serviceSpecialHours','serviceSettings','serviceAppointments','serviceResources','servicePackages','serviceCommissions','storeCustomers']) && sameCompany();
+      allow create: if !(collection in ['customerReferrals', 'customerReferralClosures']) && !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports','accountingObligations','accountingClosings','accountingPendingItems','accountingRequests','accountingBundles','accountingExports','accountsPayable','accountsReceivable','financialTransactions','ecommerceStores','storeSlugs','storeSlugHistory','ecommerceOrders','ecommercePayments','salesChannelEvents','serviceDefinitions','serviceCategories','serviceLocations','serviceBusinessHours','serviceSpecialHours','serviceSettings','serviceAppointments','serviceResources','servicePackages','serviceCommissions','storeCustomers']) && createsForOwnCompany() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if !(collection in ['customerReferrals', 'customerReferralClosures']) && !(collection in ['plans','subscriptions','subscriptionUsage','billingOrders','payments','billingProviders','billingWebhookEvents','billingAuditLogs','supportTickets','supportMessages','integrationProviders','financialCategories','financialConfigurationItems','financialApprovalFlows','dreAccounts','financialAuditLogs','bankAccounts','bankAccountSecrets','bankTransfers','idempotencyKeys','costCenters','financialAllocations','projects','projectMembers','financialSettlements','collections','collectionEvents','fiscalDocuments','taxRecords','bankStatementImports','bankStatementItems','reconciliationLinks','reconciliationHistory','budgets','budgetItems','budgetProjections','drePeriodClosures','dreClosureHistory','financialReportConfigs','financialReportExports','accountingObligations','accountingClosings','accountingPendingItems','accountingRequests','accountingBundles','accountingExports','accountsPayable','accountsReceivable','financialTransactions','ecommerceStores','storeSlugs','storeSlugHistory','ecommerceOrders','ecommercePayments','salesChannelEvents','serviceDefinitions','serviceCategories','serviceLocations','serviceBusinessHours','serviceSpecialHours','serviceSettings','serviceAppointments','serviceResources','servicePackages','serviceCommissions','storeCustomers']) && sameCompany() && request.resource.data.companyId == resource.data.companyId;
+    }
+
+    // Permitir aos usuários ler e escrever em sua própria coleção de e-mails
+    match /users/{userId}/emails/{emailId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Permitir escritas no mail_queue (se usar a extensão Trigger Email)
+    match /mail_queue/{id} {
+      allow write: if request.auth != null;
+    }
+  }
+}
+)
+        && request.resource.data.consent == true
+        && request.resource.data.consentTextVersion == '2026-11'
+        && request.resource.data.createdAt == request.time;
+      allow read, delete: if isPlatformAdmin();
+      allow update: if false;
+    }
+
     // Salas de simulação de eleição da Mesa Diretora (não oficiais).
     match /boardElectionRooms/{roomId} {
       allow get: if isSignedIn();
