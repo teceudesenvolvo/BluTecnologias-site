@@ -3,7 +3,6 @@ import {Link} from 'react-router-dom';
 import {ArrowRight,ChevronLeft,ChevronRight,Landmark,TrendingUp} from 'lucide-react';
 const slides=[
  {to:'/ferramentas/painel-selic',tag:'OBSERVATÓRIO · MACROECONOMIA',title:'Como está a economia do Brasil?',description:'Acompanhe Selic, dólar, inflação, PIB mensal e atividade econômica com dados oficiais em um só painel.',icon:TrendingUp,gradient:'from-[#111c32] via-[#15416a] to-[#127c90]',action:'Explorar indicadores do Brasil'},
- {to:'/gestao-publica/fpm-ceara',tag:'GESTÃO PÚBLICA · CEARÁ',title:'Quanto seu município recebeu do FPM?',description:'Consulte os repasses por município, compare valores e exporte os dados oficiais do Tesouro Nacional.',icon:Landmark,gradient:'from-[#0c3344] via-[#0d5570] to-[#096f93]',action:'Explorar repasses do FPM'},
  {to:'/economia/pos-eleicao-2026',tag:'OBSERVATÓRIO · ECONOMIA',title:'Como o dólar evoluiu após as eleições?',description:'Acompanhe o histórico de câmbio e a variação desde o período pré-eleitoral com dados do Banco Central.',icon:TrendingUp,gradient:'from-[#15234b] via-[#233b81] to-[#305dc2]',action:'Explorar painel econômico'}
 ] as const;
 export function ToolsHeroPanels(){
