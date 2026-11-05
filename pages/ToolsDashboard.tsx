@@ -1,9 +1,10 @@
 import React,{useMemo,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
-import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3} from 'lucide-react';
+import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3,TrendingUp} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'painel-acoes-b3',name:'Painel de Ações da B3',description:'Gráficos de ações brasileiras e comparação de desempenho de PETR4, VALE3, ITUB4 e MGLU3.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:TrendingUp},
  {slug:'painel-selic',name:'Observatório Macroeconômico do Brasil',description:'Selic, dólar, inflação, PIB mensal e atividade econômica em gráficos oficiais.',category:'Orçamento e finanças',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Landmark},
  {slug:'tutorial-nfse-nacional-2026',name:'Guia NFS-e Nacional',description:'Tutorial interativo para emissão de notas fiscais de serviço em novembro de 2026.',category:'Documentos',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:FileText},
 
