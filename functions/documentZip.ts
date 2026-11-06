@@ -143,7 +143,9 @@ export const downloadDocumentsZip = functions.https.onRequest(async (req, res) =
       res.status(403).json({ error: 'Um ou mais documentos não estão acessíveis para sua conta.' }); return;
     }
 
-    const bucket = admin.storage().bucket();
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'blutecnologias-site';
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
+    const bucket = admin.storage().bucket(bucketName);
     const files: Array<{ name: string; data: Buffer }> = [];
     let totalBytes = 0;
     for (const [index, snapshot] of snapshots.entries()) {

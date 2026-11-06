@@ -1,10 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteBluHqUser = exports.mutateBillingProvider = exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.ecommerceStore = exports.accountantWorkspace = exports.acceptCompanyInvitation = exports.manageCompanyMembership = exports.linkAccountantToCompanies = exports.findGlobalProfessional = exports.listManagedCompanies = exports.managePointOfSalePaymentSettings = exports.checkPointOfSalePayment = exports.createPointOfSalePayment = exports.managePointOfSaleRegister = exports.completePublicSale = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = exports.recordElectionPageView = exports.customerReferralProgram = void 0;
-exports.serviceScheduling = exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.dispatchDailyCompanyNotificationDigests = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.lookupProductBarcode = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = void 0;
+exports.mutateFinancialConfiguration = exports.importCashFlowTransactions = exports.commandCashFlowTransaction = exports.settleCashFlowTransaction = exports.createCashFlowTransaction = exports.mutateFinancialProject = exports.allocateFinancialTransaction = exports.mutateCostCenter = exports.adjustBankAccountBalance = exports.transferBetweenBankAccounts = exports.commandCollection = exports.addCollectionEvent = exports.receiveCollection = exports.mutateCollection = exports.mutateBankAccount = exports.dailyBillingMaintenance = exports.processBillingWebhookEvent = exports.pagarmeWebhook = exports.infinitePayWebhook = exports.billingPaymentCheck = exports.billingAdminPlans = exports.billingGatewayPublic = exports.billingPublicPlans = exports.billingSummary = exports.billingCheckout = exports.ecommerceStore = exports.accountantWorkspace = exports.acceptCompanyInvitation = exports.manageCompanyMembership = exports.linkAccountantToCompanies = exports.findGlobalProfessional = exports.listManagedCompanies = exports.managePointOfSalePaymentSettings = exports.checkPointOfSalePayment = exports.createPointOfSalePayment = exports.managePointOfSaleRegister = exports.completePublicSale = exports.commandFinancialReport = exports.queryFinancialReport = exports.getFinancialOverview = exports.commandDrePeriod = exports.commandBudget = exports.commandReconciliation = exports.importBankStatement = exports.commandTaxRecord = exports.mutateTaxRecord = exports.recordElectionPageView = exports.downloadDocumentsZip = exports.customerReferralProgram = exports.selicPanel = void 0;
+exports.serviceScheduling = exports.commandFiscalDocument = exports.mutateFiscalDocument = exports.processFirestoreMailQueue = exports.dispatchDailyCompanyNotificationDigests = exports.handleInboundEmail = exports.sendBillingEmailHttp = exports.sendBillingEmail = exports.portalComprasPublicasProxy = exports.lookupProductBarcode = exports.tceCeProxy = exports.comprasGovProxy = exports.pncpProxy = exports.helloWorld = exports.deleteBluHqUser = exports.mutateBillingProvider = void 0;
 const functions = require("firebase-functions");
+var selicPanel_1 = require("./selicPanel");
+Object.defineProperty(exports, "selicPanel", { enumerable: true, get: function () { return selicPanel_1.selicPanel; } });
 var customerReferrals_1 = require("./customerReferrals");
 Object.defineProperty(exports, "customerReferralProgram", { enumerable: true, get: function () { return customerReferrals_1.customerReferralProgram; } });
+var documentZip_1 = require("./documentZip");
+Object.defineProperty(exports, "downloadDocumentsZip", { enumerable: true, get: function () { return documentZip_1.downloadDocumentsZip; } });
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
@@ -22,12 +26,33 @@ exports.recordElectionPageView = functions.https.onRequest(async (req, res) => {
         return;
     }
     try {
+        const requestedPath = typeof req.body?.path === 'string' ? req.body.path : '/eleicoes/apuracao';
+        const path = requestedPath.startsWith('/') ? requestedPath.split('?')[0].slice(0, 300) : '/';
         const date = new Date().toISOString().slice(0, 10);
-        await admin.firestore().collection('electionPageViews').doc(date).set({
-            date,
-            count: admin.firestore.FieldValue.increment(1),
-            lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        const pageId = Buffer.from(path).toString('base64url');
+        const database = admin.firestore();
+        const pageRef = database.collection('portalPageViews').doc(`${date}_${pageId}`);
+        const sessionId = typeof req.body?.sessionId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(req.body.sessionId)
+            ? req.body.sessionId
+            : '';
+        await database.runTransaction(async (transaction) => {
+            const sessionRef = sessionId ? database.collection('portalPageViewSessions').doc(sessionId) : null;
+            const session = sessionRef ? await transaction.get(sessionRef) : null;
+            transaction.set(pageRef, {
+                date,
+                path,
+                count: admin.firestore.FieldValue.increment(1),
+                lastViewAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            if (sessionRef) {
+                const existingEvents = session?.data()?.events;
+                const events = Array.isArray(existingEvents) ? existingEvents : [];
+                transaction.set(sessionRef, {
+                    events: [...events, { path, at: Date.now() }].slice(-80),
+                    lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+            }
+        });
         res.status(204).send('');
     }
     catch (error) {
@@ -1818,8 +1843,9 @@ exports.commandFiscalDocument = functions.https.onCall(async (payload, context) 
     throw new functions.https.HttpsError('unauthenticated', 'Faça login para continuar.'); const membership = await financialMembership(context.auth.uid), id = String(payload?.id || ''), action = String(payload?.action || ''), reason = String(payload?.reason || '').trim(), protocol = String(payload?.protocol || '').trim(); if (!id || id.startsWith('legacy:') || !['cancel', 'replace', 'send'].includes(action))
     throw new functions.https.HttpsError('invalid-argument', 'Comando inválido.'); await requireFinancialPermission(membership, action === 'cancel' ? 'cancelFiscalDocument' : 'sendFiscalDocument'); if (action === 'cancel' && (!reason || !protocol))
     throw new functions.https.HttpsError('invalid-argument', 'Cancelamento exige justificativa e protocolo.'); if (action === 'replace' && !String(payload?.replacementDocumentId || ''))
-    throw new functions.https.HttpsError('invalid-argument', 'Informe a nota substituta.'); const ref = admin.firestore().collection('fiscalDocuments').doc(id); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
-    throw new functions.https.HttpsError('not-found', 'Nota fiscal não encontrada.'); const before = snap.data(), now = new Date().toISOString(), after = action === 'cancel' ? { status: 'cancelled', cancellationReason: reason, cancellationProtocol: protocol } : action === 'replace' ? { status: 'replaced', replacementDocumentId: String(payload.replacementDocumentId) } : { status: 'sent', sentAt: now }; tx.update(ref, { ...after, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); if (action === 'replace') {
+    throw new functions.https.HttpsError('invalid-argument', 'Informe a nota substituta.'); if (action === 'send')
+    throw new functions.https.HttpsError('failed-precondition', 'A integração nacional NFS-e ainda não está pronta para emissão. Configure os dados fiscais municipais, instale o certificado A1 no backend e conclua a geração/assinatura da DPS antes de emitir. A nota não foi marcada como enviada.'); const ref = admin.firestore().collection('fiscalDocuments').doc(id); await admin.firestore().runTransaction(async (tx) => { const snap = await tx.get(ref); if (!snap.exists || snap.data()?.companyId !== membership.companyId)
+    throw new functions.https.HttpsError('not-found', 'Nota fiscal não encontrada.'); const before = snap.data(), now = new Date().toISOString(), after = action === 'cancel' ? { status: 'cancelled', cancellationReason: reason, cancellationProtocol: protocol } : { status: 'replaced', replacementDocumentId: String(payload.replacementDocumentId) }; tx.update(ref, { ...after, updatedAt: now, updatedBy: context.auth.uid, version: Number(before.version || 0) + 1 }); if (action === 'replace') {
     const replacement = admin.firestore().collection('fiscalDocuments').doc(String(payload.replacementDocumentId)), replacementSnap = await tx.get(replacement);
     if (!replacementSnap.exists || replacementSnap.data()?.companyId !== membership.companyId)
         throw new functions.https.HttpsError('not-found', 'Nota substituta não encontrada.');
