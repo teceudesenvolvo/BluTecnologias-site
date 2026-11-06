@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 export { selicPanel } from './selicPanel';
 export { customerReferralProgram } from './customerReferrals';
+export { downloadDocumentsZip } from './documentZip';
 import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer';
 import * as cors from 'cors';
