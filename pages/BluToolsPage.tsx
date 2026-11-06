@@ -11,10 +11,14 @@ import { BoardElectionTool } from './BoardElectionTool';
 import { BuyOrRentComparator } from './BuyOrRentComparator';
 import { MacroeconomiaPanel } from './MacroeconomiaPanel';
 import { StockMarketPanel } from './StockMarketPanel';
+import { GovernmentSupplierTool } from './GovernmentSupplierTool';
+import { TaxReadiness2027 } from './TaxReadiness2027';
 import { NationalInvoiceGuide } from './NationalInvoiceGuide';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
+ {slug:'minha-empresa-pode-vender-ao-governo',name:'Minha empresa pode vender ao governo?',description:'Checklist de preparação para fornecedores públicos e simulador de precificação de propostas.'},
+ {slug:'checklist-tributario-2027',name:'Checklist Tributário 2027',description:'Prazos oficiais do Simples Nacional, IBS/CBS e plano de preparação para empresas.'},
  {slug:'painel-acoes-b3',name:'Painel de Ações da B3',description:'Gráficos históricos de PETR4, VALE3, ITUB4 e MGLU3, com comparação de desempenho percentual e dados de mercado.'},
  {slug:'painel-selic',name:'Observatório Macroeconômico do Brasil',description:'Selic, dólar, IPCA, PIB mensal e atividade econômica com dados oficiais do Banco Central.'},
  {slug:'tutorial-nfse-nacional-2026',name:'Tutorial NFS-e Nacional 2026',description:'Passo a passo interativo para emitir nota fiscal de serviços no novo padrão nacional a partir de novembro de 2026.'},
@@ -67,6 +71,8 @@ export function BluToolsPage(){
  useSeo(tool?.name||'Ferramentas gratuitas para câmaras e prefeituras',tool?.description||'Ferramentas gratuitas para vereadores, assessores, presidentes de câmaras e gestores municipais.');
  if(!slug) return <ToolsDashboard/>;
  if(slug==='painel-selic') return <MacroeconomiaPanel/>;
+ if(slug==='minha-empresa-pode-vender-ao-governo') return <GovernmentSupplierTool/>;
+ if(slug==='checklist-tributario-2027') return <TaxReadiness2027/>;
  if(slug==='painel-acoes-b3') return <StockMarketPanel/>;
  if(slug==='tutorial-nfse-nacional-2026') return <NationalInvoiceGuide/>;
  if(slug==='comparador-comprar-ou-alugar') return <BuyOrRentComparator/>;
