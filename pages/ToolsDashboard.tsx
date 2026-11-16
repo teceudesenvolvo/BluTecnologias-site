@@ -4,6 +4,8 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3,TrendingUp} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Receita, folha FS12 e projeção financeira de reservas para tributos.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
+ {slug:'acompanhar-simples-nacional-2027',name:'Acompanhar opção pelo Simples Nacional 2027',description:'Checklist e acesso ao resultado oficial das solicitações para 2027.',category:'Planejamento',audiences:['Empresários','Gerentes'],icon:ClipboardCheck},
  {slug:'editais-culturais-ceara',name:'Editais Culturais do Ceará',description:'Oportunidades culturais, prazos e links oficiais da Secult Ceará.',category:'Planejamento',audiences:['Prefeituras','Assessores'],icon:FileText},
  {slug:'painel-acoes-b3',name:'Painel de Ações da B3',description:'Gráficos de ações brasileiras e comparação de desempenho de PETR4, VALE3, ITUB4 e MGLU3.',category:'Finanças pessoais',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:TrendingUp},
  {slug:'painel-selic',name:'Observatório Macroeconômico do Brasil',description:'Selic, dólar, inflação, PIB mensal e atividade econômica em gráficos oficiais.',category:'Orçamento e finanças',audiences:['Câmaras','Prefeituras','Assessores','Vereadores'],icon:Landmark},
