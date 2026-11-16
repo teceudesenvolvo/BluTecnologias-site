@@ -14,10 +14,14 @@ import { StockMarketPanel } from './StockMarketPanel';
 import { CulturalNoticesPanel } from './CulturalNoticesPanel';
 import { GovernmentSupplierTool } from './GovernmentSupplierTool';
 import { TaxReadiness2027 } from './TaxReadiness2027';
+import { SimplesPlanning2027 } from './SimplesPlanning2027';
+import { SimplesOptionGuide2027 } from './SimplesOptionGuide2027';
 import { NationalInvoiceGuide } from './NationalInvoiceGuide';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
+ {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Organize receita e folha dos últimos 12 meses e projete reservas financeiras para tributos.'},
+ {slug:'acompanhar-simples-nacional-2027',name:'Acompanhar opção pelo Simples Nacional 2027',description:'Guia de consulta oficial e checklist de acompanhamento das solicitações de opção para 2027.'},
  {slug:'editais-culturais-ceara',name:'Editais Culturais do Ceará',description:'Busque editais culturais com prazos, situação e links oficiais da Secult Ceará.'},
  {slug:'minha-empresa-pode-vender-ao-governo',name:'Minha empresa pode vender ao governo?',description:'Checklist de preparação para fornecedores públicos e simulador de precificação de propostas.'},
  {slug:'checklist-tributario-2027',name:'Checklist Tributário 2027',description:'Prazos oficiais do Simples Nacional, IBS/CBS e plano de preparação para empresas.'},
@@ -76,6 +80,8 @@ export function BluToolsPage(){
  if(slug==='editais-culturais-ceara') return <CulturalNoticesPanel/>;
  if(slug==='minha-empresa-pode-vender-ao-governo') return <GovernmentSupplierTool/>;
  if(slug==='checklist-tributario-2027') return <TaxReadiness2027/>;
+ if(slug==='simulador-simples-nacional-2027') return <SimplesPlanning2027/>;
+ if(slug==='acompanhar-simples-nacional-2027') return <SimplesOptionGuide2027/>;
  if(slug==='painel-acoes-b3') return <StockMarketPanel/>;
  if(slug==='tutorial-nfse-nacional-2026') return <NationalInvoiceGuide/>;
  if(slug==='comparador-comprar-ou-alugar') return <BuyOrRentComparator/>;
