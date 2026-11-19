@@ -17,9 +17,12 @@ import { TaxReadiness2027 } from './TaxReadiness2027';
 import { SimplesPlanning2027 } from './SimplesPlanning2027';
 import { SimplesOptionGuide2027 } from './SimplesOptionGuide2027';
 import { NationalInvoiceGuide } from './NationalInvoiceGuide';
+import { ReformaTributariaCalculator, CbsRadSimulator } from './ReformaCbsTools';
 
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
+ {slug:'calculadora-reforma-tributaria',name:'Calculadora da Reforma Tributária',description:'Simule cenários hipotéticos de CBS e IBS e compare com tributos atuais.'},
+ {slug:'simulador-creditos-cbs-rad',name:'Simulador de Créditos CBS e RAD',description:'Simule cenários de créditos CBS e recolhimento pelo adquirente, sem emissão real.'},
  {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Organize receita e folha dos últimos 12 meses e projete reservas financeiras para tributos.'},
  {slug:'acompanhar-simples-nacional-2027',name:'Acompanhar opção pelo Simples Nacional 2027',description:'Guia de consulta oficial e checklist de acompanhamento das solicitações de opção para 2027.'},
  {slug:'editais-culturais-ceara',name:'Editais Culturais do Ceará',description:'Busque editais culturais com prazos, situação e links oficiais da Secult Ceará.'},
@@ -76,6 +79,8 @@ export function BluToolsPage(){
  const {slug}=useParams();const tool=tools.find(t=>t.slug===slug);
  useSeo(tool?.name||'Ferramentas gratuitas para câmaras e prefeituras',tool?.description||'Ferramentas gratuitas para vereadores, assessores, presidentes de câmaras e gestores municipais.');
  if(!slug) return <ToolsDashboard/>;
+ if(slug==='calculadora-reforma-tributaria') return <ReformaTributariaCalculator/>;
+ if(slug==='simulador-creditos-cbs-rad') return <CbsRadSimulator/>;
  if(slug==='painel-selic') return <MacroeconomiaPanel/>;
  if(slug==='editais-culturais-ceara') return <CulturalNoticesPanel/>;
  if(slug==='minha-empresa-pode-vender-ao-governo') return <GovernmentSupplierTool/>;
