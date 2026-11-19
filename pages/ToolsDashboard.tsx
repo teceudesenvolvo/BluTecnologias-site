@@ -4,6 +4,8 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3,TrendingUp} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'calculadora-reforma-tributaria',name:'Calculadora da Reforma Tributária',description:'Simule cenários hipotéticos de CBS e IBS, com memória de cálculo e CSV.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
+ {slug:'simulador-creditos-cbs-rad',name:'Simulador de Créditos CBS e RAD',description:'Avalie cenários financeiros de CBS, créditos teóricos e recolhimento pelo adquirente.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
  {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Receita, folha FS12 e projeção financeira de reservas para tributos.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
  {slug:'acompanhar-simples-nacional-2027',name:'Acompanhar opção pelo Simples Nacional 2027',description:'Checklist e acesso ao resultado oficial das solicitações para 2027.',category:'Planejamento',audiences:['Empresários','Gerentes'],icon:ClipboardCheck},
  {slug:'editais-culturais-ceara',name:'Editais Culturais do Ceará',description:'Oportunidades culturais, prazos e links oficiais da Secult Ceará.',category:'Planejamento',audiences:['Prefeituras','Assessores'],icon:FileText},
@@ -31,7 +33,7 @@ const items:Item[]=[
  {slug:'calculadora-quorum',name:'Calculadora de quórum',description:'Simule quóruns e maiorias a partir do número de parlamentares.',category:'Legislativo',audiences:['Câmaras','Assessores','Vereadores'],icon:Users}
 ];
 const categories=['Todas','Finanças pessoais','Transparência','Orçamento e finanças','Planejamento','Diagnósticos','Documentos','Legislativo'];
-const audiences=['Todos','Câmaras','Prefeituras','Assessores','Vereadores'];
+const audiences=['Todos','Empresários','Gerentes','Câmaras','Prefeituras','Assessores','Vereadores'];
 export function ToolsDashboard(){
  const [search,setSearch]=useState(''),[category,setCategory]=useState('Todas'),[audience,setAudience]=useState('Todos');
  const filtered=useMemo(()=>items.filter(t=>(category==='Todas'||t.category===category)&&(audience==='Todos'||t.audiences.includes(audience))&&[t.name,t.description,t.category].join(' ').toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[search,category,audience]);
