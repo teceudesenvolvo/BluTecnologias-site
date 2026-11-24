@@ -19,8 +19,12 @@ import { SimplesOptionGuide2027 } from './SimplesOptionGuide2027';
 import { NationalInvoiceGuide } from './NationalInvoiceGuide';
 import { ReformaTributariaCalculator, CbsRadSimulator } from './ReformaCbsTools';
 
+import { CampaignTools } from './CampaignTools';
+
 type Tool = { slug:string; name:string; description:string };
 const tools:Tool[] = [
+ {slug:'calculadora-margem-promocional',name:'Calculadora de margem promocional',description:'Simule descontos, margem, preço mínimo e ponto de equilíbrio.'},
+ {slug:'simulador-vendas-estoque',name:'Simulador de vendas e estoque',description:'Planeje faturamento, compras e caixa para campanhas comerciais.'},
  {slug:'calculadora-reforma-tributaria',name:'Calculadora da Reforma Tributária',description:'Simule cenários hipotéticos de CBS e IBS e compare com tributos atuais.'},
  {slug:'simulador-creditos-cbs-rad',name:'Simulador de Créditos CBS e RAD',description:'Simule cenários de créditos CBS e recolhimento pelo adquirente, sem emissão real.'},
  {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Organize receita e folha dos últimos 12 meses e projete reservas financeiras para tributos.'},
@@ -79,6 +83,8 @@ export function BluToolsPage(){
  const {slug}=useParams();const tool=tools.find(t=>t.slug===slug);
  useSeo(tool?.name||'Ferramentas gratuitas para câmaras e prefeituras',tool?.description||'Ferramentas gratuitas para vereadores, assessores, presidentes de câmaras e gestores municipais.');
  if(!slug) return <ToolsDashboard/>;
+ if(slug==='calculadora-margem-promocional') return <CampaignTools key={slug}/>;
+ if(slug==='simulador-vendas-estoque') return <CampaignTools key={slug} stockMode/>;
  if(slug==='calculadora-reforma-tributaria') return <ReformaTributariaCalculator/>;
  if(slug==='simulador-creditos-cbs-rad') return <CbsRadSimulator/>;
  if(slug==='painel-selic') return <MacroeconomiaPanel/>;
