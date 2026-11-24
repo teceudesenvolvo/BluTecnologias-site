@@ -4,6 +4,8 @@ import {ToolsHeroPanels} from '../components/ToolsHeroPanels';
 import {Search,LayoutGrid,Landmark,Building2,FileText,Calculator,ShieldCheck,ClipboardCheck,ArrowUpRight,Users,Layers3,TrendingUp} from 'lucide-react';
 type Item={slug:string;name:string;description:string;category:string;audiences:string[];icon:React.ComponentType<{size?:number;className?:string}>};
 const items:Item[]=[
+ {slug:'calculadora-margem-promocional',name:'Calculadora de margem promocional',description:'Descontos, margem de contribuição, preço mínimo e ponto de equilíbrio.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
+ {slug:'simulador-vendas-estoque',name:'Simulador de vendas e estoque',description:'Planeje faturamento, estoque de segurança, compras e necessidade adicional de caixa.',category:'Planejamento',audiences:['Empresários','Gerentes'],icon:TrendingUp},
  {slug:'calculadora-reforma-tributaria',name:'Calculadora da Reforma Tributária',description:'Simule cenários hipotéticos de CBS e IBS, com memória de cálculo e CSV.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
  {slug:'simulador-creditos-cbs-rad',name:'Simulador de Créditos CBS e RAD',description:'Avalie cenários financeiros de CBS, créditos teóricos e recolhimento pelo adquirente.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
  {slug:'simulador-simples-nacional-2027',name:'Planejamento do Simples Nacional 2027',description:'Receita, folha FS12 e projeção financeira de reservas para tributos.',category:'Orçamento e finanças',audiences:['Empresários','Gerentes'],icon:Calculator},
